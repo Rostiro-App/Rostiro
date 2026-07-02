@@ -182,6 +182,61 @@ export async function fetchSleeperLeagueData(
   return { league, myRoster, allRosters, userId: user.user_id }
 }
 
+// ─── Player pool (for Draft Kit ADP cache) ────────────────────────────────────
+// Sleeper has no dedicated ADP endpoint. search_rank on the full player object
+// is Sleeper's internal ranking and the accepted proxy for ADP among indie devs.
+// This payload is ~5MB — Sleeper's docs say fetch at most once/day. Only ever
+// call this from the daily cron, never from a user-facing request.
+
+const FANTASY_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE', 'K', 'DEF'])
+
+interface SleeperPlayerRaw {
+  player_id: string
+  first_name: string | null
+  last_name: string | null
+  full_name: string | null
+  position: string | null
+  team: string | null
+  status: string | null
+  injury_status: string | null
+  search_rank: number | null
+}
+
+export interface SleeperCachePlayer {
+  playerId: string
+  name: string
+  firstName: string | null
+  lastName: string | null
+  position: string
+  nflTeam: string | null
+  injuryStatus: string | null
+  adpSleeper: number
+}
+
+export async function getSleeperPlayers(): Promise<SleeperCachePlayer[]> {
+  const raw = await sleeperFetch<Record<string, SleeperPlayerRaw>>('/players/nfl')
+
+  return Object.values(raw)
+    .filter(
+      (p): p is SleeperPlayerRaw & { position: string; search_rank: number } =>
+        p.position !== null &&
+        FANTASY_POSITIONS.has(p.position) &&
+        typeof p.search_rank === 'number' &&
+        p.search_rank < 9999999 // Sleeper uses this as an "unranked" sentinel
+    )
+    .map((p) => ({
+      playerId: p.player_id,
+      name: p.full_name || `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() || p.team || p.player_id,
+      firstName: p.first_name,
+      lastName: p.last_name,
+      position: p.position,
+      nflTeam: p.team,
+      injuryStatus: p.injury_status,
+      adpSleeper: p.search_rank,
+    }))
+    .sort((a, b) => a.adpSleeper - b.adpSleeper)
+}
+
 // Fetch all leagues for a Sleeper username
 export async function fetchAllSleeperLeagues(username: string): Promise<SleeperLeagueRaw[]> {
   const user = await getSleeperUser(username)
