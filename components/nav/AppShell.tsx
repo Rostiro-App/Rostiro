@@ -1,10 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, createContext, useContext } from 'react'
 import Sidebar from './Sidebar'
 import BottomNav from './BottomNav'
 
 export type Mode = 'focused' | 'balanced' | 'savant'
+
+export const ModeContext = createContext<Mode>('balanced')
+export const useMode = () => useContext(ModeContext)
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [mode, setMode] = useState<Mode>('balanced')
@@ -27,28 +30,30 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ backgroundColor: '#0D1B2A' }}>
-      {/* Desktop sidebar — hidden on mobile */}
-      <div className="hidden md:flex">
-        <Sidebar mode={mode} onModeChange={handleModeChange} />
-      </div>
+    <ModeContext.Provider value={mode}>
+      <div className="flex h-screen overflow-hidden" style={{ backgroundColor: '#0D1B2A' }}>
+        {/* Desktop sidebar — hidden on mobile */}
+        <div className="hidden md:flex">
+          <Sidebar mode={mode} onModeChange={handleModeChange} />
+        </div>
 
-      {/* Main area */}
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        {/* Mobile top bar */}
-        <MobileHeader mode={mode} onModeChange={handleModeChange} />
+        {/* Main area */}
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          {/* Mobile top bar */}
+          <MobileHeader mode={mode} onModeChange={handleModeChange} />
 
-        {/* Page content */}
-        <main className="flex-1 overflow-y-auto pb-16 md:pb-0" style={{ backgroundColor: '#0D1B2A' }}>
-          {children}
-        </main>
+          {/* Page content */}
+          <main className="flex-1 overflow-y-auto pb-16 md:pb-0" style={{ backgroundColor: '#0D1B2A' }}>
+            {children}
+          </main>
 
-        {/* Mobile bottom nav — hidden on desktop */}
-        <div className="md:hidden">
-          <BottomNav mode={mode} onModeChange={handleModeChange} />
+          {/* Mobile bottom nav — hidden on desktop */}
+          <div className="md:hidden">
+            <BottomNav mode={mode} onModeChange={handleModeChange} />
+          </div>
         </div>
       </div>
-    </div>
+    </ModeContext.Provider>
   )
 }
 
