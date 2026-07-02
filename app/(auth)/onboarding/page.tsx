@@ -2,32 +2,41 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import ModeSelection from '@/components/onboarding/ModeSelection'
 import SleeperConnect from '@/components/onboarding/SleeperConnect'
 import YahooConnect from '@/components/onboarding/YahooConnect'
 import EspnConnect from '@/components/onboarding/EspnConnect'
 
-type Step = 'choose' | 'sleeper' | 'yahoo' | 'espn'
+type Step = 'mode' | 'connect' | 'sleeper' | 'yahoo' | 'espn'
 
 export default function OnboardingPage() {
-  const [step, setStep] = useState<Step>('choose')
+  const [step, setStep] = useState<Step>('mode')
   const [connected, setConnected] = useState<string[]>([])
   const router = useRouter()
 
   function onConnected(platform: string) {
     setConnected((prev) => [...new Set([...prev, platform])])
-    setStep('choose')
+    setStep('connect')
+  }
+
+  if (step === 'mode') {
+    return <ModeSelection onContinue={() => setStep('connect')} />
   }
 
   return (
-    <div className="min-h-screen bg-black px-4 py-12">
+    <div className="min-h-screen px-4 py-12" style={{ backgroundColor: '#0D1B2A' }}>
       <div className="max-w-lg mx-auto">
         <div className="mb-10 text-center">
-          <h1 className="text-2xl font-bold text-white tracking-tight">ROSTIRO</h1>
-          <p className="text-zinc-400 mt-2">Connect your leagues to get started.</p>
-          <p className="text-zinc-600 text-sm mt-1">Connect at least one. You can add more anytime.</p>
+          <p className="text-xs font-semibold tracking-[0.2em] uppercase mb-6" style={{ color: '#378ADD' }}>
+            ROSTIRO · Step 2 of 6
+          </p>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Connect your leagues</h1>
+          <p className="text-sm mt-2" style={{ color: '#5A7A9A' }}>
+            Connect at least one. Rostiro can&apos;t help until you do.
+          </p>
         </div>
 
-        {step === 'choose' && (
+        {step === 'connect' && (
           <div className="space-y-3">
             <PlatformCard
               name="Sleeper"
@@ -42,8 +51,8 @@ export default function OnboardingPage() {
               onClick={() => setStep('yahoo')}
             />
             <PlatformCard
-              name="ESPN"
-              description="Requires cookies from your browser. Read only."
+              name="Unlock ESPN"
+              description="Browser cookies. Read-only. Takes 2 minutes."
               connected={connected.includes('espn')}
               onClick={() => setStep('espn')}
             />
@@ -51,22 +60,29 @@ export default function OnboardingPage() {
             {connected.length > 0 && (
               <button
                 onClick={() => router.push('/dashboard')}
-                className="mt-6 w-full bg-white text-black font-semibold py-3 rounded-xl text-sm hover:bg-zinc-100 transition-colors"
+                className="mt-6 w-full font-semibold py-3 rounded-xl text-sm text-white transition-all hover:brightness-110"
+                style={{ backgroundColor: '#378ADD' }}
               >
-                Go to dashboard →
+                Continue →
               </button>
+            )}
+
+            {connected.length === 0 && (
+              <p className="text-center text-xs pt-4" style={{ color: '#3A5A7A' }}>
+                Skip is available — but your Pulse will be empty.
+              </p>
             )}
           </div>
         )}
 
         {step === 'sleeper' && (
-          <SleeperConnect onBack={() => setStep('choose')} onConnected={() => onConnected('sleeper')} />
+          <SleeperConnect onBack={() => setStep('connect')} onConnected={() => onConnected('sleeper')} />
         )}
         {step === 'yahoo' && (
-          <YahooConnect onBack={() => setStep('choose')} onConnected={() => onConnected('yahoo')} />
+          <YahooConnect onBack={() => setStep('connect')} onConnected={() => onConnected('yahoo')} />
         )}
         {step === 'espn' && (
-          <EspnConnect onBack={() => setStep('choose')} onConnected={() => onConnected('espn')} />
+          <EspnConnect onBack={() => setStep('connect')} onConnected={() => onConnected('espn')} />
         )}
       </div>
     </div>
@@ -87,20 +103,27 @@ function PlatformCard({
   return (
     <button
       onClick={onClick}
-      className="w-full bg-zinc-900 border border-zinc-800 hover:border-zinc-600 rounded-xl p-4 text-left transition-colors flex items-center justify-between group"
+      className="w-full rounded-xl p-4 text-left transition-all flex items-center justify-between group"
+      style={{
+        backgroundColor: '#0A1520',
+        border: `1.5px solid ${connected ? '#378ADD44' : '#1A3048'}`,
+      }}
     >
       <div>
         <div className="flex items-center gap-2">
           <span className="text-white font-medium">{name}</span>
           {connected && (
-            <span className="text-xs bg-green-900/50 text-green-400 border border-green-800 px-2 py-0.5 rounded-full">
+            <span
+              className="text-xs px-2 py-0.5 rounded-full font-medium"
+              style={{ backgroundColor: '#1A3D1A', color: '#4CAF72', border: '1px solid #2A5A2A' }}
+            >
               Connected
             </span>
           )}
         </div>
-        <p className="text-zinc-500 text-sm mt-0.5">{description}</p>
+        <p className="text-sm mt-0.5" style={{ color: '#5A7A9A' }}>{description}</p>
       </div>
-      <span className="text-zinc-600 group-hover:text-zinc-400 transition-colors text-lg">→</span>
+      <span className="text-lg transition-colors" style={{ color: '#3A5A7A' }}>→</span>
     </button>
   )
 }

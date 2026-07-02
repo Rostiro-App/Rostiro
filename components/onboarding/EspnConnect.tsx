@@ -43,7 +43,7 @@ export default function EspnConnect({
       step: 1,
       title: 'Open ESPN Fantasy in Chrome',
       instruction: 'Go to fantasy.espn.com and make sure you are logged in.',
-      detail: 'You must use Chrome or Edge for this step — Safari DevTools shows cookies differently.',
+      detail: 'You must use Chrome or Edge — Safari DevTools shows cookies differently.',
     },
     {
       step: 2,
@@ -54,49 +54,51 @@ export default function EspnConnect({
     {
       step: 3,
       title: 'Find your cookies',
-      instruction: 'Click the "Application" tab → expand "Cookies" in the left sidebar → click "https://www.espn.com".',
-      detail: 'You\'ll see a table of cookies. You need the values for espn_s2 and SWID.',
+      instruction: 'Click the "Application" tab → expand "Cookies" → click "https://www.espn.com".',
+      detail: 'You\'ll see a table. You need espn_s2 and SWID.',
     },
     {
       step: 4,
       title: 'Copy espn_s2 and SWID',
-      instruction: 'Click on espn_s2 in the table, copy its full value. Then do the same for SWID.',
-      detail: 'espn_s2 is a long string. SWID looks like {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}. Copy both exactly.',
+      instruction: 'Click espn_s2 in the table, copy its full value. Then do the same for SWID.',
+      detail: 'espn_s2 is a long string. SWID looks like {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}.',
     },
   ]
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-      <button onClick={onBack} className="text-zinc-500 hover:text-zinc-300 text-sm mb-5 flex items-center gap-1">
+    <div className="rounded-xl p-6" style={{ backgroundColor: '#0A1520', border: '1.5px solid #1A3048' }}>
+      <button
+        onClick={onBack}
+        className="text-sm mb-5 flex items-center gap-1"
+        style={{ color: '#5A7A9A' }}
+      >
         ← Back
       </button>
-      <h2 className="text-white font-semibold mb-1">Connect ESPN</h2>
-      <p className="text-zinc-500 text-sm mb-5">
-        ESPN doesn&apos;t have an official API, so we use your browser cookies. This is read-only — Rostiro
-        cannot make changes to your ESPN league.
+      <h2 className="text-white font-semibold mb-1">Unlock ESPN</h2>
+      <p className="text-sm mb-5" style={{ color: '#5A7A9A' }}>
+        ESPN doesn&apos;t have an official API — we use your browser cookies. Takes 2 minutes. Read-only.
       </p>
 
-      {/* Step-by-step guide */}
+      {/* Progress bar */}
       <div className="mb-5">
-        <p className="text-zinc-400 text-xs font-medium uppercase tracking-wide mb-3">
+        <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: '#378ADD55' }}>
           Step {guideStep} of 4
         </p>
         <div className="flex gap-1.5 mb-4">
           {([1, 2, 3, 4] as GuideStep[]).map((s) => (
             <div
               key={s}
-              className={`h-1 flex-1 rounded-full transition-colors ${
-                s <= guideStep ? 'bg-white' : 'bg-zinc-700'
-              }`}
+              className="h-0.5 flex-1 rounded-full transition-colors"
+              style={{ backgroundColor: s <= guideStep ? '#378ADD' : '#1A3048' }}
             />
           ))}
         </div>
 
         {steps.filter((s) => s.step === guideStep).map(({ title, instruction, detail }) => (
-          <div key={guideStep} className="bg-zinc-800 rounded-lg p-4">
+          <div key={guideStep} className="rounded-lg p-4" style={{ backgroundColor: '#07111C', border: '1px solid #1A3048' }}>
             <p className="text-white font-medium text-sm mb-1">{title}</p>
-            <p className="text-zinc-300 text-sm">{instruction}</p>
-            <p className="text-zinc-500 text-xs mt-2">{detail}</p>
+            <p className="text-sm" style={{ color: '#8AAABB' }}>{instruction}</p>
+            <p className="text-xs mt-2" style={{ color: '#5A7A9A' }}>{detail}</p>
           </div>
         ))}
 
@@ -104,23 +106,25 @@ export default function EspnConnect({
           {guideStep > 1 && (
             <button
               onClick={() => setGuideStep((s) => (s - 1) as GuideStep)}
-              className="flex-1 border border-zinc-700 text-zinc-400 py-2 rounded-lg text-sm hover:text-white transition-colors"
+              className="flex-1 py-2 rounded-lg text-sm transition-colors"
+              style={{ border: '1px solid #1A3048', color: '#5A7A9A' }}
             >
               Back
             </button>
           )}
-          {guideStep < 4 ? (
+          {guideStep < 4 && (
             <button
               onClick={() => setGuideStep((s) => (s + 1) as GuideStep)}
-              className="flex-1 bg-zinc-700 text-white py-2 rounded-lg text-sm hover:bg-zinc-600 transition-colors"
+              className="flex-1 py-2 rounded-lg text-sm text-white transition-all hover:brightness-110"
+              style={{ backgroundColor: '#1A3048' }}
             >
               Next →
             </button>
-          ) : null}
+          )}
         </div>
       </div>
 
-      {/* Credentials form — shown after completing guide */}
+      {/* Credentials form — shown on step 4 */}
       {guideStep === 4 && (
         <form onSubmit={handleConnect} className="space-y-3 mt-2">
           <input
@@ -129,7 +133,8 @@ export default function EspnConnect({
             value={leagueId}
             onChange={(e) => setLeagueId(e.target.value)}
             required
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-500"
+            className="w-full rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none"
+            style={{ backgroundColor: '#07111C', border: '1.5px solid #1A3048' }}
           />
           <textarea
             placeholder="espn_s2 value (long string)"
@@ -137,25 +142,28 @@ export default function EspnConnect({
             onChange={(e) => setEspnS2(e.target.value)}
             required
             rows={3}
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-500 resize-none font-mono text-xs"
+            className="w-full rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none resize-none font-mono"
+            style={{ backgroundColor: '#07111C', border: '1.5px solid #1A3048', fontSize: '11px' }}
           />
           <input
             type="text"
-            placeholder="SWID value  {XXXXXXXX-XXXX-...}"
+            placeholder="SWID  {XXXXXXXX-XXXX-...}"
             value={swid}
             onChange={(e) => setSwid(e.target.value)}
             required
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-500 font-mono text-xs"
+            className="w-full rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none font-mono"
+            style={{ backgroundColor: '#07111C', border: '1.5px solid #1A3048', fontSize: '11px' }}
           />
 
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+          {error && <p className="text-sm" style={{ color: '#E84040' }}>{error}</p>}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-white text-black font-semibold py-2.5 rounded-lg text-sm hover:bg-zinc-100 disabled:opacity-50 transition-colors"
+            className="w-full font-semibold py-2.5 rounded-lg text-sm text-white disabled:opacity-50 transition-all hover:brightness-110"
+            style={{ backgroundColor: '#378ADD' }}
           >
-            {loading ? 'Connecting...' : 'Connect ESPN →'}
+            {loading ? 'Connecting...' : 'Unlock ESPN →'}
           </button>
         </form>
       )}
