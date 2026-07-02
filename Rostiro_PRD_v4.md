@@ -1,11 +1,23 @@
-# ROSTIRO — Product Requirements Document v4.0
+# ROSTIRO — Product Requirements Document v4.1
 **Run Every League.**
 The operating system for fantasy sports.
 rostiro.com | July 2026 | Pass directly to Claude Code
 
 ---
 
-## Changelog from v3 → v4
+## Changelog from v4.0 → v4.1
+
+| Change | Rationale |
+|---|---|
+| "Most popular" badge removed from Focused mode | No user data to support this claim pre-launch. Replaced with "Quick & clean." |
+| Step 4 league variables collapsed to 3 upfront | Full 10-variable form causes drop-off. Show scoring format, roster type, waiver system. Rest behind "Advanced settings." |
+| iOS push friction surfaced before permission prompt | "Add to Home Screen" requirement for Safari iOS must be shown before user taps — not discovered after failure. |
+| Blue-tinted dark theme confirmed as design standard | `#0D1B2A` / `#0A1520` chosen over zinc-gray — sports data terminal aesthetic, more distinctive than generic dark SaaS. |
+| Step 6 completion toast added | Closes the loop. "Rostiro is running. You'll get your first alert Saturday at 11pm." Sets a specific expectation. |
+| Three modes confirmed: Focused / Balanced / Savant | Balanced covers the largest real user cohort — wants context, makes own decision. |
+| Mode selection moved to Step 1, before account creation | Configuring an OS before committing > signing up for a tool. |
+
+## Changelog from v3 → v4.0
 
 | Change | Rationale |
 |---|---|
@@ -85,24 +97,33 @@ ROSTIRO PULSE — Good morning, Lawrence.
 
 ### Premium Dark-First
 
-Rostiro should feel like Raycast, Linear, or Vercel — not ESPN or Yahoo. The design language is:
-- **Near-black backgrounds** (`zinc-950` / `#09090b`) — not pure black, not dark gray
-- **Subtle borders** (`zinc-800`) — structure without weight
-- **White as the action color** — primary CTAs are white on dark, not colored buttons
-- **One accent color maximum** — used sparingly for critical priority items only (e.g. `red-400` for CRITICAL pulse items)
-- **No gradients on content** — gradients only on hero/marketing surfaces
+Rostiro should feel like a Bloomberg terminal built for fantasy sports — not ESPN, not Yahoo, not generic dark SaaS. The design language is:
+- **Blue-tinted dark backgrounds** — `#0D1B2A` (page), `#0A1520` (topbar/nav), `#0F2235` (cards). Not pure black, not zinc-gray. The blue tint makes it feel like a domain-specific tool, not a generic dashboard.
+- **Subtle borders** (`#1A3050`) — structure without weight
+- **`#378ADD` as the primary accent** — used for progress, selection state, active items, and links
+- **White as the CTA color** — primary buttons are white text on `#185FA5` or white on dark
+- **One destructive accent only** — `#E24B4A` (red) for CRITICAL priority items. Nothing else uses red.
+- **Muted text: `#4A6580`** — secondary labels, timestamps, helper text
 - **Typography: Geist** — already in the stack, feels native to the product category
+- **No gradients on content** — gradients only on hero/marketing surfaces
 
 ### Information Density as Identity
 
-The product serves two distinct users. These are not modes — they are personalities:
+The product serves three distinct users. These are not modes — they are personalities:
 
-| Persona | Descriptor | What they want |
+| Persona | Tagline | What they want |
 |---|---|---|
-| **Focused** | "I have 2-3 leagues, I want to be done in 3 minutes" | 5 cards, clear verdicts, one tap to act |
-| **Savant** | "I have 4+ leagues, I want every data point" | Full portfolio view, exposure bars, Vegas lines, weather overlays |
+| **Focused** ⚡ | "Tell me what to do." | 5 max actions, verdict before reasoning, one-tap execution, stats hidden by default |
+| **Balanced** ⚖️ | "Show me the key stuff." | Decisions + most relevant supporting data inline, expandable to full detail |
+| **Savant** 🧠 | "Give me everything." | Full data layer always visible, nothing hidden, AI advisory not directive |
 
-The density choice is made at onboarding and persists. It is always changeable from the profile menu. It is never a tab or toggle mid-session — it changes the entire interface density.
+The density choice is made at onboarding Step 1 — before account creation — and persists across every session. It is always changeable from the sidebar. It shapes the entire interface: card density, data visible by default, AI voice, and Pulse item count.
+
+**Focused** — verdict shown before reasoning. Stats hidden, tap "why" to expand. Session time estimate always shown. One-tap actions, no confirmation screens.
+
+**Balanced** — matchup difficulty, injury status, weather always visible inline. Tap any item to expand to full Savant view. Trade and waiver reasoning visible by default.
+
+**Savant** — full data layer: Vegas totals, target share, snap count, usage trends, raw projection numbers, confidence intervals, opponent tendency modeling. AI recommendations shown as advisory, never directive.
 
 ### Mobile-First Rules
 
@@ -122,70 +143,102 @@ The density choice is made at onboarding and persists. It is always changeable f
 The onboarding must deliver value before asking for anything. The sequence is:
 **value hint → mode selection → lowest-friction connection → first value moment → upgrade prompt**
 
-### Step-by-Step Onboarding Flow
+### Step-by-Step Onboarding Flow — 6 Steps
 
 ```
-STEP 1 — LANDING
-"Run Every League."
-One hero. One CTA: "Get started free — no card required"
-Secondary CTA: "Try Draft Kit free →" (no account needed)
-
-STEP 2 — SIGNUP
-Email + password. No oauth friction here.
-Sub-headline: "7 days of Starter free. Cancel anytime."
-
-STEP 3 — MODE SELECTION (new in v4)
+STEP 1 — MODE SELECTION (before account creation)
+First interaction. No email asked yet.
 "How do you run your leagues?"
+Three radio cards: Focused / Balanced / Savant
+Each card shows a live preview of how that mode renders the same Pulse item.
+CTA: "Continue →"
+Stored in localStorage until account is created, then persisted to users table.
 
-  ┌─────────────────────┐  ┌─────────────────────┐
-  │    FOCUSED          │  │    SAVANT           │
-  │                     │  │                     │
-  │  2-3 leagues        │  │  4+ leagues         │
-  │  Quick decisions    │  │  Full data          │
-  │  Done in 3 min      │  │  Every edge         │
-  │                     │  │                     │
-  │  "Just tell me      │  │  "Show me           │
-  │   what to do"       │  │   everything"       │
-  └─────────────────────┘  └─────────────────────┘
+  Badges:
+  - Focused:  "Quick & clean"       ← NOT "Most popular" — no data to support pre-launch
+  - Balanced: "Recommended"
+  - Savant:   "Data heavy"
 
-  "You can change this anytime in settings."
+STEP 2 — CREATE ACCOUNT
+Email + password or magic link.
+Headline: "Your Rostiro OS is ready."
+Sub-headline: "Create your account to save it."
+Never say "Sign up." Never say "Register."
+7-day full Starter trial begins automatically on confirm.
 
-STEP 4 — CONNECT FIRST LEAGUE
-"Connect your first league to see your Pulse."
+STEP 3 — CONNECT YOUR LEAGUES
+"Connect your first league. Rostiro can't help until you do."
+Skip is available but honest — not guilt-free.
 
-  [Sleeper — No login needed]     ← lead with this
-  [Yahoo — Connect with Yahoo]
-  [ESPN — Unlock ESPN]            ← "unlock" framing, not peer
+  [Sleeper]  Username field visible immediately. Lead with this.
+  [Yahoo]    "Connect with Yahoo →" or "Coming soon — join early access"
+  [ESPN]     "Unlock ESPN →" or "Coming soon — join early access"
 
-  Sleeper is the default-open option. Username field visible immediately.
-  Yahoo and ESPN are collapsed accordions.
+  Yahoo and ESPN show "Coming soon" until integrations are fully approved.
+  Early access emails are captured and become the first paid conversion list.
 
-STEP 5 — FIRST VALUE MOMENT
-Immediately after first league connected:
-  Show a league health card with the league name
-  Show 1-2 sample Pulse items (clearly marked "preview")
-  Show: "Connect more leagues to see cross-league intelligence"
+STEP 4 — LEAGUE CONFIGURATION
+Per-league card for each connected league.
+Show only 3 variables upfront:
+  - Scoring format (Standard / Half PPR / Full PPR / TE Premium / Custom)
+  - Roster type (Standard / Superflex / 2QB / Custom)
+  - Waiver system (FAAB / Rolling / Snake / Free agent)
+All other variables (waiver cutoff, playoff weeks, trade deadline, FAAB budget,
+scoring modifiers) are behind "Advanced settings ↓" — collapsed by default.
+Yahoo and Sleeper: auto-fetch all values pre-filled. Show as "Looks right?" not a blank form.
+ESPN: manual input until auth is live.
+Never make a variable required if it can be reasonably inferred.
 
-STEP 6 — CONNECT MORE (optional, skippable)
-"Your Pulse gets smarter with every league."
-Progress indicator: "1 of your leagues connected"
-[Connect Yahoo] [Connect ESPN] [Skip — go to my dashboard]
+STEP 5 — PUSH NOTIFICATIONS
+Headline: "The Saturday night advantage."
+Sub-headline: "Injury reports drop at 11pm Saturday. Rostiro alerts you instantly
+— before your opponents even check their apps."
+Show the actual notification example FIRST, then ask permission:
 
-STEP 7 — DASHBOARD
-First real session begins.
+  ┌─────────────────────────────────────────────┐
+  │ Rostiro · now                               │
+  │ Joe Mixon is OUT. Affects 2 leagues.        │
+  │ Zach Moss is your pivot — tap to act.       │
+  └─────────────────────────────────────────────┘
+
+  🚨 Injury reports — the moment they drop
+  🌩️ Weather alerts — 30mph winds changes everything
+  ⏰ Waiver deadlines — never miss a cutoff
+  📅 Sunday morning lineup checklist
+
+iOS detection: if user agent is Safari iOS, show BEFORE the permission button:
+  "On iPhone? Tap Share → Add to Home Screen first for full alert support."
+  Do not hide this. Do not show it after failure. Show it proactively.
+
+CTA: "Enable alerts 🔔"
+Skip: "Skip — I'll check manually"
+Denied: email fallback via Resend, no blocking.
+
+STEP 6 — SYNC ANIMATION → LAND ON PULSE
+Animated sync screen (2-3 seconds minimum even if sync is faster):
+  "Syncing your leagues..."
+  "Analyzing rosters..."
+  "Building your first Pulse..."
+
+Lands directly on Pulse dashboard — never a settings page, never an empty screen.
+
+Completion toast (shown for 4 seconds after Pulse loads):
+  "Rostiro is running. You'll get your first alert Saturday at 11pm."
+  This closes the loop and sets a specific, concrete expectation.
+
+If offseason / no urgent items: show Draft Kit card as first Pulse item.
 ```
 
-### ESPN Onboarding — "Unlock ESPN" (v4 — Repositioned)
+### ESPN Onboarding — "Unlock ESPN"
 
-ESPN is not presented as equal to Sleeper or Yahoo on the onboarding screen. It is framed as an unlock:
-
-- Label: **"Unlock ESPN"** — not "Connect ESPN"
-- Position: Third, collapsed by default
-- Trigger: User clicks to expand, then sees the 4-step cookie guide
-- If user skips: Dashboard shows an "Unlock ESPN" card with a subtle prompt, never blocking
+ESPN is not a peer to Sleeper and Yahoo in the connect flow. It is an unlock:
+- Label: **"Unlock ESPN"** — never "Connect ESPN"
+- Position: Third, collapsed by default in step 3
+- 4-step animated cookie guide (DevTools → Application → Cookies → copy espn_s2 + SWID)
+- If skipped: dashboard shows a subtle "Unlock ESPN" prompt card, never blocking
 - Copy: "ESPN doesn't have an official API — we use your browser cookies. Takes 2 minutes. Read-only."
 
-This framing reduces perceived risk and sets expectations. Users who complete it feel like they've done something special, not jumped through a hoop.
+Users who complete it feel like they've done something — not jumped through a hoop.
 
 ---
 
