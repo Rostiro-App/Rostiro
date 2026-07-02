@@ -72,7 +72,7 @@ export default function EspnConnect({
       </button>
       <h2 className="text-white font-semibold mb-1">Connect ESPN</h2>
       <p className="text-zinc-500 text-sm mb-5">
-        ESPN doesn't have an official API, so we use your browser cookies. This is read-only — Rostiro
+        ESPN doesn&apos;t have an official API, so we use your browser cookies. This is read-only — Rostiro
         cannot make changes to your ESPN league.
       </p>
 

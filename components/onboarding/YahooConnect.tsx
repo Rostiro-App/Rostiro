@@ -2,7 +2,7 @@
 
 export default function YahooConnect({
   onBack,
-  onConnected: _onConnected,
+  onConnected: _onConnected, // called after OAuth redirect completes
 }: {
   onBack: () => void
   onConnected: () => void
@@ -18,7 +18,7 @@ export default function YahooConnect({
       </button>
       <h2 className="text-white font-semibold mb-1">Connect Yahoo</h2>
       <p className="text-zinc-500 text-sm mb-5">
-        You'll be redirected to Yahoo to authorize Rostiro. This allows Rostiro to read your leagues
+        You&apos;ll be redirected to Yahoo to authorize Rostiro. This allows Rostiro to read your leagues
         and submit lineup changes on your behalf.
       </p>
 

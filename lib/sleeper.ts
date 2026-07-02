@@ -2,7 +2,7 @@
 // Public REST API — no auth required. Username lookup only.
 // Rate limit: stay under 1,000 req/min. 10-second polling = 6 req/min.
 
-import { SleeperAPIError, type League, type Roster, type DraftPick, type Platform } from '@/types'
+import { SleeperAPIError } from '@/types'
 
 const BASE_URL = 'https://api.sleeper.app/v1'
 const SEASON = 2026

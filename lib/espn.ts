@@ -124,7 +124,7 @@ export async function getEspnMatchup(
 export async function getEspnWaivers(
   leagueId: string,
   credentials: EspnCredentials,
-  position?: string
+  _position?: string
 ): Promise<unknown> {
   const filter: Record<string, unknown> = {
     players: {

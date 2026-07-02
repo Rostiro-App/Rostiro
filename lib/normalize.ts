@@ -6,7 +6,6 @@ import type {
   League,
   Roster,
   Player,
-  Matchup,
   ScoringSettings,
   RosterSlot,
   NFLPosition,
@@ -94,7 +93,6 @@ export function normalizeYahooLeague(raw: any): League {
   const settings = lg?.settings ?? {}
   const statCategories = settings?.stat_categories?.stats?.stat ?? []
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const getStat = (statId: number): number => {
     const stat = statCategories.find(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -232,9 +230,7 @@ export function normalizeEspnLeague(raw: any): League {
     isHalfPpr: ppr === 0.5,
   }
 
-  const members = raw?.members ?? []
   const teams = raw?.teams ?? []
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const myTeam = teams[0] ?? {} // caller should filter to current user's team
   const record = myTeam?.record?.overall ?? { wins: 0, losses: 0, ties: 0 }
 

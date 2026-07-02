@@ -5,8 +5,7 @@ import crypto from 'crypto'
 import { EncryptionError } from '@/types'
 
 const ALGORITHM = 'aes-256-gcm'
-const IV_LENGTH = 12   // 96-bit IV, standard for GCM
-const TAG_LENGTH = 16  // 128-bit auth tag
+const IV_LENGTH = 12  // 96-bit IV, standard for GCM
 
 function getKey(): Buffer {
   const key = process.env.ENCRYPTION_KEY
