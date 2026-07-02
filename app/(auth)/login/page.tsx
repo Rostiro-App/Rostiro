@@ -7,7 +7,7 @@ import Link from 'next/link'
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [mode, setMode] = useState<'password' | 'magic'>('password')
+  const [authMode, setAuthMode] = useState<'password' | 'magic'>('password')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null)
 
@@ -24,7 +24,7 @@ export default function LoginPage() {
       return
     }
 
-    window.location.href = '/dashboard'
+    window.location.href = '/pulse'
   }
 
   async function handleMagicLink(e: React.FormEvent) {
@@ -35,7 +35,7 @@ export default function LoginPage() {
     const { error } = await browserClient.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/api/auth/callback`,
+        emailRedirectTo: `${window.location.origin}/api/auth/callback?next=/pulse`,
       },
     })
 
@@ -48,38 +48,40 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center px-4">
+    <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: '#0D1B2A' }}>
       <div className="w-full max-w-sm">
+
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-white tracking-tight">ROSTIRO</h1>
-          <p className="text-zinc-500 text-sm mt-1">Run Every League.</p>
+          <p className="text-xs font-semibold tracking-[0.2em] uppercase mb-3" style={{ color: '#378ADD' }}>
+            ROSTIRO
+          </p>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Welcome back</h1>
+          <p className="text-sm mt-1" style={{ color: '#5A7A9A' }}>Run Every League.</p>
         </div>
 
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-          <div className="flex gap-2 mb-6">
-            <button
-              onClick={() => setMode('password')}
-              className={`flex-1 py-2 text-sm rounded-lg font-medium transition-colors ${
-                mode === 'password'
-                  ? 'bg-zinc-700 text-white'
-                  : 'text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              Password
-            </button>
-            <button
-              onClick={() => setMode('magic')}
-              className={`flex-1 py-2 text-sm rounded-lg font-medium transition-colors ${
-                mode === 'magic'
-                  ? 'bg-zinc-700 text-white'
-                  : 'text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              Magic Link
-            </button>
+        <div className="rounded-xl p-6" style={{ backgroundColor: '#0A1520', border: '1.5px solid #1A3048' }}>
+
+          {/* Mode toggle */}
+          <div
+            className="flex gap-1 mb-6 p-1 rounded-lg"
+            style={{ backgroundColor: '#07111C' }}
+          >
+            {(['password', 'magic'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setAuthMode(m)}
+                className="flex-1 py-2 text-sm rounded-md font-medium transition-all"
+                style={{
+                  backgroundColor: authMode === m ? '#1A3048' : 'transparent',
+                  color: authMode === m ? '#C8DCF0' : '#3A5A7A',
+                }}
+              >
+                {m === 'password' ? 'Password' : 'Magic Link'}
+              </button>
+            ))}
           </div>
 
-          <form onSubmit={mode === 'password' ? handlePasswordLogin : handleMagicLink}>
+          <form onSubmit={authMode === 'password' ? handlePasswordLogin : handleMagicLink}>
             <div className="space-y-3">
               <input
                 type="email"
@@ -87,22 +89,27 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-500"
+                className="w-full rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none"
+                style={{ backgroundColor: '#07111C', border: '1.5px solid #1A3048' }}
               />
-              {mode === 'password' && (
+              {authMode === 'password' && (
                 <input
                   type="password"
                   placeholder="Password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-500"
+                  className="w-full rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none"
+                  style={{ backgroundColor: '#07111C', border: '1.5px solid #1A3048' }}
                 />
               )}
             </div>
 
             {message && (
-              <p className={`mt-3 text-sm ${message.type === 'error' ? 'text-red-400' : 'text-green-400'}`}>
+              <p
+                className="mt-3 text-sm"
+                style={{ color: message.type === 'error' ? '#E84040' : '#4CAF72' }}
+              >
                 {message.text}
               </p>
             )}
@@ -110,19 +117,21 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="mt-4 w-full bg-white text-black font-semibold py-2.5 rounded-lg text-sm hover:bg-zinc-100 disabled:opacity-50 transition-colors"
+              className="mt-4 w-full font-semibold py-2.5 rounded-lg text-sm text-white disabled:opacity-50 transition-all hover:brightness-110"
+              style={{ backgroundColor: '#378ADD' }}
             >
-              {loading ? 'Loading...' : mode === 'password' ? 'Sign in' : 'Send link'}
+              {loading ? 'Loading...' : authMode === 'password' ? 'Sign in →' : 'Send link →'}
             </button>
           </form>
         </div>
 
-        <p className="text-center text-zinc-600 text-sm mt-4">
+        <p className="text-center text-sm mt-4" style={{ color: '#3A5A7A' }}>
           No account?{' '}
-          <Link href="/signup" className="text-zinc-400 hover:text-white">
+          <Link href="/signup" style={{ color: '#5A7A9A' }}>
             Create one free
           </Link>
         </p>
+
       </div>
     </div>
   )
