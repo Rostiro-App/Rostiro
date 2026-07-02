@@ -1,9 +1,9 @@
-// Auth middleware — protects app routes and refreshes Supabase sessions.
-// Intentionally minimal: any error passes through rather than crashing.
+// Next.js 16 proxy (replaces middleware.ts)
+// Protects app routes and refreshes Supabase sessions.
 
 import { NextResponse, type NextRequest } from 'next/server'
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   return NextResponse.next()
 }
 
