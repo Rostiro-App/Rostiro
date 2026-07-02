@@ -63,3 +63,48 @@ export async function generateStartSitReasoning(input: StartSitReasoningInput): 
   }
   return textBlock.text.trim()
 }
+
+interface TradeReasoningInput {
+  give: Array<{ name: string; position: string; adp: number }>
+  receive: Array<{ name: string; position: string; adp: number }>
+  verdict: 'win' | 'lose' | 'even'
+  netValue: number
+}
+
+// Same split as generateStartSitReasoning: verdict and value are computed
+// deterministically from ADP before this is called (see
+// app/api/trades/analyze/route.ts) — Claude explains the numbers, it doesn't
+// decide the trade.
+export async function generateTradeReasoning(input: TradeReasoningInput): Promise<string> {
+  const anthropic = getClient()
+
+  const describe = (side: TradeReasoningInput['give']) =>
+    side.map((p) => `${p.name} (${p.position}, ADP ${Math.round(p.adp)})`).join(', ')
+
+  let message
+  try {
+    message = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 300,
+      thinking: { type: 'disabled' },
+      output_config: { effort: 'low' },
+      system:
+        'You write short, factual fantasy football trade evaluations. Use only the numbers given to you. Never invent stats, injuries, team needs, or league context that was not provided. Three to five sentences, direct, no hedging filler.',
+      messages: [
+        {
+          role: 'user',
+          content: `A manager is considering trading away ${describe(input.give)} to receive ${describe(input.receive)}. Based on ADP-implied value, this trade nets a ${input.netValue >= 0 ? '+' : ''}${input.netValue} point swing in the manager's favor, and the computed verdict is "${input.verdict}". Explain why, based only on these ADP numbers.`,
+        },
+      ],
+    })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    throw new ClaudeAPIError(`Claude request failed: ${message}`)
+  }
+
+  const textBlock = message.content.find((b) => b.type === 'text')
+  if (!textBlock || textBlock.type !== 'text') {
+    throw new ClaudeAPIError('Claude returned no text content')
+  }
+  return textBlock.text.trim()
+}
