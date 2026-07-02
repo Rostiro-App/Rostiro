@@ -19,7 +19,7 @@ import { normalizeSleeperLeague, normalizeYahooLeague, normalizeYahooDraftResult
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { YahooAPIError } from '@/types'
-import type { DraftSettings } from '@/types'
+import type { DraftSettings, ScoringSettings } from '@/types'
 
 const Body = z.discriminatedUnion('platform', [
   z.object({
@@ -52,40 +52,72 @@ async function joinSleeperDraft(data: { draftId: string; username: string }) {
 
   try {
     const draft = await getSleeperDraft(draftId)
-    const [league, rosters, sleeperUser] = await Promise.all([
-      getSleeperLeague(draft.league_id),
-      getSleeperRosters(draft.league_id),
-      getSleeperUser(username),
-    ])
+    const sleeperUser = await getSleeperUser(username)
 
-    const myRoster = rosters.find((r) => r.owner_id === sleeperUser.user_id)
-    if (!myRoster) {
-      return NextResponse.json(
-        { error: `Could not find "${username}" in this draft's league` },
-        { status: 404 }
-      )
-    }
+    let settings: DraftSettings
 
-    const mySlot = Object.entries(draft.slot_to_roster_id).find(
-      ([, rosterId]) => rosterId === myRoster.roster_id
-    )?.[0]
-    if (!mySlot) {
-      return NextResponse.json({ error: 'Could not resolve draft position for this roster' }, { status: 500 })
-    }
+    if (draft.league_id) {
+      // Real league draft — resolve identity via the actual roster.
+      const [league, rosters] = await Promise.all([
+        getSleeperLeague(draft.league_id),
+        getSleeperRosters(draft.league_id),
+      ])
 
-    const normalized = normalizeSleeperLeague(league, myRoster.roster_id)
+      const myRoster = rosters.find((r) => r.owner_id === sleeperUser.user_id)
+      if (!myRoster) {
+        return NextResponse.json(
+          { error: `Could not find "${username}" in this draft's league` },
+          { status: 404 }
+        )
+      }
 
-    const settings: DraftSettings = {
-      platform: 'sleeper',
-      leagueId: draft.league_id,
-      draftId: draft.draft_id,
-      teamCount: draft.settings.teams,
-      myDraftPosition: Number(mySlot),
-      myRosterId: String(myRoster.roster_id),
-      totalRounds: draft.settings.rounds,
-      scoringSettings: normalized.scoringSettings,
-      rosterSlots: normalized.rosterSlots,
-      isSnakeDraft: draft.type === 'snake',
+      const mySlot = Object.entries(draft.slot_to_roster_id).find(
+        ([, rosterId]) => rosterId === myRoster.roster_id
+      )?.[0]
+      if (!mySlot) {
+        return NextResponse.json({ error: 'Could not resolve draft position for this roster' }, { status: 500 })
+      }
+
+      const normalized = normalizeSleeperLeague(league, myRoster.roster_id)
+
+      settings = {
+        platform: 'sleeper',
+        leagueId: draft.league_id,
+        draftId: draft.draft_id,
+        teamCount: draft.settings.teams,
+        myDraftPosition: Number(mySlot),
+        myRosterId: String(myRoster.roster_id),
+        totalRounds: draft.settings.rounds,
+        scoringSettings: normalized.scoringSettings,
+        rosterSlots: normalized.rosterSlots,
+        isSnakeDraft: draft.type === 'snake',
+      }
+    } else {
+      // Mock draft — confirmed live (no league behind it): league_id is
+      // null, there's no roster to look up, and picks report roster_id:
+      // null. draft_order maps the user directly to a slot instead, and
+      // that same slot number (as a string) is what the picks route matches
+      // against each pick's draft_slot for isMyPick.
+      const mySlot = draft.draft_order?.[sleeperUser.user_id]
+      if (mySlot === undefined) {
+        return NextResponse.json(
+          { error: `Could not find "${username}" in this mock draft` },
+          { status: 404 }
+        )
+      }
+
+      settings = {
+        platform: 'sleeper',
+        leagueId: null,
+        draftId: draft.draft_id,
+        teamCount: draft.settings.teams,
+        myDraftPosition: mySlot,
+        myRosterId: String(mySlot),
+        totalRounds: draft.settings.rounds,
+        scoringSettings: scoringSettingsFromMockType(draft.metadata?.scoring_type),
+        rosterSlots: rosterSlotsFromDraftSettings(draft.settings),
+        isSnakeDraft: draft.type === 'snake',
+      }
     }
 
     const supabase = await createSSRClient()
@@ -95,6 +127,49 @@ async function joinSleeperDraft(data: { draftId: string; username: string }) {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
+
+// Mock drafts have no real league to normalize scoring/roster settings from
+// (normalizeSleeperLeague expects one) — build them directly from the
+// draft's own settings/metadata instead, confirmed against a live mock draft.
+function rosterSlotsFromDraftSettings(settings: {
+  rounds: number
+  slots_qb: number
+  slots_rb: number
+  slots_wr: number
+  slots_te: number
+  slots_flex: number
+  slots_k: number
+  slots_def: number
+  slots_bn?: number
+}): string[] {
+  const starters = [
+    ...Array(settings.slots_qb).fill('QB'),
+    ...Array(settings.slots_rb).fill('RB'),
+    ...Array(settings.slots_wr).fill('WR'),
+    ...Array(settings.slots_te).fill('TE'),
+    ...Array(settings.slots_flex).fill('FLEX'),
+    ...Array(settings.slots_k).fill('K'),
+    ...Array(settings.slots_def).fill('DEF'),
+  ]
+  // Mock draft settings don't include slots_bn — bench is whatever's left
+  // of the total rounds after starters.
+  const benchCount = settings.slots_bn ?? Math.max(0, settings.rounds - starters.length)
+  return [...starters, ...Array(benchCount).fill('BN')]
+}
+
+function scoringSettingsFromMockType(scoringType: 'std' | 'ppr' | 'half_ppr' | undefined): ScoringSettings {
+  const ppr = scoringType === 'ppr' ? 1 : scoringType === 'half_ppr' ? 0.5 : 0
+  return {
+    ppr,
+    tePremium: 0,
+    qbTouchdownPoints: 4,
+    passingYardsPerPoint: 1 / 25,
+    rushingYardsPerPoint: 1 / 10,
+    receivingYardsPerPoint: 1 / 10,
+    isSuperFlex: false,
+    isHalfPpr: ppr === 0.5,
   }
 }
 

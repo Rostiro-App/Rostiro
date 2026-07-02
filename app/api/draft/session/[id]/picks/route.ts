@@ -93,6 +93,11 @@ async function buildSleeperPicks(
     const position = (c?.position ?? raw.metadata?.position ?? 'BN') as NFLPosition
     const adpConsensus = c?.adp_sleeper ?? null
 
+    // Mock drafts always report roster_id: null (confirmed live) — fall
+    // back to draft_slot, which is what the join route stores as
+    // myRosterId for mock drafts (see app/api/draft/session/route.ts).
+    const teamIdentifier = raw.roster_id !== null ? String(raw.roster_id) : String(raw.draft_slot)
+
     return {
       pickNumber: raw.pick_no,
       round: raw.round,
@@ -101,8 +106,8 @@ async function buildSleeperPicks(
       playerName: name,
       position,
       nflTeam: raw.metadata?.team ?? '',
-      pickedByTeamId: String(raw.roster_id),
-      isMyPick: settings.myRosterId !== null && String(raw.roster_id) === settings.myRosterId,
+      pickedByTeamId: teamIdentifier,
+      isMyPick: settings.myRosterId !== null && teamIdentifier === settings.myRosterId,
       adpConsensus,
       adpDelta: adpConsensus !== null ? raw.pick_no - adpConsensus : null,
     }

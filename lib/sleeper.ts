@@ -77,7 +77,9 @@ interface SleeperDraftPick {
   pick_no: number
   player_id: string
   picked_by: string
-  roster_id: number
+  // Mock drafts (no real league behind them) always report roster_id: null —
+  // draft_slot is the only reliable "who picked this" identifier for them.
+  roster_id: number | null
   metadata: {
     first_name: string
     last_name: string
@@ -88,7 +90,10 @@ interface SleeperDraftPick {
 
 interface SleeperDraft {
   draft_id: string
-  league_id: string
+  // Mock drafts (started from sleeper.com/mockdraft, not tied to a real
+  // league) always report league_id: null — confirmed against a live mock
+  // draft. Real league drafts have the actual league_id.
+  league_id: string | null
   status: 'pre_draft' | 'drafting' | 'complete' | 'paused'
   type: 'snake' | 'auction' | 'linear'
   settings: {
@@ -102,9 +107,18 @@ interface SleeperDraft {
     slots_flex: number
     slots_k: number
     slots_def: number
-    slots_bn: number
+    // Confirmed absent on a live mock draft's settings object — bench count
+    // there is implied as rounds minus the sum of starter slots above.
+    slots_bn?: number
   }
   slot_to_roster_id: Record<string, number>
+  // Only present on mock drafts — maps the creating/joined user's ID
+  // directly to their draft slot, since there's no real roster to resolve it
+  // from. Confirmed live: { "<user_id>": <slot> }.
+  draft_order?: Record<string, number>
+  metadata?: {
+    scoring_type?: 'std' | 'ppr' | 'half_ppr'
+  }
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
