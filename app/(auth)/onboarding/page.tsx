@@ -59,7 +59,7 @@ export default function OnboardingPage() {
 
             {connected.length > 0 && (
               <button
-                onClick={() => router.push('/dashboard')}
+                onClick={() => router.push('/pulse')}
                 className="mt-6 w-full font-semibold py-3 rounded-xl text-sm text-white transition-all hover:brightness-110"
                 style={{ backgroundColor: '#378ADD' }}
               >

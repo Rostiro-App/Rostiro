@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rostiro — Onboarding Sequence & Mode System</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;background:#F5F4F0;color:#0E0E0E;padding:24px;font-size:15px}
+.wrap{max-width:900px;margin:0 auto;display:flex;flex-direction:column;gap:32px}
+h1{font-size:22px;font-weight:600;margin-bottom:4px}
+.subtitle{font-size:14px;color:#777;margin-bottom:8px}
+.sec-label{font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #DDD}
+.card{background:#fff;border:1px solid #E2E1DC;border-radius:12px;padding:16px 18px}
+
+/* FLOW */
+.flow{display:flex;flex-direction:column;gap:0}
+.flow-step{display:flex;gap:14px;padding-bottom:24px}
+.flow-step:last-child{padding-bottom:0}
+.step-spine{display:flex;flex-direction:column;align-items:center;flex-shrink:0}
+.step-circle{width:32px;height:32px;border-radius:50%;background:#1A4A7A;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0}
+.step-circle.green{background:#1A6641}
+.step-line{width:2px;background:#DDD;flex:1;margin:4px 0;min-height:32px}
+.step-body{flex:1;padding-top:4px}
+.step-title{font-size:14px;font-weight:600;color:#0E0E0E;margin-bottom:4px}
+.step-desc{font-size:13px;color:#555;line-height:1.6;margin-bottom:6px}
+.step-note{font-size:12px;color:#999;font-style:italic;margin-bottom:6px}
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.tag{font-size:11px;font-weight:500;padding:2px 9px;border-radius:20px}
+.tag-blue{background:#EBF2FA;color:#0C447C}
+.tag-green{background:#E8F4ED;color:#1A6641}
+.tag-amber{background:#FDF2E4;color:#B05E0A}
+.tag-gray{background:#F0F0EE;color:#666}
+
+/* MODES */
+.mode-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.mode-card{border:1.5px solid #E2E1DC;border-radius:12px;padding:16px;background:#fff}
+.mode-card.focused{border-color:#1A4A7A}
+.mode-card.balanced{border-color:#1A6641}
+.mode-card.savant{border-color:#B05E0A}
+.mode-icon{font-size:24px;margin-bottom:8px}
+.mode-name{font-size:16px;font-weight:600;margin-bottom:2px}
+.mode-tagline{font-size:12px;color:#888;font-style:italic;margin-bottom:10px}
+.mode-desc{font-size:13px;color:#444;line-height:1.55;margin-bottom:12px}
+.mode-feature{font-size:12px;color:#555;padding:3px 0;display:flex;align-items:flex-start;gap:8px;line-height:1.45}
+.dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;margin-top:5px}
+.mode-user{font-size:12px;color:#888;font-style:italic;margin-top:10px;padding-top:8px;border-top:1px solid #EEE}
+
+/* SCREENS */
+.screen-frame{background:#0D1B2A;border-radius:12px;overflow:hidden;border:1px solid #1A3050;margin-bottom:16px}
+.screen-topbar{background:#0A1520;height:42px;display:flex;align-items:center;padding:0 16px;gap:10px;border-bottom:1px solid #1A3050}
+.screen-logo{font-size:14px;font-weight:600;color:#fff}
+.screen-logo span{color:#378ADD}
+.progress-bar{flex:1;height:3px;background:#1A3050;border-radius:2px;overflow:hidden;margin:0 8px}
+.progress-fill{height:100%;border-radius:2px;background:#378ADD}
+.step-count{font-size:11px;color:#4A6580}
+.screen-body{padding:24px 20px}
+.eyebrow{font-size:11px;font-weight:600;color:#378ADD;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+.screen-h{font-size:20px;font-weight:600;color:#fff;margin-bottom:6px;line-height:1.2}
+.screen-sub{font-size:13px;color:#4A6580;line-height:1.6;margin-bottom:20px}
+
+.mode-opt{background:#0F2235;border:1px solid #1A3050;border-radius:10px;padding:13px 15px;margin-bottom:8px;cursor:pointer}
+.mode-opt.sel{border-color:#378ADD;border-width:1.5px}
+.mode-opt-header{display:flex;align-items:center;gap:10px;margin-bottom:5px}
+.radio{width:16px;height:16px;border-radius:50%;border:1.5px solid #2A4A70;flex-shrink:0;background:transparent}
+.radio.sel{background:#378ADD;border-color:#378ADD;position:relative}
+.mode-opt-name{font-size:14px;font-weight:500;color:#D0E4F5}
+.mode-opt-badge{font-size:10px;font-weight:500;padding:2px 7px;border-radius:20px;margin-left:auto}
+.mode-opt-desc{font-size:12px;color:#4A6580;line-height:1.5;margin-left:26px}
+.preview-box{background:#080F18;border-radius:6px;padding:8px 10px;margin-top:6px;margin-left:26px}
+.preview-line{font-size:11px;color:#4A6580;padding:2px 0;display:flex;align-items:center;gap:6px}
+.pdot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+
+.cta{width:100%;background:#185FA5;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:600;color:#fff;cursor:pointer;margin-top:4px}
+.skip{text-align:center;font-size:11px;color:#4A6580;margin-top:8px;cursor:pointer}
+
+.notif-preview{background:#080F18;border-left:3px solid #E24B4A;border-radius:6px;padding:12px 14px;margin-bottom:12px}
+.notif-title{font-size:12px;font-weight:600;color:#D0E4F5;margin-bottom:3px}
+.notif-body{font-size:11px;color:#4A6580;line-height:1.5}
+.notif-ex{font-size:11px;color:#4A6580;padding:4px 0;display:flex;gap:8px}
+
+/* VARS */
+.var-row{display:flex;align-items:flex-start;gap:12px;padding:8px 10px;background:#F8F9FA;border-radius:8px;border:1px solid #E2E1DC;margin-bottom:6px}
+.var-key{font-size:12px;font-weight:600;color:#0E0E0E;min-width:130px;flex-shrink:0;padding-top:2px}
+.var-opts{display:flex;flex-wrap:wrap;gap:5px}
+.var-opt{font-size:11px;padding:2px 9px;border-radius:20px;background:#EEE;color:#555;border:1px solid #DDD}
+.var-opt.def{border-color:#1A4A7A;color:#1A4A7A;background:#EBF2FA}
+
+/* BUILD NOW */
+.build-item{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid #EEE;font-size:13px;color:#444;line-height:1.6}
+.build-item:last-child{border-bottom:none;padding-bottom:0}
+.build-icon{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0;margin-top:1px}
+.bi-green{background:#E8F4ED;color:#1A6641}
+.bi-amber{background:#FDF2E4;color:#B05E0A}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div>
+    <h1>Rostiro — Onboarding Sequence & Mode System</h1>
+    <div class="subtitle">July 2, 2025 · Design reference for Claude Code</div>
+  </div>
+
+  <!-- FLOW -->
+  <div>
+    <div class="sec-label">Onboarding sequence — 6 steps</div>
+    <div class="card">
+      <div class="flow">
+
+        <div class="flow-step">
+          <div class="step-spine"><div class="step-circle">1</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">Mode selection — before account creation</div>
+            <div class="step-desc">"How do you run your leagues?" Three cards — Focused, Balanced, Savant. User picks one. This is the very first interaction — before email, before password. Sets the mental model immediately: you're configuring an OS, not signing up for a tool.</div>
+            <div class="step-note">Mode is stored in localStorage until account is created, then persisted to the users table.</div>
+            <div class="tags"><span class="tag tag-blue">Mode selection</span><span class="tag tag-gray">No auth yet</span><span class="tag tag-green">Sets identity</span></div>
+          </div>
+        </div>
+
+        <div class="flow-step">
+          <div class="step-spine"><div class="step-circle">2</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">Create account</div>
+            <div class="step-desc">Email + password or magic link. Copy: "Your Rostiro OS is ready. Create your account to save it." Framed as completing a configuration — not starting a signup. 7-day full Starter trial begins automatically on confirm.</div>
+            <div class="step-note">Never say "Sign up." Say "Save your setup" or "Activate your OS."</div>
+            <div class="tags"><span class="tag tag-blue">Email / magic link</span><span class="tag tag-green">7-day trial starts</span></div>
+          </div>
+        </div>
+
+        <div class="flow-step">
+          <div class="step-spine"><div class="step-circle">3</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">Connect your leagues</div>
+            <div class="step-desc">Connect ESPN (cookie guide), Yahoo (OAuth), Sleeper (username). Skip is available but copy is honest: "Connect later — but Rostiro can't help until you do." At least one league required to reach Pulse. ESPN and Yahoo show "Coming soon — join early access" until integrations are approved.</div>
+            <div class="step-note">Sleeper works immediately. Build the full flow with Sleeper first. ESPN and Yahoo plug in when ready.</div>
+            <div class="tags"><span class="tag tag-green">Sleeper live now</span><span class="tag tag-amber">Yahoo pending</span><span class="tag tag-amber">ESPN in progress</span></div>
+          </div>
+        </div>
+
+        <div class="flow-step">
+          <div class="step-spine"><div class="step-circle">4</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">League configuration — scoring variables</div>
+            <div class="step-desc">For each connected league: scoring format, roster slots, league size, waiver system, FAAB budget, playoff weeks, trade deadline. This is what makes Rostiro's AI league-aware instead of generic. Show as a per-league card — not a long form. Yahoo and Sleeper auto-fetch these values pre-filled. ESPN requires manual input until auth is live.</div>
+            <div class="step-note">Never make a variable required if it can be reasonably inferred. Default values shown and editable.</div>
+            <div class="tags"><span class="tag tag-blue">Auto-fetched for Yahoo/Sleeper</span><span class="tag tag-gray">Manual fallback always available</span></div>
+          </div>
+        </div>
+
+        <div class="flow-step">
+          <div class="step-spine"><div class="step-circle">5</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">Enable push notifications — the retention moment</div>
+            <div class="step-desc">Show the actual notification example first: "Joe Mixon is OUT. Affects 2 leagues. Tap to see moves." Then ask permission. THEN trigger the browser prompt. Pre-framing dramatically improves opt-in rate. iOS users get an explanation of Add to Home Screen. Denied users get email fallback via Resend.</div>
+            <div class="step-note">This is the most important step for season-long retention. Don't skip it. Don't bury it.</div>
+            <div class="tags"><span class="tag tag-blue">OneSignal web push</span><span class="tag tag-amber">iOS: Add to Home Screen</span><span class="tag tag-gray">Email fallback if denied</span></div>
+          </div>
+        </div>
+
+        <div class="flow-step">
+          <div class="step-spine"><div class="step-circle green">6</div></div>
+          <div class="step-body">
+            <div class="step-title">Your OS is live — land on Pulse</div>
+            <div class="step-desc">Animated sync screen: "Syncing your leagues... analyzing rosters... building your first Pulse." Then lands directly on the Pulse dashboard — never a settings page or empty state. The first thing the user sees is the north star experience.</div>
+            <div class="step-note">If Pulse has nothing to show yet (offseason, no active week), show a "Draft Kit ready" card pointing to rostiro.com/draft as the first action.</div>
+            <div class="tags"><span class="tag tag-green">Lands on Pulse</span><span class="tag tag-blue">First sync complete</span><span class="tag tag-green">7-day trial active</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- MODES -->
+  <div>
+    <div class="sec-label">The three modes — full definitions</div>
+    <div class="mode-grid">
+
+      <div class="mode-card focused">
+        <div class="mode-icon">⚡</div>
+        <div class="mode-name" style="color:#1A4A7A">Focused</div>
+        <div class="mode-tagline">"Tell me what to do."</div>
+        <div class="mode-desc">Rostiro makes the decisions. User executes. Everything distilled to the minimum actions needed to win this week. No noise, no data overload. In and out in under 3 minutes.</div>
+        <div class="mode-feature"><div class="dot" style="background:#1A4A7A"></div>5 prioritized actions maximum per Pulse session</div>
+        <div class="mode-feature"><div class="dot" style="background:#1A4A7A"></div>Verdict shown before reasoning — decision first, data second</div>
+        <div class="mode-feature"><div class="dot" style="background:#1A4A7A"></div>One-tap actions — no intermediate confirmation screens</div>
+        <div class="mode-feature"><div class="dot" style="background:#1A4A7A"></div>Stats hidden by default — tap "why" to see reasoning</div>
+        <div class="mode-feature"><div class="dot" style="background:#1A4A7A"></div>Estimated session time shown on every Pulse view</div>
+        <div class="mode-feature"><div class="dot" style="background:#1A4A7A"></div>Push notifications on by default</div>
+        <div class="mode-user">The manager in 5 leagues who wants to win without spending hours on Sunday morning.</div>
+      </div>
+
+      <div class="mode-card balanced">
+        <div class="mode-icon">⚖️</div>
+        <div class="mode-name" style="color:#1A6641">Balanced</div>
+        <div class="mode-tagline">"Show me the key stuff."</div>
+        <div class="mode-desc">The middle ground. Rostiro surfaces decisions with the most relevant data behind each one. User sees enough to feel in control without being overwhelmed by a full data layer.</div>
+        <div class="mode-feature"><div class="dot" style="background:#1A6641"></div>Actions shown with key supporting data inline</div>
+        <div class="mode-feature"><div class="dot" style="background:#1A6641"></div>Matchup difficulty, injury status, weather always visible</div>
+        <div class="mode-feature"><div class="dot" style="background:#1A6641"></div>Tap any item to expand to full Savant data view</div>
+        <div class="mode-feature"><div class="dot" style="background:#1A6641"></div>Cross-league exposure shown on roster view</div>
+        <div class="mode-feature"><div class="dot" style="background:#1A6641"></div>Trade and waiver reasoning visible by default</div>
+        <div class="mode-feature"><div class="dot" style="background:#1A6641"></div>ADP delta and scarcity shown on draft board</div>
+        <div class="mode-user">The manager who trusts data but still wants to make the final call with context in hand.</div>
+      </div>
+
+      <div class="mode-card savant">
+        <div class="mode-icon">🧠</div>
+        <div class="mode-name" style="color:#B05E0A">Savant</div>
+        <div class="mode-tagline">"Give me everything."</div>
+        <div class="mode-desc">Full portfolio intelligence. Every data point visible. Nothing hidden. Rostiro is the infrastructure — the manager is the analyst. Bloomberg terminal mode.</div>
+        <div class="mode-feature"><div class="dot" style="background:#B05E0A"></div>Full data layer always visible — no collapsed stats</div>
+        <div class="mode-feature"><div class="dot" style="background:#B05E0A"></div>Cross-league exposure bars on every player</div>
+        <div class="mode-feature"><div class="dot" style="background:#B05E0A"></div>Vegas totals, target share, snap count, usage trends</div>
+        <div class="mode-feature"><div class="dot" style="background:#B05E0A"></div>Raw projection numbers and confidence intervals</div>
+        <div class="mode-feature"><div class="dot" style="background:#B05E0A"></div>AI recommendations shown but never forced — advisory only</div>
+        <div class="mode-feature"><div class="dot" style="background:#B05E0A"></div>Opponent tendency modeling visible</div>
+        <div class="mode-user">The manager who already knows what they want — they want full context and confirmation, not direction.</div>
+      </div>
+
+    </div>
+    <div class="card" style="margin-top:12px">
+      <div style="font-size:13px;font-weight:600;color:#0E0E0E;margin-bottom:6px">Mode is always changeable — this is critical</div>
+      <div style="font-size:13px;color:#555;line-height:1.6">Mode lives in user settings and toggles from the sidebar at any time, including mid-session. Focused users who have a tough decision week will flip to Balanced to dig in. Savant users on a busy weekend will flip to Focused to get through it fast. The toggle earns trust both ways. Never lock anyone in.</div>
+    </div>
+  </div>
+
+  <!-- SCREEN MOCKUPS -->
+  <div>
+    <div class="sec-label">Key onboarding screens</div>
+
+    <div style="font-size:12px;color:#888;margin-bottom:8px">Step 1 — Mode selection (before account creation)</div>
+    <div class="screen-frame">
+      <div class="screen-topbar">
+        <span class="screen-logo">Ros<span>tiro</span></span>
+        <div class="progress-bar"><div class="progress-fill" style="width:16%"></div></div>
+        <span class="step-count">1 of 6</span>
+      </div>
+      <div class="screen-body">
+        <div class="eyebrow">Welcome to Rostiro</div>
+        <div class="screen-h">How do you run your leagues?</div>
+        <div class="screen-sub">This sets how Rostiro works for you. You can change it anytime.</div>
+        <div>
+          <div class="mode-opt">
+            <div class="mode-opt-header">
+              <div class="radio"></div>
+              <span style="font-size:17px">⚡</span>
+              <span class="mode-opt-name">Focused</span>
+              <span class="mode-opt-badge" style="background:#0F1F30;color:#378ADD">Most popular</span>
+            </div>
+            <div class="mode-opt-desc">Tell me what to do. Decisions not data. Get me in and out fast.</div>
+            <div class="preview-box">
+              <div class="preview-line"><div class="pdot" style="background:#E24B4A"></div>Bench Diggs — 31mph winds in Buffalo</div>
+              <div class="preview-line"><div class="pdot" style="background:#EF9F27"></div>Claim Jaylen Warren before 3pm</div>
+              <div class="preview-line" style="color:#2A4A70;font-size:10px">Est. 2 min to complete</div>
+            </div>
+          </div>
+          <div class="mode-opt sel">
+            <div class="mode-opt-header">
+              <div class="radio sel"></div>
+              <span style="font-size:17px">⚖️</span>
+              <span class="mode-opt-name">Balanced</span>
+              <span class="mode-opt-badge" style="background:#0A2010;color:#639922">Recommended</span>
+            </div>
+            <div class="mode-opt-desc">Show me decisions and the key data behind them. I'll make the call.</div>
+            <div class="preview-box">
+              <div class="preview-line"><div class="pdot" style="background:#E24B4A"></div>Bench Diggs — 31mph winds, proj drops 6.2 pts</div>
+              <div class="preview-line"><div class="pdot" style="background:#EF9F27"></div>Claim Warren — Najee Q, 38% owned, bid $18-22</div>
+            </div>
+          </div>
+          <div class="mode-opt">
+            <div class="mode-opt-header">
+              <div class="radio"></div>
+              <span style="font-size:17px">🧠</span>
+              <span class="mode-opt-name">Savant</span>
+              <span class="mode-opt-badge" style="background:#1A1A10;color:#EF9F27">Data heavy</span>
+            </div>
+            <div class="mode-opt-desc">Give me everything. Full data, I'll make my own decisions.</div>
+            <div class="preview-box">
+              <div class="preview-line"><div class="pdot" style="background:#E24B4A"></div>BUF vs MIA · Wind 31mph · Diggs proj 6.8 (↓4.2) · 3 leagues</div>
+              <div class="preview-line"><div class="pdot" style="background:#EF9F27"></div>Warren · 34% snap share · 4.2 YPC · Najee Q (knee, limited)</div>
+            </div>
+          </div>
+        </div>
+        <button class="cta">Continue →</button>
+      </div>
+    </div>
+
+    <div style="font-size:12px;color:#888;margin-bottom:8px">Step 5 — Push notification permission</div>
+    <div class="screen-frame">
+      <div class="screen-topbar">
+        <span class="screen-logo">Ros<span>tiro</span></span>
+        <div class="progress-bar"><div class="progress-fill" style="width:83%"></div></div>
+        <span class="step-count">5 of 6</span>
+      </div>
+      <div class="screen-body">
+        <div class="eyebrow">Never miss a move</div>
+        <div class="screen-h">The Saturday night advantage.</div>
+        <div class="screen-sub">Injury reports drop at 11pm Saturday. Rostiro alerts you instantly — before your opponents even check their apps.</div>
+        <div style="background:#0F2235;border:1px solid #1A3050;border-radius:10px;padding:14px;margin-bottom:16px">
+          <div class="notif-preview">
+            <div class="notif-title">Rostiro · now</div>
+            <div class="notif-body">Joe Mixon is OUT. Affects 2 leagues. Zach Moss is your pivot — tap to update lineups.</div>
+          </div>
+          <div class="notif-ex">🚨 <span>Injury reports — the moment they drop, not the morning after</span></div>
+          <div class="notif-ex">🌩️ <span>Weather alerts — 30mph winds in Buffalo changes everything</span></div>
+          <div class="notif-ex">⏰ <span>Waiver deadlines — never miss a cutoff again</span></div>
+          <div class="notif-ex">📅 <span>Sunday morning lineup checklist before kickoff</span></div>
+        </div>
+        <button class="cta">Enable alerts 🔔</button>
+        <div class="skip">Skip — I'll check manually</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LEAGUE VARIABLES -->
+  <div>
+    <div class="sec-label">League configuration variables — collected in Step 4</div>
+    <div class="card">
+      <div class="var-row"><div class="var-key">Scoring format</div><div class="var-opts"><span class="var-opt def">Standard</span><span class="var-opt">Half PPR</span><span class="var-opt">Full PPR</span><span class="var-opt">TE Premium</span><span class="var-opt">Custom</span></div></div>
+      <div class="var-row"><div class="var-key">League size</div><div class="var-opts"><span class="var-opt">8 teams</span><span class="var-opt">10 teams</span><span class="var-opt def">12 teams</span><span class="var-opt">14 teams</span><span class="var-opt">16 teams</span></div></div>
+      <div class="var-row"><div class="var-key">League type</div><div class="var-opts"><span class="var-opt def">Redraft</span><span class="var-opt">Keeper (1)</span><span class="var-opt">Keeper (3)</span><span class="var-opt">Dynasty</span><span class="var-opt">Best Ball</span></div></div>
+      <div class="var-row"><div class="var-key">Roster slots</div><div class="var-opts"><span class="var-opt def">Standard (1QB/2RB/2WR/1TE/1FLEX)</span><span class="var-opt">Superflex</span><span class="var-opt">2QB</span><span class="var-opt">Custom</span></div></div>
+      <div class="var-row"><div class="var-key">Waiver system</div><div class="var-opts"><span class="var-opt">Rolling</span><span class="var-opt def">FAAB</span><span class="var-opt">Snake (inverse)</span><span class="var-opt">Free agent</span></div></div>
+      <div class="var-row"><div class="var-key">Waiver cutoff</div><div class="var-opts"><span class="var-opt">Tuesday</span><span class="var-opt def">Wednesday</span><span class="var-opt">Thursday</span><span class="var-opt">Custom day + time</span></div></div>
+      <div class="var-row"><div class="var-key">Scoring modifiers</div><div class="var-opts"><span class="var-opt">Bonus TD yardage (40/50/100yd)</span><span class="var-opt">First down bonuses</span><span class="var-opt">Return TDs</span><span class="var-opt">Fumbles lost</span><span class="var-opt">2pt conversions</span></div></div>
+      <div class="var-row"><div class="var-key">Playoff weeks</div><div class="var-opts"><span class="var-opt">Wks 15–16</span><span class="var-opt def">Wks 15–17</span><span class="var-opt">Wks 16–17</span><span class="var-opt">Custom</span></div></div>
+      <div class="var-row"><div class="var-key">Trade deadline</div><div class="var-opts"><span class="var-opt">Week 10</span><span class="var-opt def">Week 11</span><span class="var-opt">Week 12</span><span class="var-opt">No deadline</span></div></div>
+      <div class="var-row"><div class="var-key">FAAB budget</div><div class="var-opts"><span class="var-opt">$100</span><span class="var-opt def">$200</span><span class="var-opt">$500</span><span class="var-opt">$1,000</span><span class="var-opt">Custom</span></div></div>
+      <div style="font-size:11px;color:#999;margin-top:10px;padding-top:8px;border-top:1px solid #EEE">Blue outlined = default value pre-selected. Yahoo and Sleeper: auto-fetch all values — show pre-filled and editable. ESPN: manual input until auth is live. Never make a variable required if it can be reasonably inferred.</div>
+    </div>
+  </div>
+
+  <!-- WHAT TO BUILD NOW -->
+  <div>
+    <div class="sec-label">What to build right now — while Yahoo and ESPN are pending</div>
+    <div class="card">
+      <div class="build-item"><div class="build-icon bi-green">✓</div><div><strong>Build the full onboarding flow end-to-end with Sleeper only.</strong> Sleeper needs no auth, no approval, no cookies. A user who connects their Sleeper league goes through the complete 6-step onboarding and lands on Pulse. This validates the entire flow before Yahoo and ESPN are live.</div></div>
+      <div class="build-item"><div class="build-icon bi-green">✓</div><div><strong>Build the league variables form with manual entry for all fields.</strong> When Yahoo and ESPN auto-fetch goes live, you replace manual entry with pre-filled values. The form infrastructure is the same either way — build it once.</div></div>
+      <div class="build-item"><div class="build-icon bi-green">✓</div><div><strong>Build the Draft Kit at rostiro.com/draft — no platform approval needed.</strong> Sleeper draft sync works today. This is your launch feature and acquisition channel. It can be live and shareable right now while you wait for everything else.</div></div>
+      <div class="build-item"><div class="build-icon bi-green">✓</div><div><strong>Build Pulse with Sleeper data only.</strong> The morning screen works with one league. When Yahoo and ESPN connect, Pulse gets richer. Sleeper-only users get full value from day one — and that's a real, large audience.</div></div>
+      <div class="build-item"><div class="build-icon bi-amber">→</div><div><strong>Show ESPN and Yahoo as "Coming soon — join early access" in the connect flow.</strong> Capture emails of users who want ESPN/Yahoo before it's live. That becomes your day-one paid conversion list the moment those integrations ship.</div></div>
+      <div class="build-item"><div class="build-icon bi-amber">→</div><div><strong>The mode selection, account creation, push notification, and sync screens are all fully buildable today</strong> — none of them depend on Yahoo or ESPN. Build all 6 onboarding steps now. Platforms plug in when ready.</div></div>
+    </div>
+  </div>
+
+  <div style="font-size:12px;color:#999;text-align:center;padding-bottom:8px">Rostiro Onboarding Design · July 2, 2025 · Pass to Claude Code</div>
+
+</div>
+
+<script>
+document.querySelectorAll('.mode-opt').forEach(card => {
+  card.addEventListener('click', () => {
+    document.querySelectorAll('.mode-opt').forEach(c => { c.classList.remove('sel'); c.querySelector('.radio').classList.remove('sel'); });
+    card.classList.add('sel');
+    card.querySelector('.radio').classList.add('sel');
+  });
+});
+</script>
+</body>
+</html>
