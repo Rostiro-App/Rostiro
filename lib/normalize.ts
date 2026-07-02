@@ -118,6 +118,25 @@ export function normalizeYahooLeague(raw: any): League {
   const myTeam = lg?.teams?.team?.[0] ?? {}
   const teamRecord = myTeam?.team_standings?.outcome_totals ?? {}
 
+  // roster_position is a simple repeating XML element, so Yahoo's JSON
+  // conversion gives a plain array here (unlike the numeric-string-keyed
+  // "count" object pattern used for countable resources like teams/players/
+  // draft_results elsewhere in this file) — handle both defensively since
+  // this is unverified against live Yahoo data.
+  const rawRosterPositions = settings?.roster_positions?.roster_position ?? settings?.roster_positions ?? []
+  const rosterPositionList = Array.isArray(rawRosterPositions)
+    ? rawRosterPositions
+    : Object.values(rawRosterPositions).filter((v): v is object => typeof v === 'object' && v !== null)
+  const rosterSlots: string[] = []
+  for (const entry of rosterPositionList) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rp = (entry as any)?.roster_position ?? entry
+    const position = rp?.position
+    const count = parseInt(rp?.count ?? '0', 10)
+    if (!position || !count) continue
+    for (let i = 0; i < count; i++) rosterSlots.push(position)
+  }
+
   return {
     id: '',
     platform: 'yahoo',
@@ -133,7 +152,7 @@ export function normalizeYahooLeague(raw: any): League {
       ties: parseInt(teamRecord?.ties ?? '0', 10),
     },
     scoringSettings: scoring,
-    rosterSlots: [],
+    rosterSlots,
     currentMatchup: null,
     lastSyncedAt: new Date().toISOString(),
     syncStatus: 'ok',
@@ -200,6 +219,75 @@ export function normalizeYahooRoster(raw: any, leagueId: string, teamKey: string
     bench,
     injuredReserve: ir,
   }
+}
+
+// Batch player lookup — Yahoo's draft/results only gives player_key, no
+// name, so Draft Copilot's picks route needs this to have a name/team to
+// match against players_cache. Same fantasy_content.<n>.player[0] metadata
+// traversal normalizeYahooRoster already uses per-roster-slot.
+export interface YahooPlayerRaw {
+  playerKey: string
+  name: string
+  team: string
+  position: string
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function normalizeYahooPlayers(raw: any): YahooPlayerRaw[] {
+  const playersObj = raw?.fantasy_content?.league?.[1]?.players ?? {}
+  const count = Number(playersObj.count ?? 0)
+
+  const results: YahooPlayerRaw[] = []
+  for (let i = 0; i < count; i++) {
+    const playerData = playersObj[String(i)]?.player?.[0] ?? []
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const info: Record<string, any> = {}
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    playerData.forEach((item: any) => {
+      if (item?.player_key) info.playerKey = item.player_key
+      if (item?.name) info.name = item.name
+      if (item?.editorial_team_abbr) info.team = item.editorial_team_abbr
+      if (item?.primary_position) info.position = item.primary_position
+    })
+    if (!info.playerKey) continue
+    results.push({
+      playerKey: info.playerKey,
+      name: `${info.name?.first ?? ''} ${info.name?.last ?? ''}`.trim(),
+      team: info.team ?? '',
+      position: info.position ?? '',
+    })
+  }
+  return results
+}
+
+// T-64.2: Draft Copilot — Yahoo draft results. Intermediate shape, not a full
+// DraftPick — mirrors the Sleeper split where lib/sleeper.ts returns raw
+// picks and the picks API route does the players_cache/player_mappings
+// enrichment. Keeps both platforms structurally parallel.
+export interface YahooDraftResultRaw {
+  pickNumber: number
+  round: number
+  teamKey: string
+  playerKey: string | null
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function normalizeYahooDraftResults(raw: any): YahooDraftResultRaw[] {
+  const draftResults = raw?.fantasy_content?.league?.[1]?.draft_results ?? {}
+  const count = Number(draftResults.count ?? 0)
+
+  const results: YahooDraftResultRaw[] = []
+  for (let i = 0; i < count; i++) {
+    const entry = draftResults[String(i)]?.draft_result
+    if (!entry) continue
+    results.push({
+      pickNumber: Number(entry.pick),
+      round: Number(entry.round),
+      teamKey: entry.team_key,
+      playerKey: entry.player_key ?? null,
+    })
+  }
+  return results
 }
 
 // ─── ESPN normalization ────────────────────────────────────────────────────────

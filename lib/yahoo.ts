@@ -4,6 +4,8 @@
 // Attribution required: "Fantasy data provided by Yahoo Fantasy"
 
 import { YahooAPIError } from '@/types'
+import { createAdminClient } from '@/lib/supabase'
+import { encrypt, decrypt } from '@/lib/encrypt'
 
 const YAHOO_API_BASE = 'https://fantasysports.yahooapis.com/fantasy/v2'
 const YAHOO_AUTH_URL = 'https://api.login.yahoo.com/oauth2/request_auth'
@@ -134,6 +136,47 @@ export async function refreshYahooTokens(refreshToken: string): Promise<YahooTok
   }
 }
 
+// ─── Token retrieval ────────────────────────────────────────────────────────────
+// T-64.2: the one helper every Yahoo read/write call needs — a guaranteed
+// non-expired access token for a given user, refreshing and re-persisting if
+// the stored one is stale. Draft Copilot's Yahoo support is the first real
+// caller of this; lineup/waiver/trade writes should switch to it too.
+
+const REFRESH_BUFFER_MS = 2 * 60 * 1000 // refresh if expiring within 2 minutes
+
+export async function getValidYahooAccessToken(userId: string): Promise<string> {
+  const admin = createAdminClient()
+
+  const { data: row, error } = await admin
+    .from('yahoo_tokens')
+    .select('access_token, refresh_token, expires_at')
+    .eq('user_id', userId)
+    .single()
+
+  if (error || !row) {
+    throw new YahooAPIError('No Yahoo account connected', 'YAHOO_NOT_CONNECTED', 404)
+  }
+
+  const expiresAt = new Date(row.expires_at).getTime()
+  if (expiresAt - Date.now() > REFRESH_BUFFER_MS) {
+    return decrypt(row.access_token)
+  }
+
+  const refreshed = await refreshYahooTokens(decrypt(row.refresh_token))
+
+  await admin
+    .from('yahoo_tokens')
+    .update({
+      access_token: encrypt(refreshed.accessToken),
+      refresh_token: encrypt(refreshed.refreshToken),
+      expires_at: refreshed.expiresAt.toISOString(),
+      scope: refreshed.scope,
+    })
+    .eq('user_id', userId)
+
+  return refreshed.accessToken
+}
+
 // ─── Core API fetcher ─────────────────────────────────────────────────────────
 // Always call this with a fresh access token. Token refresh is the caller's
 // responsibility — see /api/auth/yahoo/refresh route.
@@ -211,6 +254,18 @@ export async function getYahooMatchup(
   return yahooFetch(`/league/${leagueKey}/scoreboard;week=${week}`, accessToken)
 }
 
+// Yahoo's draft/results resource only returns player_key (no name) — this
+// batch-resolves names/positions/teams for a set of keys. Used by Draft
+// Copilot's picks route to give the players_cache name/team fallback-match
+// something to match against, since player_mappings is currently unseeded.
+export async function getYahooPlayersByKeys(
+  leagueKey: string,
+  playerKeys: string[],
+  accessToken: string
+): Promise<unknown> {
+  return yahooFetch(`/league/${leagueKey}/players;player_keys=${playerKeys.join(',')}`, accessToken)
+}
+
 export async function getYahooWaiverPlayers(
   leagueKey: string,
   accessToken: string,
@@ -228,6 +283,31 @@ export async function getYahooDraftResults(
   accessToken: string
 ): Promise<unknown> {
   return yahooFetch(`/league/${leagueKey}/draft/results`, accessToken)
+}
+
+// T-64.2: resolves the current season's numeric NFL game key so callers only
+// ever need the user-visible numeric league ID (from their browser URL), not
+// Yahoo's opaque league_key ("{game_key}.l.{league_id}"). Unverified against
+// live Yahoo data — best-effort per Yahoo's documented "nfl" game-code alias.
+export async function getYahooCurrentGameKey(accessToken: string): Promise<string> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const raw = await yahooFetch<any>('/game/nfl', accessToken)
+  const gameKey = raw?.fantasy_content?.game?.[0]?.game_key
+  if (!gameKey) {
+    throw new YahooAPIError('Could not resolve current NFL game key', 'YAHOO_GAME_KEY_ERROR')
+  }
+  return gameKey
+}
+
+// All teams in a league — needed to find "my team" for Draft Copilot's turn
+// prediction. Deliberately does NOT reuse normalizeYahooLeague's
+// teams.team[0] shortcut for that purpose (unverified ordering assumption);
+// callers should filter on is_owned_by_current_login instead.
+export async function getYahooLeagueTeams(
+  leagueKey: string,
+  accessToken: string
+): Promise<unknown> {
+  return yahooFetch(`/league/${leagueKey}/teams`, accessToken)
 }
 
 // ─── Write operations ──────────────────────────────────────────────────────────
@@ -321,6 +401,12 @@ export function yahooWaiverUrl(leagueKey: string): string {
 export function yahooTradeUrl(leagueKey: string): string {
   const leagueId = leagueKey.split('.l.')[1]
   return `https://football.fantasysports.yahoo.com/f1/${leagueId}/trade`
+}
+
+// Best-effort — unverified against a live Yahoo draft room this season.
+export function yahooDraftUrl(leagueKey: string): string {
+  const leagueId = leagueKey.split('.l.')[1]
+  return `https://football.fantasysports.yahoo.com/f1/${leagueId}/draftclient`
 }
 
 // ─── XML builders ─────────────────────────────────────────────────────────────

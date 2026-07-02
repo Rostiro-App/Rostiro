@@ -15,7 +15,7 @@ import {
   picksUntilMyTurn,
   type PositionRun,
 } from '@/lib/draftBoard'
-import type { ADPPlayer, DraftPick, DraftSettings, NFLPosition } from '@/types'
+import type { ADPPlayer, DraftPick, DraftSettings, NFLPosition, Platform } from '@/types'
 import type { DraftPickRecommendation } from '@/lib/claude'
 
 const POLL_INTERVAL_MS = 10_000
@@ -186,7 +186,13 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
 
   return (
     <div className="max-w-2xl mx-auto px-4 pt-6 pb-16 md:px-6 md:pt-8">
-      <TurnHeader round={currentRound} pickNumber={currentPickNumber} picksLeft={picksLeft} draftId={settings?.draftId ?? null} />
+      <TurnHeader
+        round={currentRound}
+        pickNumber={currentPickNumber}
+        picksLeft={picksLeft}
+        draftId={settings?.draftId ?? null}
+        platform={settings?.platform ?? null}
+      />
 
       {positionRun && (
         <AlertBanner
@@ -301,12 +307,24 @@ function TurnHeader({
   pickNumber,
   picksLeft,
   draftId,
+  platform,
 }: {
   round: number
   pickNumber: number
   picksLeft: number | null
   draftId: string | null
+  platform: Platform | null
 }) {
+  // Not importing lib/yahoo.ts here — it transitively pulls in
+  // lib/supabase.ts (next/headers, service-role client), which must never
+  // reach the client bundle. Inlined instead of reusing yahooDraftUrl().
+  const draftUrl = draftId
+    ? platform === 'yahoo'
+      ? `https://football.fantasysports.yahoo.com/f1/${draftId.split('.l.')[1]}/draftclient`
+      : `https://sleeper.com/draft/nfl/${draftId}`
+    : null
+  const platformLabel = platform === 'yahoo' ? 'Yahoo' : 'Sleeper'
+
   return (
     <div className="mb-4 flex items-baseline justify-between">
       <div>
@@ -320,15 +338,15 @@ function TurnHeader({
           )}
         </p>
       </div>
-      {draftId && (
+      {draftUrl && (
         <a
-          href={`https://sleeper.com/draft/nfl/${draftId}`}
+          href={draftUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="text-xs font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap transition-all hover:brightness-110"
           style={{ backgroundColor: '#378ADD22', color: '#378ADD' }}
         >
-          Draft on Sleeper →
+          Draft on {platformLabel} →
         </a>
       )}
     </div>

@@ -1,35 +1,77 @@
 'use client'
 
-// T-64.1: entry point for Draft Copilot — join a live/mock Sleeper draft by
-// draft ID + username, land on the live companion view.
+// T-64.1/T-64.2: entry point for Draft Copilot — join a live/mock draft
+// (Sleeper or Yahoo), land on the live companion view.
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import type { Platform } from '@/types'
+
+type SupportedPlatform = Extract<Platform, 'sleeper' | 'yahoo'>
 
 export default function JoinDraftPage() {
   const router = useRouter()
+  const [platform, setPlatform] = useState<SupportedPlatform>('sleeper')
+
   const [draftId, setDraftId] = useState('')
   const [username, setUsername] = useState('')
+  const [yahooLeagueId, setYahooLeagueId] = useState('')
+  const [manualSlot, setManualSlot] = useState('')
+  const [needsManualSlot, setNeedsManualSlot] = useState(false)
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [errorLink, setErrorLink] = useState<{ href: string; label: string } | null>(null)
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  async function submitJoin(body: Record<string, unknown>) {
     setLoading(true)
     setError(null)
+    setErrorLink(null)
     try {
       const res = await fetch('/api/draft/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ draftId: draftId.trim(), username: username.trim() }),
+        body: JSON.stringify(body),
       })
       const data = await res.json()
+
+      if (res.status === 409 && data.error === 'needs_manual_slot') {
+        setNeedsManualSlot(true)
+        setLoading(false)
+        return
+      }
+      if (res.status === 401 && data.error === 'sign_in_required') {
+        setError("You'll need to sign in first.")
+        setErrorLink({ href: '/login', label: 'Sign in →' })
+        setLoading(false)
+        return
+      }
+      if (res.status === 401 && data.error === 'yahoo_not_connected') {
+        setError("Connect a Yahoo account first — you haven't linked one yet.")
+        setErrorLink({ href: '/onboarding', label: 'Connect Yahoo →' })
+        setLoading(false)
+        return
+      }
       if (!res.ok) throw new Error(data.error ?? 'Failed to join draft')
+
       router.push(`/draft/session/${data.sessionId}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to join draft')
       setLoading(false)
     }
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (platform === 'sleeper') {
+      submitJoin({ platform: 'sleeper', draftId: draftId.trim(), username: username.trim() })
+      return
+    }
+    const body: Record<string, unknown> = { platform: 'yahoo', yahooLeagueId: yahooLeagueId.trim() }
+    if (needsManualSlot && manualSlot.trim()) {
+      body.manualDraftPosition = Number(manualSlot.trim())
+    }
+    submitJoin(body)
   }
 
   return (
@@ -43,42 +85,113 @@ export default function JoinDraftPage() {
         </span>
         <h1 className="text-2xl font-bold text-white tracking-tight">Join your live draft</h1>
         <p className="text-sm mt-2" style={{ color: '#5A7A9A' }}>
-          Draft on Sleeper as normal. Rostiro tracks it live alongside you: always-current best available, a heads-up before your turn, and an alert the moment a run starts or your target gets sniped.
+          Draft on {platform === 'sleeper' ? 'Sleeper' : 'Yahoo'} as normal. Rostiro tracks it live alongside you: always-current best available, a heads-up before your turn, and an alert the moment a run starts or your target gets sniped.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="rounded-xl p-5 space-y-4" style={{ backgroundColor: '#0A1520', border: '1px solid #1A3048' }}>
-        <div>
-          <label className="text-xs font-medium block mb-1.5" style={{ color: '#5A7A9A' }}>Sleeper draft ID</label>
-          <input
-            type="text"
-            value={draftId}
-            onChange={(e) => setDraftId(e.target.value)}
-            placeholder="e.g. 1128176747251396608"
-            required
-            className="w-full text-sm px-3 py-2.5 rounded-lg outline-none"
-            style={{ backgroundColor: '#07111C', border: '1px solid #1A3048', color: 'white' }}
-          />
-          <p className="text-xs mt-1" style={{ color: '#3A5A7A' }}>
-            The number at the end of your Sleeper draft URL.
-          </p>
-        </div>
+      <div className="flex gap-1.5 mb-4 justify-center">
+        {(['sleeper', 'yahoo'] as const).map((p) => (
+          <button
+            key={p}
+            onClick={() => {
+              setPlatform(p)
+              setNeedsManualSlot(false)
+              setError(null)
+            }}
+            className="text-xs font-semibold px-4 py-1.5 rounded-lg transition-all"
+            style={{
+              backgroundColor: platform === p ? '#378ADD' : '#0A1520',
+              color: platform === p ? 'white' : '#5A7A9A',
+              border: `1px solid ${platform === p ? '#378ADD' : '#1A3048'}`,
+            }}
+          >
+            {p === 'sleeper' ? 'Sleeper' : 'Yahoo'}
+          </button>
+        ))}
+      </div>
 
-        <div>
-          <label className="text-xs font-medium block mb-1.5" style={{ color: '#5A7A9A' }}>Your Sleeper username</label>
-          <input
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="e.g. lordelightskin"
-            required
-            className="w-full text-sm px-3 py-2.5 rounded-lg outline-none"
-            style={{ backgroundColor: '#07111C', border: '1px solid #1A3048', color: 'white' }}
-          />
-        </div>
+      <form onSubmit={handleSubmit} className="rounded-xl p-5 space-y-4" style={{ backgroundColor: '#0A1520', border: '1px solid #1A3048' }}>
+        {platform === 'sleeper' ? (
+          <>
+            <div>
+              <label className="text-xs font-medium block mb-1.5" style={{ color: '#5A7A9A' }}>Sleeper draft ID</label>
+              <input
+                type="text"
+                value={draftId}
+                onChange={(e) => setDraftId(e.target.value)}
+                placeholder="e.g. 1128176747251396608"
+                required
+                className="w-full text-sm px-3 py-2.5 rounded-lg outline-none"
+                style={{ backgroundColor: '#07111C', border: '1px solid #1A3048', color: 'white' }}
+              />
+              <p className="text-xs mt-1" style={{ color: '#3A5A7A' }}>
+                The number at the end of your Sleeper draft URL.
+              </p>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium block mb-1.5" style={{ color: '#5A7A9A' }}>Your Sleeper username</label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="e.g. lordelightskin"
+                required
+                className="w-full text-sm px-3 py-2.5 rounded-lg outline-none"
+                style={{ backgroundColor: '#07111C', border: '1px solid #1A3048', color: 'white' }}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <div>
+              <label className="text-xs font-medium block mb-1.5" style={{ color: '#5A7A9A' }}>Yahoo league ID</label>
+              <input
+                type="text"
+                value={yahooLeagueId}
+                onChange={(e) => setYahooLeagueId(e.target.value)}
+                placeholder="e.g. 729259"
+                required
+                className="w-full text-sm px-3 py-2.5 rounded-lg outline-none"
+                style={{ backgroundColor: '#07111C', border: '1px solid #1A3048', color: 'white' }}
+              />
+              <p className="text-xs mt-1" style={{ color: '#3A5A7A' }}>
+                The number in your Yahoo league URL: fantasy.football.yahoo.com/f1/<strong>{'{this number}'}</strong>. Requires a Yahoo account already connected to Rostiro.
+              </p>
+            </div>
+
+            {needsManualSlot && (
+              <div>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: '#5A7A9A' }}>
+                  Your draft slot / position number
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={manualSlot}
+                  onChange={(e) => setManualSlot(e.target.value)}
+                  placeholder="e.g. 4"
+                  required
+                  className="w-full text-sm px-3 py-2.5 rounded-lg outline-none"
+                  style={{ backgroundColor: '#07111C', border: '1px solid #1A3048', color: 'white' }}
+                />
+                <p className="text-xs mt-1" style={{ color: '#3A5A7A' }}>
+                  Your draft hasn&apos;t started yet, so Rostiro can&apos;t auto-detect this. It&apos;s usually set by your commissioner ahead of time.
+                </p>
+              </div>
+            )}
+          </>
+        )}
 
         {error && (
-          <p className="text-sm" style={{ color: '#E84040' }}>{error}</p>
+          <div>
+            <p className="text-sm" style={{ color: '#E84040' }}>{error}</p>
+            {errorLink && (
+              <a href={errorLink.href} className="text-sm font-semibold mt-1 inline-block" style={{ color: '#378ADD' }}>
+                {errorLink.label}
+              </a>
+            )}
+          </div>
         )}
 
         <button
@@ -87,7 +200,7 @@ export default function JoinDraftPage() {
           className="w-full text-sm font-semibold px-4 py-3 rounded-xl text-white transition-all hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed"
           style={{ backgroundColor: '#378ADD' }}
         >
-          {loading ? 'Joining...' : 'Join draft'}
+          {loading ? 'Joining...' : needsManualSlot ? 'Continue' : 'Join draft'}
         </button>
       </form>
     </div>
