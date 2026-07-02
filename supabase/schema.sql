@@ -223,6 +223,7 @@ create table public.draft_sessions (
   settings_json jsonb not null default '{}',
   picks_json    jsonb not null default '[]',
   my_picks_json jsonb not null default '[]',
+  queue_json    jsonb not null default '[]', -- T-64.1: queued/starred target player IDs, priority order
   grade_json    jsonb,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()

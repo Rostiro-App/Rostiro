@@ -1,9 +1,16 @@
-# ROSTIRO — Product Requirements Document v4.1
+# ROSTIRO — Product Requirements Document v4.2
 **Run Every League.**
 The operating system for fantasy sports.
 rostiro.com | July 2026 | Pass directly to Claude Code
 
 ---
+
+## Changelog from v4.1 → v4.2
+
+| Change | Rationale |
+|---|---|
+| Draft Copilot added to Draft Kit (6.3.1) | The real drafting pain isn't pre-draft rankings — it's the mid-draft panic moment when a run starts, your target gets sniped, and the clock hits single digits. Live tracking + pre-fetched recommendations turn that panic moment into a solved problem instead of a scramble. |
+| Draft Kit reframed as companion, not draft room | Sleeper/ESPN/Yahoo have no draft-submission write API — confirmed in 5.1. Rostiro tracks and advises in real time; the user still clicks the pick on the platform's own site. Deep-link, don't replace. |
 
 ## Changelog from v4.0 → v4.1
 
@@ -357,6 +364,21 @@ This gives the dashboard a reason to exist even when there's no urgent Pulse ite
 > **ACQUISITION FUNNEL:** Free. No account required to start.
 
 User flow unchanged from v3. Key addition: Sleeper auto-sync is the default demo path in all marketing — zero friction, best technical sync.
+
+### 6.3.1 Draft Copilot — Live Panic-Proofing (v4.2 — new)
+
+> **THE PROBLEM:** Pre-draft rankings solve the wrong moment. The moment that actually costs a manager their draft is mid-draft: a run starts, three picks go off-plan, a targeted player gets sniped, and the clock drops under 10 seconds while the manager re-derives "okay, given what's gone, who do I actually take" from scratch. That's the moment Rostiro needs to have already solved.
+
+**Access constraint (see 5.1):** no platform exposes a draft-submission write API. Rostiro tracks the draft in real time and advises — the manager still makes the pick on the platform's own site. Sleeper's live draft picks endpoint (`GET /draft/{draft_id}/picks`) is polled every 10 seconds per 5.4; no manual refresh.
+
+**Four pieces, shipped together as v1 — they solve one problem, not four separate ones:**
+
+1. **Always-current board.** The full player pool is cached locally (`players_cache`); a pick landing on the next poll removes that player from "available" instantly. No per-view API call — this is a local filter over already-cached data, updated on every 10-second poll.
+2. **Turn prediction.** From snake draft position + team count + current pick number, Rostiro computes every future pick number that belongs to the manager (`myNextPickNumbers`) and therefore how many picks remain until their turn.
+3. **Pre-fetched recommendations.** When the manager is within ~3 picks of their turn, Rostiro generates Claude's reasoning for the top best-available-by-need candidates *before* the clock starts — never during it. The explanation is already rendered the instant the panic moment arrives. A live Claude call during a sub-10-second window is the wrong architecture; a call two picks earlier, during calm time, is the right one.
+4. **Run + snipe alerts.** Three or more picks at one position within a short window surfaces a "position run in progress" flag, unprompted. If a manager has queued (starred) a target player and someone else takes them, Rostiro surfaces the next-best option immediately instead of waiting for the manager to notice and re-scan.
+
+**What Claude does and doesn't decide, consistent with 6.4/6.5:** best-available filtering and turn prediction are deterministic (ADP + roster need + draft position math). Claude only writes the explanation for candidates the deterministic layer already surfaced — it is never the thing deciding who's recommended.
 
 ### 6.4 Start/Sit Engine
 

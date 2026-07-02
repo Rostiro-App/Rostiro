@@ -133,6 +133,20 @@ export async function getSleeperDrafts(leagueId: string): Promise<SleeperDraft[]
   return sleeperFetch<SleeperDraft[]>(`/league/${leagueId}/drafts`)
 }
 
+// Fetch a single draft directly by ID — used to join a live/mock draft when
+// the caller only has a draft_id (e.g. pasted from a Sleeper draft URL),
+// not the league_id.
+export async function getSleeperDraft(draftId: string): Promise<SleeperDraft> {
+  return sleeperFetch<SleeperDraft>(`/draft/${draftId}`)
+}
+
+// Fetch a league directly by ID (as opposed to getSleeperLeagues, which
+// lists a user's leagues for a season). Used to pull scoring settings and
+// roster slots when joining a draft from just a draft_id.
+export async function getSleeperLeague(leagueId: string): Promise<SleeperLeague> {
+  return sleeperFetch<SleeperLeague>(`/league/${leagueId}`)
+}
+
 export async function getSleeperDraftPicks(draftId: string): Promise<SleeperDraftPick[]> {
   return sleeperFetch<SleeperDraftPick[]>(`/draft/${draftId}/picks`)
 }

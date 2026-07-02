@@ -108,3 +108,96 @@ export async function generateTradeReasoning(input: TradeReasoningInput): Promis
   }
   return textBlock.text.trim()
 }
+
+interface DraftRecommendationCandidate {
+  playerId: string
+  name: string
+  position: string
+  adp: number
+}
+
+export interface DraftPickRecommendation {
+  playerId: string
+  reasoning: string
+}
+
+interface DraftRecommendationsInput {
+  candidates: DraftRecommendationCandidate[]
+  round: number
+  pickNumber: number
+  rosterSoFar: Array<{ name: string; position: string }>
+}
+
+const RECOMMENDATION_SCHEMA = {
+  type: 'object',
+  properties: {
+    recommendations: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          playerId: { type: 'string' },
+          reasoning: { type: 'string' },
+        },
+        required: ['playerId', 'reasoning'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['recommendations'],
+  additionalProperties: false,
+} as const
+
+// T-64.1: called ~2-3 picks before the manager's turn (pre-fetch, never
+// during the live clock — see PRD 6.3.1). Candidates and their ADP are
+// already the deterministic best-available-by-need list computed by
+// lib/draftBoard.ts; Claude only writes why each one fits right now.
+export async function generateDraftPickRecommendations(
+  input: DraftRecommendationsInput
+): Promise<DraftPickRecommendation[]> {
+  const anthropic = getClient()
+
+  const candidateList = input.candidates
+    .map((c) => `- ${c.name} (${c.position}, ADP ${Math.round(c.adp)}, id: ${c.playerId})`)
+    .join('\n')
+  const rosterList = input.rosterSoFar.length > 0
+    ? input.rosterSoFar.map((p) => `${p.name} (${p.position})`).join(', ')
+    : 'no picks yet'
+
+  let message
+  try {
+    message = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 700,
+      thinking: { type: 'disabled' },
+      output_config: {
+        effort: 'low',
+        format: { type: 'json_schema', schema: RECOMMENDATION_SCHEMA },
+      },
+      system:
+        'You write short, factual fantasy football draft pick explanations. Use only the ADP numbers, positions, and roster given to you. Never invent stats, injuries, or team needs that were not provided. One to two sentences per player, direct, no hedging filler.',
+      messages: [
+        {
+          role: 'user',
+          content: `It is round ${input.round}, pick ${input.pickNumber} of a live snake draft. The manager's roster so far: ${rosterList}. Here are the best available candidates for their next pick:\n${candidateList}\n\nFor each candidate, explain in 1-2 sentences why they might be the pick, based only on their ADP relative to the other candidates and how they fit the roster built so far.`,
+        },
+      ],
+    })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    throw new ClaudeAPIError(`Claude request failed: ${message}`)
+  }
+
+  const textBlock = message.content.find((b) => b.type === 'text')
+  if (!textBlock || textBlock.type !== 'text') {
+    throw new ClaudeAPIError('Claude returned no text content')
+  }
+
+  let parsed: { recommendations: DraftPickRecommendation[] }
+  try {
+    parsed = JSON.parse(textBlock.text)
+  } catch {
+    throw new ClaudeAPIError('Claude returned malformed JSON for draft recommendations')
+  }
+  return parsed.recommendations
+}

@@ -133,6 +133,7 @@ export interface DraftSettings {
   draftId: string | null
   teamCount: number
   myDraftPosition: number
+  myRosterId: string | null // platform's internal roster/team ID — used to match picks to "isMyPick"
   totalRounds: number
   scoringSettings: ScoringSettings
   rosterSlots: string[]

@@ -1,0 +1,350 @@
+'use client'
+
+// T-64.1: Draft Copilot live companion. Polls picks every 10s (matching
+// Sleeper's own recommended cadence); best-available, turn countdown, run
+// detection, and snipe detection are all computed locally from that poll —
+// no extra API calls per view. Claude is only called once, pre-fetched a few
+// picks before the manager's turn, per PRD 6.3.1.
+
+import { use, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  computeBestAvailable,
+  computeMyPickNumbers,
+  detectPositionRun,
+  findSnipedQueueTargets,
+  picksUntilMyTurn,
+  type PositionRun,
+} from '@/lib/draftBoard'
+import type { ADPPlayer, DraftPick, DraftSettings, NFLPosition } from '@/types'
+import type { DraftPickRecommendation } from '@/lib/claude'
+
+const POLL_INTERVAL_MS = 10_000
+const PREFETCH_THRESHOLD = 3
+const NEEDED_POSITIONS: NFLPosition[] = ['QB', 'RB', 'WR', 'TE', 'K']
+
+export default function DraftSessionPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: sessionId } = use(params)
+
+  const [settings, setSettings] = useState<DraftSettings | null>(null)
+  const [queue, setQueue] = useState<string[]>([])
+  const [pool, setPool] = useState<ADPPlayer[]>([])
+  const [picks, setPicks] = useState<DraftPick[]>([])
+  const [myPicks, setMyPicks] = useState<DraftPick[]>([])
+  const [currentPickNumber, setCurrentPickNumber] = useState(1)
+  const [recommendations, setRecommendations] = useState<DraftPickRecommendation[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [positionFilter, setPositionFilter] = useState<NFLPosition | 'ALL'>('ALL')
+
+  const recommendedForPick = useRef<number | null>(null)
+  const seenSnipes = useRef<Set<string>>(new Set())
+  const [freshSnipes, setFreshSnipes] = useState<string[]>([])
+
+  // Load session settings + queue, and the full ADP pool, once.
+  useEffect(() => {
+    fetch(`/api/draft/session/${sessionId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setSettings(data.session.settings_json)
+        setQueue(data.session.queue_json ?? [])
+      })
+      .catch(() => setError('Failed to load draft session'))
+
+    fetch('/api/draft/players')
+      .then((res) => res.json())
+      .then((data: { players: ADPPlayer[] }) => setPool(data.players))
+      .catch(() => setError('Failed to load player pool'))
+  }, [sessionId])
+
+  // Poll picks every 10 seconds.
+  useEffect(() => {
+    let cancelled = false
+
+    async function poll() {
+      try {
+        const res = await fetch(`/api/draft/session/${sessionId}/picks`)
+        const data = await res.json()
+        if (cancelled) return
+        if (!res.ok) throw new Error(data.error ?? 'Failed to poll picks')
+        setPicks(data.picks)
+        setMyPicks(data.myPicks)
+        setCurrentPickNumber(data.currentPickNumber)
+      } catch {
+        if (!cancelled) setError('Lost connection to the draft — retrying...')
+      }
+    }
+
+    poll()
+    const interval = setInterval(poll, POLL_INTERVAL_MS)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [sessionId])
+
+  const draftedIds = useMemo(() => new Set(picks.map((p) => p.playerId)), [picks])
+
+  const rosterCounts = useMemo(() => {
+    const counts: Partial<Record<NFLPosition, number>> = {}
+    for (const p of myPicks) counts[p.position] = (counts[p.position] ?? 0) + 1
+    return counts
+  }, [myPicks])
+
+  const rosterNeeds = useMemo(() => {
+    const needs: Partial<Record<NFLPosition, number>> = {}
+    if (!settings) return needs
+    for (const slot of settings.rosterSlots) {
+      const pos = slot as NFLPosition
+      if (NEEDED_POSITIONS.includes(pos)) needs[pos] = (needs[pos] ?? 0) + 1
+    }
+    return needs
+  }, [settings])
+
+  const bestAvailable = useMemo(
+    () => computeBestAvailable(pool, draftedIds, rosterNeeds, rosterCounts),
+    [pool, draftedIds, rosterNeeds, rosterCounts]
+  )
+
+  const filteredBestAvailable = useMemo(
+    () => (positionFilter === 'ALL' ? bestAvailable : bestAvailable.filter((p) => p.position === positionFilter)),
+    [bestAvailable, positionFilter]
+  )
+
+  const myPickNumbers = useMemo(
+    () => (settings ? computeMyPickNumbers(settings.myDraftPosition, settings.teamCount, settings.totalRounds) : []),
+    [settings]
+  )
+  const picksLeft = picksUntilMyTurn(myPickNumbers, currentPickNumber)
+  const currentRound = settings ? Math.ceil(currentPickNumber / settings.teamCount) : 1
+
+  const positionRun: PositionRun | null = useMemo(() => detectPositionRun(picks), [picks])
+
+  // Track newly-sniped queue targets (only alert once per player).
+  useEffect(() => {
+    const sniped = findSnipedQueueTargets(queue, draftedIds)
+    const fresh = sniped.filter((id) => !seenSnipes.current.has(id))
+    if (fresh.length > 0) {
+      fresh.forEach((id) => seenSnipes.current.add(id))
+      setFreshSnipes((prev) => [...prev, ...fresh])
+      setQueue((prev) => prev.filter((id) => !sniped.includes(id)))
+    }
+  }, [draftedIds, queue])
+
+  // Pre-fetch recommendations once we're within range of the manager's turn.
+  useEffect(() => {
+    if (picksLeft === null || picksLeft > PREFETCH_THRESHOLD || bestAvailable.length === 0) return
+    const targetPick = currentPickNumber + picksLeft
+    if (recommendedForPick.current === targetPick) return
+    recommendedForPick.current = targetPick
+
+    fetch(`/api/draft/session/${sessionId}/recommend`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        round: currentRound,
+        pickNumber: targetPick,
+        rosterSoFar: myPicks.map((p) => ({ name: p.playerName, position: p.position })),
+        candidates: bestAvailable.slice(0, 5).map((p) => ({
+          playerId: p.playerId,
+          name: p.name,
+          position: p.position,
+          adp: p.adpConsensus,
+        })),
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.recommendations) setRecommendations(data.recommendations)
+      })
+      .catch(() => {
+        // Silent — the deterministic best-available board still works without Claude's reasoning
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [picksLeft, currentPickNumber])
+
+  function toggleQueue(playerId: string) {
+    const next = queue.includes(playerId) ? queue.filter((id) => id !== playerId) : [...queue, playerId]
+    setQueue(next)
+    fetch(`/api/draft/session/${sessionId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ queue: next }),
+    }).catch(() => {
+      // Persisting the queue is best-effort — it still works client-side for this session
+    })
+  }
+
+  if (error && !settings) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 pt-12 text-center">
+        <p className="text-sm" style={{ color: '#E84040' }}>{error}</p>
+      </div>
+    )
+  }
+
+  const recommendationByPlayerId = new Map(recommendations.map((r) => [r.playerId, r.reasoning]))
+  const showPanicPanel = picksLeft !== null && picksLeft <= PREFETCH_THRESHOLD
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 pt-6 pb-16 md:px-6 md:pt-8">
+      <TurnHeader round={currentRound} pickNumber={currentPickNumber} picksLeft={picksLeft} draftId={settings?.draftId ?? null} />
+
+      {positionRun && (
+        <AlertBanner
+          color="#F59E0B"
+          text={`${positionRun.position} run in progress — ${positionRun.count} of the last ${positionRun.windowSize} picks were ${positionRun.position}.`}
+        />
+      )}
+
+      {freshSnipes.length > 0 && (
+        <AlertBanner
+          color="#E84040"
+          text={`Your queued target${freshSnipes.length > 1 ? 's were' : ' was'} just drafted by someone else. Check the best-available list below for your next option.`}
+          onDismiss={() => setFreshSnipes([])}
+        />
+      )}
+
+      {showPanicPanel && (
+        <div
+          className="rounded-xl p-4 mb-4"
+          style={{ backgroundColor: '#0A1520', border: '1px solid #378ADD', borderLeft: '3px solid #378ADD' }}
+        >
+          <p className="text-xs font-semibold tracking-widest uppercase mb-3" style={{ color: '#378ADD' }}>
+            {picksLeft === 0 ? "You're on the clock" : `Your turn in ${picksLeft} pick${picksLeft === 1 ? '' : 's'}`}
+          </p>
+          {recommendations.length === 0 ? (
+            <p className="text-sm" style={{ color: '#5A7A9A' }}>Preparing recommendations...</p>
+          ) : (
+            <div className="space-y-3">
+              {bestAvailable.slice(0, 5).map((p) => {
+                const reasoning = recommendationByPlayerId.get(p.playerId)
+                if (!reasoning) return null
+                return (
+                  <div key={p.playerId}>
+                    <p className="text-sm font-semibold text-white">{p.name} <span className="text-xs font-normal" style={{ color: '#3A5A7A' }}>{p.position} · ADP {Math.round(p.adpConsensus)}</span></p>
+                    <p className="text-sm mt-0.5" style={{ color: '#8AAABB' }}>{reasoning}</p>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="flex gap-1.5 mb-3 overflow-x-auto pb-1">
+        {(['ALL', ...NEEDED_POSITIONS] as const).map((pos) => (
+          <button
+            key={pos}
+            onClick={() => setPositionFilter(pos)}
+            className="flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all"
+            style={{
+              backgroundColor: positionFilter === pos ? '#378ADD' : '#0A1520',
+              color: positionFilter === pos ? 'white' : '#5A7A9A',
+              border: `1px solid ${positionFilter === pos ? '#378ADD' : '#1A3048'}`,
+            }}
+          >
+            {pos}
+          </button>
+        ))}
+      </div>
+
+      <div className="rounded-xl overflow-hidden mb-4" style={{ border: '1px solid #1A3048' }}>
+        {filteredBestAvailable.slice(0, 20).map((p, i) => (
+          <div
+            key={p.playerId}
+            className="flex items-center gap-3 px-4 py-2.5"
+            style={{ backgroundColor: '#0A1520', borderTop: i === 0 ? 'none' : '1px solid #1A3048' }}
+          >
+            <button
+              onClick={() => toggleQueue(p.playerId)}
+              className="flex-shrink-0 text-base"
+              style={{ color: queue.includes(p.playerId) ? '#F59E0B' : '#3A5A7A' }}
+              aria-label="Toggle target"
+            >
+              {queue.includes(p.playerId) ? '★' : '☆'}
+            </button>
+            <span className="text-xs font-semibold flex-shrink-0 w-9" style={{ color: '#3A5A7A' }}>
+              ADP {Math.round(p.adpConsensus)}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-white truncate">{p.name}</p>
+              <p className="text-xs truncate" style={{ color: '#3A5A7A' }}>{p.position} · {p.nflTeam || 'FA'}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <h2 className="text-sm font-semibold text-white mb-2">My roster ({myPicks.length})</h2>
+      <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #1A3048' }}>
+        {myPicks.length === 0 ? (
+          <div className="px-4 py-3" style={{ backgroundColor: '#0A1520' }}>
+            <p className="text-sm" style={{ color: '#5A7A9A' }}>No picks yet.</p>
+          </div>
+        ) : (
+          myPicks.map((p, i) => (
+            <div
+              key={p.playerId}
+              className="flex items-center justify-between px-4 py-2.5"
+              style={{ backgroundColor: '#0A1520', borderTop: i === 0 ? 'none' : '1px solid #1A3048' }}
+            >
+              <p className="text-sm font-medium text-white">{p.playerName}</p>
+              <span className="text-xs" style={{ color: '#3A5A7A' }}>{p.position} · Round {p.round}</span>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
+
+function TurnHeader({
+  round,
+  pickNumber,
+  picksLeft,
+  draftId,
+}: {
+  round: number
+  pickNumber: number
+  picksLeft: number | null
+  draftId: string | null
+}) {
+  return (
+    <div className="mb-4 flex items-baseline justify-between">
+      <div>
+        <h1 className="text-2xl font-bold text-white tracking-tight">Draft Copilot</h1>
+        <p className="text-sm mt-0.5" style={{ color: '#5A7A9A' }}>
+          Round {round} · Pick {pickNumber}
+          {picksLeft !== null && (
+            <span style={{ color: picksLeft <= 1 ? '#E84040' : picksLeft <= 3 ? '#F59E0B' : '#3A5A7A' }}>
+              {' '}· {picksLeft === 0 ? 'you\'re up' : `${picksLeft} to your turn`}
+            </span>
+          )}
+        </p>
+      </div>
+      {draftId && (
+        <a
+          href={`https://sleeper.com/draft/nfl/${draftId}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap transition-all hover:brightness-110"
+          style={{ backgroundColor: '#378ADD22', color: '#378ADD' }}
+        >
+          Draft on Sleeper →
+        </a>
+      )}
+    </div>
+  )
+}
+
+function AlertBanner({ color, text, onDismiss }: { color: string; text: string; onDismiss?: () => void }) {
+  return (
+    <div
+      className="rounded-xl px-4 py-3 mb-3 flex items-start justify-between gap-3"
+      style={{ backgroundColor: `${color}12`, border: `1px solid ${color}40` }}
+    >
+      <p className="text-sm" style={{ color }}>{text}</p>
+      {onDismiss && (
+        <button onClick={onDismiss} className="text-sm flex-shrink-0" style={{ color }}>×</button>
+      )}
+    </div>
+  )
+}

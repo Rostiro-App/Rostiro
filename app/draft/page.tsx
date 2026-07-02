@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { useMode } from '@/components/nav/AppShell'
 import type { ADPPlayer, NFLPosition } from '@/types'
 
@@ -71,6 +72,18 @@ export default function DraftPage() {
             </span>
           )}
         </div>
+        <Link
+          href="/draft/join"
+          className="flex items-center justify-between gap-3 rounded-xl px-4 py-3 mb-4 transition-all hover:brightness-110"
+          style={{ backgroundColor: '#378ADD18', border: '1px solid #378ADD40' }}
+        >
+          <div>
+            <p className="text-sm font-semibold" style={{ color: '#378ADD' }}>Drafting right now? Try Draft Copilot →</p>
+            <p className="text-xs mt-0.5" style={{ color: '#5A7A9A' }}>
+              Live tracking during your actual draft — best available, a heads-up before your turn, and an alert the moment a run starts.
+            </p>
+          </div>
+        </Link>
         <p className="text-sm mt-0.5" style={{ color: '#5A7A9A' }}>
           Consensus ADP from Sleeper · {players.length} players
         </p>
