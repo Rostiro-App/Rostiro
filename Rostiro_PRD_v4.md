@@ -1,9 +1,16 @@
-# ROSTIRO — Product Requirements Document v4.2
+# ROSTIRO — Product Requirements Document v4.3
 **Run Every League.**
 The operating system for fantasy sports.
 rostiro.com | July 2026 | Pass directly to Claude Code
 
 ---
+
+## Changelog from v4.2 → v4.3
+
+| Change | Rationale |
+|---|---|
+| Draft Copilot platform research added (5.6) | Researched whether Yahoo/ESPN/CBS/NFL/Fantrax/MFL can support live draft tracking like Sleeper. Yahoo confirmed viable (official API, already has an unused `getYahooDraftResults` function). CBS and NFL Fantasy ruled out — no viable API surface. MFL and Fantrax confirmed viable, no OAuth needed. ESPN's `mDraftDetail` lead from v3 was never actually tested for read-only tracking — re-opened, not ruled out. |
+| MyFantasyLeague pulled forward in priority (5.5) | Turns out to have one of the most open fantasy APIs in the industry, live-draft-capable with no OAuth — easier to build than CBS/NFL, worth prioritizing above them in Phase 2. |
 
 ## Changelog from v4.1 → v4.2
 
@@ -289,12 +296,25 @@ Users who complete it feel like they've done something — not jumped through a 
 
 ### 5.5 Phase 2 Platform Connectors
 
-| Platform | Priority |
-|---|---|
-| CBS Sports Commissioner | Phase 2 |
-| NFL Fantasy | Phase 2 |
-| Fantrax | Phase 2 |
-| MyFantasyLeague (MFL) | Phase 2 |
+| Platform | Priority | Draft Copilot viability (researched July 2026) |
+|---|---|---|
+| CBS Sports Commissioner | Phase 2 | **Not viable.** Legacy fantasy developer API is deprecated — `developer.cbssports.com` no longer resolves. Would need a different, unofficial approach if revisited. |
+| NFL Fantasy | Phase 2 | **Not viable.** No discoverable stable public API. Long-standing known gap in the fantasy-dev community — NFL.com has always been the hardest platform to pull data from programmatically. |
+| Fantrax | Phase 2 | **Viable.** Unofficial but well-documented `fxea` endpoints (`fantrax.com/fxea/general/getDraftPicks?leagueId=...`, `getTeamRosters`), no authentication required. Docs explicitly note results "can be retrieved live during a draft." |
+| MyFantasyLeague (MFL) | Phase 2 — **pull forward** | **Viable, arguably the easiest of the four.** MFL's official "Developer's Open API" is one of the most open in the industry — long-time favorite of fantasy-nerd tooling. Explicitly supports live draft polling, down to auction-in-progress detection ("if a player has been nominated but no winning bid specified, the auction is currently underway"). No OAuth. Recommend pulling this ahead of CBS/NFL given how little friction it'd take.
+
+### 5.6 Draft Copilot Platform Support (research findings, July 2026)
+
+> Context: v4.2 added Draft Copilot (6.3.1) — live tracking + pre-fetched recommendations during an actual draft. This section tracks which platforms can support it and why.
+
+| Platform | Status | Notes |
+|---|---|---|
+| Sleeper | **Shipped** | `GET /draft/{draft_id}/picks`, public, no auth, poll every 10s. See 5.4. |
+| Yahoo | **In progress** | Official API already has `getYahooDraftResults()` (`/league/{leagueKey}/draft/results`) in `lib/yahoo.ts`, unused until now. Yahoo's own docs: "If called during the draft, it includes the players that have been drafted thus far" — confirmed live-capable, not just post-draft. Requires OAuth (already built) — unlike Sleeper, this is **not** a no-account path; user must have already connected a Yahoo league. |
+| ESPN | **Re-open for testing** | v3 PRD flagged an unofficial `?view=mDraftDetail` endpoint — ESPN's own React draft room calls it internally — as untested-but-promising for **read-only** live tracking. This got dropped when v4 reframed ESPN as write-incapable (that part is still correct — no official write API — but read-only tracking was never actually ruled out, just never verified). Needs a 10-minute mock-draft test: poll it every 10s during an active ESPN mock draft, confirm the picks array grows. |
+| MyFantasyLeague (MFL) | **Recommended next after Yahoo** | See 5.5 — no OAuth, confirmed live-capable including auction state. |
+| Fantrax | **Candidate** | See 5.5 — no-auth endpoints, documented as live-capable. |
+| CBS Sports / NFL Fantasy | **Ruled out** | See 5.5 — no viable API surface for either. |
 
 ---
 
