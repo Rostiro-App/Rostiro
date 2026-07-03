@@ -2,8 +2,6 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
-import { type Mode, ModeButton, ModeSwitcher } from './AppShell'
 
 const NAV_ITEMS = [
   {
@@ -63,9 +61,10 @@ const NAV_ITEMS = [
   },
 ]
 
-export default function Sidebar({ mode, onModeChange }: { mode: Mode; onModeChange: (m: Mode) => void }) {
+// T-67: wordmark and mode chip moved up into the SystemBar — the sidebar is
+// nav only now.
+export default function Sidebar() {
   const pathname = usePathname()
-  const [switcherOpen, setSwitcherOpen] = useState(false)
 
   return (
     <>
@@ -73,15 +72,6 @@ export default function Sidebar({ mode, onModeChange }: { mode: Mode; onModeChan
         className="w-60 flex flex-col h-full flex-shrink-0"
         style={{ backgroundColor: '#0A1520', borderRight: '1px solid #1A3048' }}
       >
-        {/* Wordmark + mode chip */}
-        <div className="px-5 pt-6 pb-4 flex-shrink-0">
-          <span className="text-white font-bold tracking-[0.15em] text-sm block mb-3">ROSTIRO</span>
-          <ModeButton mode={mode} onClick={() => setSwitcherOpen(true)} />
-        </div>
-
-        {/* Divider */}
-        <div style={{ height: '1px', backgroundColor: '#1A3048', margin: '0 20px' }} />
-
         {/* Nav items */}
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
           {NAV_ITEMS.map((item) => {
@@ -122,14 +112,6 @@ export default function Sidebar({ mode, onModeChange }: { mode: Mode; onModeChan
           </form>
         </div>
       </aside>
-
-      {switcherOpen && (
-        <ModeSwitcher
-          current={mode}
-          onSelect={(m) => { onModeChange(m); setSwitcherOpen(false) }}
-          onClose={() => setSwitcherOpen(false)}
-        />
-      )}
     </>
   )
 }

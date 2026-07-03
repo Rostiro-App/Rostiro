@@ -291,6 +291,45 @@ export interface PlayerExposure {
   injuryAlert: boolean
 }
 
+// ─── OS Shell: League Health + System Status (PRD 6.2 / 6.7 W1-W2) ───────────
+
+export type LeagueHealthStatus = 'healthy' | 'monitor' | 'action' | 'unknown'
+
+export interface LeagueHealthFactor {
+  key: 'injury' | 'bye' | 'waiver' | 'matchup' | 'depth'
+  label: string
+  weight: number // PRD 6.2 weights: 30/20/20/20/10
+  score: number | null // null = data source not available yet (honest degradation)
+  note: string | null // shown when score is null, e.g. "Loads Week 1"
+}
+
+export interface LeagueHealth {
+  score: number | null // weighted average over available factors; null if none
+  status: LeagueHealthStatus
+  factors: LeagueHealthFactor[]
+  topFlag: string | null // most actionable one-liner, e.g. "2 starters OUT"
+}
+
+export interface SystemStatusLeague {
+  id: string // connected_leagues.id
+  name: string
+  platform: Platform
+  health: LeagueHealth
+}
+
+export interface SystemDeadline {
+  kind: 'draft' | 'waivers'
+  label: string // e.g. "Draft"
+  leagueName: string
+  at: string // ISO timestamp
+}
+
+export interface SystemStatus {
+  syncedAt: string
+  leagues: SystemStatusLeague[]
+  nextDeadline: SystemDeadline | null
+}
+
 // ─── Error Classes ─────────────────────────────────────────────────────────────
 
 export class AppError extends Error {

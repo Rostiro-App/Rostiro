@@ -96,6 +96,9 @@ interface SleeperDraft {
   league_id: string | null
   status: 'pre_draft' | 'drafting' | 'complete' | 'paused'
   type: 'snake' | 'auction' | 'linear'
+  // Unix ms of the scheduled draft start; null when the commissioner hasn't
+  // scheduled it. Used by /api/system/status for the deadline countdown.
+  start_time?: number | null
   settings: {
     teams: number
     rounds: number
