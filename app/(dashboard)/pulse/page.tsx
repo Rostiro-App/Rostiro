@@ -165,7 +165,7 @@ export default function PulsePage() {
         <AllClearState doneToday={doneToday} />
       )}
       {!loading && items.length > 0 && (
-        <div className={mode === 'focused' ? 'space-y-2' : 'space-y-3'}>
+        <div className={mode === 'balanced' ? 'space-y-3' : 'space-y-2'}>
           {items.map((item) => (
             <PulseCard
               key={item.id}
@@ -321,11 +321,11 @@ function BalancedCard({ item, border, typeConf, onAction }: CardProps) {
   )
 }
 
-// Savant — everything visible, no hidden data
+// Savant — everything visible, no hidden data; denser than Balanced (T-71)
 function SavantCard({ item, border, typeConf, onAction }: CardProps) {
   return (
     <div
-      className="rounded-xl p-4"
+      className="rounded-xl p-3"
       style={{ backgroundColor: '#0A1520', border: '1px solid #1A3048', borderLeft: `3px solid ${border}` }}
     >
       <div className="flex items-start justify-between gap-2 mb-1">

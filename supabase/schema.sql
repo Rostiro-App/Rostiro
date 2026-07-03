@@ -21,6 +21,10 @@ create table public.users (
   stripe_subscription_id  text,
   intelligence_addon      boolean not null default false,
   push_enabled            boolean not null default false,
+  -- T-71: UI mode follows the user across devices; localStorage is only the
+  -- pre-signup cache.
+  mode                    text not null default 'balanced'
+                            check (mode in ('focused', 'balanced', 'savant')),
   created_at              timestamptz not null default now(),
   updated_at              timestamptz not null default now()
 );

@@ -6,6 +6,13 @@
 alter table public.draft_sessions
   add column if not exists queue_json jsonb not null default '[]';
 
+-- ─── T-71: Mode persists to the users table (closes T-51) ─────────────────────
+-- localStorage remains the pre-signup cache; once signed in, this column is
+-- the source of truth so mode follows the user across devices.
+alter table public.users
+  add column if not exists mode text not null default 'balanced'
+  check (mode in ('focused', 'balanced', 'savant'));
+
 -- ─── T-69: Pulse persistence — fingerprint + lifecycle state ──────────────────
 -- fingerprint: stable identity for a piece of intelligence (e.g.
 -- "injury:<league>:<player>:<status>") so regeneration can tell "same item,

@@ -24,3 +24,14 @@ body {
     padding-bottom: env(safe-area-inset-bottom);
   }
 }
+
+/* T-71: terminal tick — brief flash when a live value updates. Applied by
+   re-keying the element on the value it tracks (key change remounts and
+   replays the animation). */
+@keyframes rostiro-tick {
+  0% { color: #ffffff; }
+  100% { color: inherit; }
+}
+.value-tick {
+  animation: rostiro-tick 600ms ease-out;
+}

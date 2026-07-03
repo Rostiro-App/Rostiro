@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useSyncExternalStore } from 'react'
+import { createContext, useContext, useEffect, useSyncExternalStore } from 'react'
 import Sidebar from './Sidebar'
 import BottomNav from './BottomNav'
 import SystemBar from './SystemBar'
@@ -11,10 +11,12 @@ export type Mode = 'focused' | 'balanced' | 'savant'
 export const ModeContext = createContext<Mode>('balanced')
 export const useMode = () => useContext(ModeContext)
 
-// Mode lives in localStorage (until T-71 moves the source of truth to the
-// users table) — read via useSyncExternalStore so React handles the
-// server/client mismatch itself: SSR renders the default, hydration swaps in
-// the stored value, and the 'storage' listener keeps multiple tabs in sync.
+// T-71: the users table is the source of truth for signed-in users; mode
+// follows them across devices. localStorage stays as the pre-signup cache
+// and the synchronous read path — read via useSyncExternalStore so React
+// handles the server/client mismatch itself: SSR renders the default,
+// hydration swaps in the cached value, DB hydration corrects it if another
+// device changed it, and the 'storage' listener keeps tabs in sync.
 const MODE_KEY = 'rostiro_mode'
 const MODE_EVENT = 'rostiro:mode-change'
 const VALID_MODES: readonly Mode[] = ['focused', 'balanced', 'savant']
@@ -33,12 +35,44 @@ function readMode(): Mode {
   return VALID_MODES.includes(stored as Mode) ? (stored as Mode) : 'balanced'
 }
 
+// Single write path for mode: local cache + cross-tab event + best-effort DB
+// persist. Exported so Settings changes mode through the exact same door.
+export function setGlobalMode(next: Mode) {
+  localStorage.setItem(MODE_KEY, next)
+  window.dispatchEvent(new Event(MODE_EVENT))
+  // Fire-and-forget: 401 (anonymous Draft Kit visitor) and 503 (mode column
+  // not migrated yet) both just mean localStorage stays authoritative.
+  fetch('/api/settings', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode: next }),
+  }).catch(() => {})
+}
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const mode = useSyncExternalStore(subscribeToMode, readMode, () => 'balanced' as Mode)
 
+  // Hydrate from the DB once per mount — if another device changed the mode,
+  // the local cache catches up here.
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/settings')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { mode: Mode | null } | null) => {
+        if (cancelled || !data?.mode || !VALID_MODES.includes(data.mode)) return
+        if (data.mode !== readMode()) {
+          localStorage.setItem(MODE_KEY, data.mode)
+          window.dispatchEvent(new Event(MODE_EVENT))
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   function handleModeChange(next: Mode) {
-    localStorage.setItem(MODE_KEY, next)
-    window.dispatchEvent(new Event(MODE_EVENT))
+    setGlobalMode(next)
   }
 
   return (

@@ -111,7 +111,9 @@ export default function SystemBar({
               boxShadow: syncing ? '0 0 5px #378ADD' : '0 0 5px #4CAF7280',
             }}
           />
-          <span className="hidden sm:inline">{syncLabel}</span>
+          {/* Re-keyed on each successful poll so the label ticks exactly
+              when the data is actually fresh, not every second. */}
+          <span key={lastSyncAt ?? 0} className="hidden sm:inline value-tick">{syncLabel}</span>
         </span>
 
         {/* League health dots */}
