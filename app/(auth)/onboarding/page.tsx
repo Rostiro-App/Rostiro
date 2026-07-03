@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import ModeSelection from '@/components/onboarding/ModeSelection'
 import SleeperConnect from '@/components/onboarding/SleeperConnect'
 import YahooConnect from '@/components/onboarding/YahooConnect'
@@ -9,12 +9,34 @@ import EspnConnect from '@/components/onboarding/EspnConnect'
 
 type Step = 'mode' | 'connect' | 'sleeper' | 'yahoo' | 'espn'
 
-export default function OnboardingPage() {
-  const [step, setStep] = useState<Step>('mode')
-  const [connected, setConnected] = useState<string[]>([])
+const CONNECT_ERRORS: Record<string, string> = {
+  yahoo_auth_failed: 'Yahoo connection failed. Please try again.',
+  espn_auth_failed: 'ESPN connection failed — check your cookies and try again.',
+}
+
+function OnboardingFlow() {
+  const searchParams = useSearchParams()
+  const errorParam = searchParams.get('error')
   const router = useRouter()
 
+  // A failed OAuth/cookie connect redirects back here as a full page
+  // navigation (not a client route change), which remounts this component
+  // and would otherwise silently drop the user back to step 1 with no
+  // indication anything failed. Land on 'connect' with the error surfaced
+  // instead of resetting the whole flow.
+  const [step, setStep] = useState<Step>(errorParam ? 'connect' : 'mode')
+  const [connected, setConnected] = useState<string[]>([])
+  const [connectError, setConnectError] = useState<string | null>(
+    errorParam ? (CONNECT_ERRORS[errorParam] ?? 'That connection failed. Please try again.') : null
+  )
+
+  useEffect(() => {
+    if (errorParam) router.replace('/onboarding')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   function onConnected(platform: string) {
+    setConnectError(null)
     setConnected((prev) => [...new Set([...prev, platform])])
     setStep('connect')
   }
@@ -35,6 +57,15 @@ export default function OnboardingPage() {
             Connect at least one. Rostiro can&apos;t help until you do.
           </p>
         </div>
+
+        {connectError && (
+          <div
+            className="mb-4 rounded-lg px-4 py-3 text-sm"
+            style={{ backgroundColor: 'rgba(226,75,74,0.12)', border: '1px solid rgba(226,75,74,0.35)', color: '#E24B4A' }}
+          >
+            {connectError}
+          </div>
+        )}
 
         {step === 'connect' && (
           <div className="space-y-3">
@@ -86,6 +117,14 @@ export default function OnboardingPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function OnboardingPage() {
+  return (
+    <Suspense fallback={null}>
+      <OnboardingFlow />
+    </Suspense>
   )
 }
 

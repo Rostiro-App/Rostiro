@@ -26,7 +26,12 @@ export function getYahooAuthUrl(state: string): string {
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: 'code',
-    scope: 'fspt-r fspt-w',
+    // Yahoo's Fantasy Sports permission is a single app-level grant (Read
+    // or Read/Write, chosen at app registration) — not a combinable OAuth
+    // scope list. Requesting "fspt-r fspt-w" together is an invalid scope
+    // and Yahoo rejects it before ever showing the consent screen. fspt-w
+    // (Read/Write) is a superset of read, matching what Rostiro needs.
+    scope: 'fspt-w',
     state,
   })
 
