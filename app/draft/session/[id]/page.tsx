@@ -18,7 +18,7 @@ import {
 import type { ADPPlayer, DraftPick, DraftSettings, NFLPosition, Platform } from '@/types'
 import type { DraftPickRecommendation } from '@/lib/claude'
 
-const POLL_INTERVAL_MS = 10_000
+const POLL_INTERVAL_MS = 5_000
 const PREFETCH_THRESHOLD = 3
 const NEEDED_POSITIONS: NFLPosition[] = ['QB', 'RB', 'WR', 'TE', 'K']
 
@@ -36,8 +36,10 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
   const [positionFilter, setPositionFilter] = useState<NFLPosition | 'ALL'>('ALL')
 
   const recommendedForPick = useRef<number | null>(null)
+  const recommendedPlayerIds = useRef<Set<string>>(new Set())
   const seenSnipes = useRef<Set<string>>(new Set())
   const [freshSnipes, setFreshSnipes] = useState<string[]>([])
+  const pollRef = useRef<() => void>(() => {})
 
   // Load session settings + queue, and the full ADP pool, once.
   useEffect(() => {
@@ -55,11 +57,14 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
       .catch(() => setError('Failed to load player pool'))
   }, [sessionId])
 
-  // Poll picks every 10 seconds.
+  const [polling, setPolling] = useState(false)
+
+  // Poll picks on an interval, plus a manual refresh for "check right now."
   useEffect(() => {
     let cancelled = false
 
     async function poll() {
+      setPolling(true)
       try {
         const res = await fetch(`/api/draft/session/${sessionId}/picks`)
         const data = await res.json()
@@ -68,11 +73,15 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
         setPicks(data.picks)
         setMyPicks(data.myPicks)
         setCurrentPickNumber(data.currentPickNumber)
+        setError(null)
       } catch {
         if (!cancelled) setError('Lost connection to the draft — retrying...')
+      } finally {
+        if (!cancelled) setPolling(false)
       }
     }
 
+    pollRef.current = poll
     poll()
     const interval = setInterval(poll, POLL_INTERVAL_MS)
     return () => {
@@ -129,12 +138,30 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
     }
   }, [draftedIds, queue])
 
+  // If the board shifts enough before the manager's turn that a recommended
+  // player is no longer available, the old recommendation set is stale —
+  // clear it and let the effect below re-fetch against the current board
+  // instead of silently rendering nothing (the bug that showed up live:
+  // recommendations were fetched once and never revisited).
+  useEffect(() => {
+    if (recommendedPlayerIds.current.size === 0) return
+    const anyDrafted = [...recommendedPlayerIds.current].some((id) => draftedIds.has(id))
+    if (anyDrafted) {
+      recommendedForPick.current = null
+      recommendedPlayerIds.current = new Set()
+      setRecommendations([])
+    }
+  }, [draftedIds])
+
   // Pre-fetch recommendations once we're within range of the manager's turn.
   useEffect(() => {
     if (picksLeft === null || picksLeft > PREFETCH_THRESHOLD || bestAvailable.length === 0) return
     const targetPick = currentPickNumber + picksLeft
     if (recommendedForPick.current === targetPick) return
     recommendedForPick.current = targetPick
+
+    const candidates = bestAvailable.slice(0, 5)
+    recommendedPlayerIds.current = new Set(candidates.map((p) => p.playerId))
 
     fetch(`/api/draft/session/${sessionId}/recommend`, {
       method: 'POST',
@@ -143,7 +170,7 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
         round: currentRound,
         pickNumber: targetPick,
         rosterSoFar: myPicks.map((p) => ({ name: p.playerName, position: p.position })),
-        candidates: bestAvailable.slice(0, 5).map((p) => ({
+        candidates: candidates.map((p) => ({
           playerId: p.playerId,
           name: p.name,
           position: p.position,
@@ -181,7 +208,7 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
     )
   }
 
-  const recommendationByPlayerId = new Map(recommendations.map((r) => [r.playerId, r.reasoning]))
+  const poolByPlayerId = new Map(pool.map((p) => [p.playerId, p]))
   const showPanicPanel = picksLeft !== null && picksLeft <= PREFETCH_THRESHOLD
 
   return (
@@ -192,6 +219,8 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
         picksLeft={picksLeft}
         draftId={settings?.draftId ?? null}
         platform={settings?.platform ?? null}
+        onRefresh={() => pollRef.current()}
+        refreshing={polling}
       />
 
       {positionRun && (
@@ -221,13 +250,17 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
             <p className="text-sm" style={{ color: '#5A7A9A' }}>Preparing recommendations...</p>
           ) : (
             <div className="space-y-3">
-              {bestAvailable.slice(0, 5).map((p) => {
-                const reasoning = recommendationByPlayerId.get(p.playerId)
-                if (!reasoning) return null
+              {recommendations.map((rec) => {
+                // Render from the recommendation itself, not the live top-5 —
+                // if the board shifted since this was fetched, the
+                // draftedIds effect above already cleared and re-fetched;
+                // anything still here is still live.
+                const p = poolByPlayerId.get(rec.playerId)
+                if (!p || draftedIds.has(rec.playerId)) return null
                 return (
-                  <div key={p.playerId}>
+                  <div key={rec.playerId}>
                     <p className="text-sm font-semibold text-white">{p.name} <span className="text-xs font-normal" style={{ color: '#3A5A7A' }}>{p.position} · ADP {Math.round(p.adpConsensus)}</span></p>
-                    <p className="text-sm mt-0.5" style={{ color: '#8AAABB' }}>{reasoning}</p>
+                    <p className="text-sm mt-0.5" style={{ color: '#8AAABB' }}>{rec.reasoning}</p>
                   </div>
                 )
               })}
@@ -308,12 +341,16 @@ function TurnHeader({
   picksLeft,
   draftId,
   platform,
+  onRefresh,
+  refreshing,
 }: {
   round: number
   pickNumber: number
   picksLeft: number | null
   draftId: string | null
   platform: Platform | null
+  onRefresh: () => void
+  refreshing: boolean
 }) {
   // Not importing lib/yahoo.ts here — it transitively pulls in
   // lib/supabase.ts (next/headers, service-role client), which must never
@@ -338,6 +375,15 @@ function TurnHeader({
           )}
         </p>
       </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <button
+          onClick={onRefresh}
+          disabled={refreshing}
+          className="text-xs font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap transition-all hover:brightness-110 disabled:opacity-50"
+          style={{ backgroundColor: '#1A3048', color: '#8AAABB' }}
+        >
+          {refreshing ? 'Checking...' : 'Refresh now'}
+        </button>
       {draftUrl && (
         <a
           href={draftUrl}
@@ -349,6 +395,7 @@ function TurnHeader({
           Draft on {platformLabel} →
         </a>
       )}
+      </div>
     </div>
   )
 }
