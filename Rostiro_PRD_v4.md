@@ -1,9 +1,19 @@
-# ROSTIRO — Product Requirements Document v4.4
+# ROSTIRO — Product Requirements Document v4.5
 **Run Every League.**
 The operating system for fantasy sports.
 rostiro.com | July 2026 | Pass directly to Claude Code
 
 ---
+
+## Changelog from v4.4 → v4.5
+
+| Change | Rationale |
+|---|---|
+| Native-OS visual redesign shipped (3, 6.7) | The approved mockup (July 2026) is implemented: token system on CSS custom properties, glass surfaces over an ambient ground, icon dock, glowing signal accents, mono live values, panel-style route transitions, detail drawer, bottom ticker strip. Marketing surfaces deliberately untouched pending designs. |
+| Experience Layer added (6.8) | Signup and every login should feel like an experience, not a form. Boot sequence, coach-mark hint registry, ticker seasonal roadmap (the ticker + Pulse are the bread and butter), features page. |
+| Product Foundations added (6.9) | Accessibility, security hardening, Daylight (light) theme, and privacy policy + data controls are now first-class build targets with acceptance criteria — not launch-week afterthoughts. |
+| Tasks T-72 through T-78 added (12) | The Experience Layer and Product Foundations workstreams. |
+| Open decisions flagged (6.8, 6.9) | Four decisions recorded with recommended defaults: meaning of "locked" in-game scores, first-run style, light-mode timing, features-page timing. Defaults apply unless overridden. |
 
 ## Changelog from v4.3 → v4.4
 
@@ -440,6 +450,35 @@ Approved from an interactive mockup (July 2026). Five workstreams, sequenced so 
 
 **Explicitly out of scope for the shell** (separate tracks): push/OneSignal, Stripe + quota enforcement, onboarding steps 4–6, weather data, ESPN/Yahoo Pulse merge. The shell is their landing spot — notification prefs UI, deadline countdown, and Pulse actions are where they slot in.
 
+### 6.8 Experience Layer (v4.5 — new)
+
+> **THE THESIS:** The ticker and Pulse are the bread and butter. Signing up and every login should feel like stepping into a running system, not opening a website. An OS doesn't make you watch a tutorial video — it teaches through its chrome.
+
+**E1 — Boot sequence + coach marks (T-72).** First login only: a ~5-second skippable boot moment — system bar comes alive, ticker types out, Pulse panels land in sequence. Then progressive, dismissable coach marks anchored to the crucial instruments: health dots, ⌘K, Pulse actions (Done/Snooze), the ticker, the mode chip. Contextual hints appear on first *use* of a surface (Draft Copilot hint on first draft join), not all on day one. Infrastructure: one `<Hint>` component with a registry (mirroring the palette's command registry), dismissed-forever state persisted per user (`seen_hints` jsonb on `users`), "replay tour" available from Settings and the command palette. Every-login experience stays light: morning header + greeting (built), ticker warm-up on load — no repeated tutorials, daily friction kills retention.
+*Open decision (default: boot + coach marks, no modal step-by-step tour).*
+
+**E2 — Ticker seasonal roadmap (T-73).** The bottom strip's data source rotates with the season; the response shape stays fixed so the component never changes:
+- **Pre-draft (built):** ADP movement over a 7-day window from `adp_snapshots`; honest "DAY N OF 7" fallback while history accumulates.
+- **Post-draft / in-season:** top waiver claims of the week from each connected league's transactions (Sleeper `/league/{id}/transactions` — *your leagues'* actual claims, not generic trends) + injury news from designation *changes*. Prerequisite shipped early: daily injury-status snapshots start now (same "cheap today, impossible to backfill" logic as ADP).
+- **Game day:** live scores. Surfaced in the ticker and as Pulse items.
+*Open decision on "locked" in-game scores (default: premium-gated — free users see them blurred with an upgrade prompt). To be confirmed before build.*
+
+**E3 — Features page (T-74).** Marketing page telling the OS story: what Rostiro does (ambient monitoring, the decision queue, Draft Copilot, Health Score, modes) and how it's different (deterministic numbers, Claude only explains; actions come to you; one system for every league). Embeds the *real living components* — an actual ticking ticker, a live demo Pulse card — never screenshots.
+*Open decision (default: build after the incoming marketing designs land, in one pass with the rest of the marketing surface).*
+
+### 6.9 Product Foundations (v4.5 — new)
+
+Genuine build targets with acceptance criteria — not launch-week afterthoughts.
+
+**F1 — Accessibility (T-75).** Acceptance criteria: WCAG AA contrast on all text (known issue: `--t3` dim text at small sizes needs an audit pass), visible focus states on every interactive element, full keyboard operability (palette ✓, drawer focus-trap needed, cards ✓), `prefers-reduced-motion` honored everywhere (✓), ticker marked `aria-hidden` with a static screen-reader alternative, `aria-live` regions for value updates kept polite/off where noisy, semantic landmarks per screen. Audit + fix pass, then a11y checks added to the pre-launch checklist.
+
+**F2 — Security hardening (T-76).** Pre-launch pass: security headers in `next.config` (CSP, HSTS, X-Frame-Options, Referrer-Policy), rate limiting on API routes (especially Claude-backed ones), dependency audit, full `/security-review` run with findings triaged. Already in place and staying: RLS on every table, Zod on every body, encrypted OAuth tokens, CRON_SECRET on crons, service-role keys server-only.
+
+**F3 — Daylight theme (T-77).** Light mode as designed work, not inversion — the glow-and-glass identity needs light equivalents (white translucency + soft tinted shadows instead of glows). Structurally cheap: every color is already a CSS custom property, so the theme is a `:root` swap behind a toggle in Settings + system-preference detection (`prefers-color-scheme`), persisted alongside mode on `users`.
+*Open decision (default: post-launch fast-follow — launch is dark-first, it's the brand identity).*
+
+**F4 — Privacy policy + data controls (T-78).** Quietly launch-critical: Yahoo OAuth app review requires a public privacy-policy URL; Stripe expects one. Public `/privacy` page (drafted for review, plain language) covering: what's collected, platform credentials handling (encrypted, never logged), AI processing disclosure (league data sent to Claude for explanations), retention, contact. Backed by real controls in Settings: export my data (JSON), delete my account (cascade — schema already cascades on `users.id`), disconnect leagues (✓ built). Analytics opt-out lands here if/when analytics are added.
+
 ---
 
 ## 7. Navigation Structure (v4 — new)
@@ -574,7 +613,19 @@ Additional tasks from v4.4 (Rostiro OS Shell — see 6.7):
 | T-70 | Command palette — ⌘K overlay + mobile FAB, command registry (navigation / Pulse actions / player search), keyboard navigation. |
 | T-71 | Identity + polish — mode persisted to `users` table (closes T-51), real Settings page, terminal visual pass (tabular-nums, update ticks, denser Savant layouts). Fixes AppShell setState-in-effect lint error. |
 
+Additional tasks from v4.5 (Experience Layer + Product Foundations — see 6.8, 6.9):
+
+| Task | Description |
+|---|---|
+| T-72 | Boot sequence + coach marks — first-login boot moment (skippable, never repeats), `<Hint>` registry component, `seen_hints` persistence, contextual first-use hints, replay from Settings/palette. |
+| T-73 | Ticker seasonal sources — injury-status snapshots start immediately (backfill-proofing); in-season: per-league top waiver claims (Sleeper transactions) + injury designation changes; game day: live scores (gating decision pending). Response shape stays fixed. |
+| T-74 | Features page — the OS story with live embedded components (real ticker, demo Pulse card), no screenshots. Timing: with the marketing-designs pass (default). |
+| T-75 | Accessibility baseline — WCAG AA contrast audit (`--t3` flagged), drawer focus-trap, ticker screen-reader alternative, keyboard operability pass, a11y in pre-launch checklist. |
+| T-76 | Security hardening — security headers, API rate limiting, dependency audit, full /security-review with triage. |
+| T-77 | Daylight theme — designed light mode behind a Settings toggle + `prefers-color-scheme`, persisted on `users`. Default timing: post-launch fast-follow. |
+| T-78 | Privacy policy + data controls — public `/privacy` page (Yahoo OAuth review prerequisite), data export, account deletion (cascade), AI-processing disclosure. |
+
 ---
 
-*Rostiro PRD v4.4 — July 2026*
+*Rostiro PRD v4.5 — July 2026*
 *Run Every League. — rostiro.com*
