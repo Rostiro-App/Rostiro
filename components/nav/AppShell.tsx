@@ -62,7 +62,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
             {/* Mobile bottom nav — hidden on desktop */}
             <div className="md:hidden">
-              <BottomNav mode={mode} onModeChange={handleModeChange} />
+              <BottomNav />
             </div>
           </div>
         </div>
