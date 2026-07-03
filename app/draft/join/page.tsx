@@ -82,12 +82,12 @@ export default function JoinDraftPage() {
       <div className="mb-6 text-center">
         <span
           className="inline-block text-xs font-semibold tracking-widest uppercase px-3 py-1 rounded-full mb-4"
-          style={{ backgroundColor: '#378ADD18', color: '#378ADD' }}
+          style={{ backgroundColor: 'var(--signal-dim)', color: 'var(--signal)' }}
         >
           Draft Copilot
         </span>
         <h1 className="text-2xl font-bold text-white tracking-tight">Join your live draft</h1>
-        <p className="text-sm mt-2" style={{ color: '#5A7A9A' }}>
+        <p className="text-sm mt-2" style={{ color: 'var(--t2)' }}>
           Draft on {platform === 'sleeper' ? 'Sleeper' : 'Yahoo'} as normal. Rostiro tracks it live alongside you: always-current best available, a heads-up before your turn, and an alert the moment a run starts or your target gets sniped.
         </p>
       </div>
@@ -103,9 +103,9 @@ export default function JoinDraftPage() {
             }}
             className="text-xs font-semibold px-4 py-1.5 rounded-lg transition-all"
             style={{
-              backgroundColor: platform === p ? '#378ADD' : '#0A1520',
-              color: platform === p ? 'white' : '#5A7A9A',
-              border: `1px solid ${platform === p ? '#378ADD' : '#1A3048'}`,
+              backgroundColor: platform === p ? 'var(--signal)' : 'rgba(8, 15, 26, 0.6)',
+              color: platform === p ? 'white' : 'var(--t2)',
+              border: `1px solid ${platform === p ? 'var(--signal)' : 'var(--hairline)'}`,
             }}
           >
             {p === 'sleeper' ? 'Sleeper' : 'Yahoo'}
@@ -114,7 +114,7 @@ export default function JoinDraftPage() {
       </div>
 
       <div className="mb-4">
-        <p className="text-xs font-medium mb-1.5 text-center" style={{ color: '#5A7A9A' }}>Draft strategy</p>
+        <p className="text-xs font-medium mb-1.5 text-center" style={{ color: 'var(--t2)' }}>Draft strategy</p>
         <div className="grid grid-cols-2 gap-1.5">
           {STRATEGIES.map((s) => (
             <button
@@ -123,29 +123,29 @@ export default function JoinDraftPage() {
               onClick={() => setStrategy(s)}
               className="text-left px-3 py-2 rounded-lg transition-all"
               style={{
-                backgroundColor: strategy === s ? '#378ADD18' : '#0A1520',
-                border: `1px solid ${strategy === s ? '#378ADD' : '#1A3048'}`,
+                backgroundColor: strategy === s ? 'var(--signal-dim)' : 'rgba(8, 15, 26, 0.6)',
+                border: `1px solid ${strategy === s ? 'var(--signal)' : 'var(--hairline)'}`,
               }}
             >
-              <p className="text-xs font-semibold" style={{ color: strategy === s ? '#378ADD' : 'white' }}>
+              <p className="text-xs font-semibold" style={{ color: strategy === s ? 'var(--signal)' : 'white' }}>
                 {STRATEGY_LABELS[s]}
               </p>
-              <p className="text-[11px] mt-0.5 leading-tight" style={{ color: '#5A7A9A' }}>
+              <p className="text-[11px] mt-0.5 leading-tight" style={{ color: 'var(--t2)' }}>
                 {STRATEGY_DESCRIPTIONS[s]}
               </p>
             </button>
           ))}
         </div>
-        <p className="text-xs mt-2 text-center" style={{ color: '#3A5A7A' }}>
+        <p className="text-xs mt-2 text-center" style={{ color: 'var(--t3)' }}>
           You can change this mid-draft as things develop.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="rounded-xl p-5 space-y-4" style={{ backgroundColor: '#0A1520', border: '1px solid #1A3048' }}>
+      <form onSubmit={handleSubmit} className="rounded-xl p-5 space-y-4" style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', border: '1px solid var(--hairline)' }}>
         {platform === 'sleeper' ? (
           <>
             <div>
-              <label className="text-xs font-medium block mb-1.5" style={{ color: '#5A7A9A' }}>Sleeper draft ID</label>
+              <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--t2)' }}>Sleeper draft ID</label>
               <input
                 type="text"
                 value={draftId}
@@ -153,15 +153,15 @@ export default function JoinDraftPage() {
                 placeholder="e.g. 1128176747251396608"
                 required
                 className="w-full text-sm px-3 py-2.5 rounded-lg outline-none"
-                style={{ backgroundColor: '#07111C', border: '1px solid #1A3048', color: 'white' }}
+                style={{ backgroundColor: 'rgba(6, 11, 19, 0.55)', border: '1px solid var(--hairline)', color: 'white' }}
               />
-              <p className="text-xs mt-1" style={{ color: '#3A5A7A' }}>
+              <p className="text-xs mt-1" style={{ color: 'var(--t3)' }}>
                 The number at the end of your Sleeper draft URL.
               </p>
             </div>
 
             <div>
-              <label className="text-xs font-medium block mb-1.5" style={{ color: '#5A7A9A' }}>Your Sleeper username</label>
+              <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--t2)' }}>Your Sleeper username</label>
               <input
                 type="text"
                 value={username}
@@ -169,14 +169,14 @@ export default function JoinDraftPage() {
                 placeholder="e.g. lordelightskin"
                 required
                 className="w-full text-sm px-3 py-2.5 rounded-lg outline-none"
-                style={{ backgroundColor: '#07111C', border: '1px solid #1A3048', color: 'white' }}
+                style={{ backgroundColor: 'rgba(6, 11, 19, 0.55)', border: '1px solid var(--hairline)', color: 'white' }}
               />
             </div>
           </>
         ) : (
           <>
             <div>
-              <label className="text-xs font-medium block mb-1.5" style={{ color: '#5A7A9A' }}>Yahoo league ID</label>
+              <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--t2)' }}>Yahoo league ID</label>
               <input
                 type="text"
                 value={yahooLeagueId}
@@ -184,16 +184,16 @@ export default function JoinDraftPage() {
                 placeholder="e.g. 729259"
                 required
                 className="w-full text-sm px-3 py-2.5 rounded-lg outline-none"
-                style={{ backgroundColor: '#07111C', border: '1px solid #1A3048', color: 'white' }}
+                style={{ backgroundColor: 'rgba(6, 11, 19, 0.55)', border: '1px solid var(--hairline)', color: 'white' }}
               />
-              <p className="text-xs mt-1" style={{ color: '#3A5A7A' }}>
+              <p className="text-xs mt-1" style={{ color: 'var(--t3)' }}>
                 The number in your Yahoo league URL: fantasy.football.yahoo.com/f1/<strong>{'{this number}'}</strong>. Requires a Yahoo account already connected to Rostiro.
               </p>
             </div>
 
             {needsManualSlot && (
               <div>
-                <label className="text-xs font-medium block mb-1.5" style={{ color: '#5A7A9A' }}>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--t2)' }}>
                   Your draft slot / position number
                 </label>
                 <input
@@ -204,9 +204,9 @@ export default function JoinDraftPage() {
                   placeholder="e.g. 4"
                   required
                   className="w-full text-sm px-3 py-2.5 rounded-lg outline-none"
-                  style={{ backgroundColor: '#07111C', border: '1px solid #1A3048', color: 'white' }}
+                  style={{ backgroundColor: 'rgba(6, 11, 19, 0.55)', border: '1px solid var(--hairline)', color: 'white' }}
                 />
-                <p className="text-xs mt-1" style={{ color: '#3A5A7A' }}>
+                <p className="text-xs mt-1" style={{ color: 'var(--t3)' }}>
                   Your draft hasn&apos;t started yet, so Rostiro can&apos;t auto-detect this. It&apos;s usually set by your commissioner ahead of time.
                 </p>
               </div>
@@ -216,9 +216,9 @@ export default function JoinDraftPage() {
 
         {error && (
           <div>
-            <p className="text-sm" style={{ color: '#E84040' }}>{error}</p>
+            <p className="text-sm" style={{ color: 'var(--crit)' }}>{error}</p>
             {errorLink && (
-              <a href={errorLink.href} className="text-sm font-semibold mt-1 inline-block" style={{ color: '#378ADD' }}>
+              <a href={errorLink.href} className="text-sm font-semibold mt-1 inline-block" style={{ color: 'var(--signal)' }}>
                 {errorLink.label}
               </a>
             )}
@@ -229,7 +229,7 @@ export default function JoinDraftPage() {
           type="submit"
           disabled={loading}
           className="w-full text-sm font-semibold px-4 py-3 rounded-xl text-white transition-all hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed"
-          style={{ backgroundColor: '#378ADD' }}
+          style={{ backgroundColor: 'var(--signal)' }}
         >
           {loading ? 'Joining...' : needsManualSlot ? 'Continue' : 'Join draft'}
         </button>

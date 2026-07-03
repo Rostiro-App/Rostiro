@@ -94,13 +94,13 @@ export default function SettingsPage() {
     <div className="max-w-2xl mx-auto px-4 pt-6 pb-8 md:px-6 md:pt-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white tracking-tight">Settings</h1>
-        <p className="text-sm mt-0.5" style={{ color: '#5A7A9A' }}>
+        <p className="text-sm mt-0.5" style={{ color: 'var(--t2)' }}>
           Account, mode, leagues, notifications
         </p>
       </div>
 
       {error && (
-        <p className="text-sm mb-4" style={{ color: '#E84040' }}>{error}</p>
+        <p className="text-sm mb-4" style={{ color: 'var(--crit)' }}>{error}</p>
       )}
 
       {loading && <Skeleton />}
@@ -112,13 +112,13 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between py-1">
               <div>
                 <p className="text-sm text-white">{data.email}</p>
-                <p className="text-xs mt-0.5" style={{ color: '#3A5A7A' }}>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--t3)' }}>
                   Member since {new Date(data.createdAt).toLocaleDateString([], { month: 'long', year: 'numeric' })}
                 </p>
               </div>
               <span
                 className="text-[10px] font-bold tracking-wider px-2 py-1 rounded"
-                style={{ backgroundColor: '#378ADD22', color: '#378ADD' }}
+                style={{ backgroundColor: 'var(--signal-dim)', color: 'var(--signal)' }}
               >
                 {(PLAN_LABEL[data.plan] ?? data.plan).toUpperCase()}
               </span>
@@ -143,17 +143,17 @@ export default function SettingsPage() {
                     onClick={() => setGlobalMode(m.id)}
                     className="text-left rounded-xl px-3.5 py-3 transition-all"
                     style={{
-                      backgroundColor: isActive ? '#378ADD22' : '#0A1520',
-                      border: `1.5px solid ${isActive ? '#378ADD' : '#1A3048'}`,
+                      backgroundColor: isActive ? 'var(--signal-dim)' : 'rgba(8, 15, 26, 0.6)',
+                      border: `1.5px solid ${isActive ? 'var(--signal)' : 'var(--hairline)'}`,
                     }}
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-white">{m.label}</span>
                       {isActive && (
-                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#378ADD' }} />
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--signal)' }} />
                       )}
                     </div>
-                    <span className="text-xs" style={{ color: '#5A7A9A' }}>{m.tagline}</span>
+                    <span className="text-xs" style={{ color: 'var(--t2)' }}>{m.tagline}</span>
                   </button>
                 )
               })}
@@ -164,11 +164,11 @@ export default function SettingsPage() {
           <Section title="Connected leagues">
             {data.leagues.length === 0 ? (
               <div className="flex items-center justify-between py-1">
-                <p className="text-sm" style={{ color: '#5A7A9A' }}>No leagues connected.</p>
+                <p className="text-sm" style={{ color: 'var(--t2)' }}>No leagues connected.</p>
                 <a
                   href="/onboarding"
                   className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white"
-                  style={{ backgroundColor: '#185FA5' }}
+                  style={{ backgroundColor: 'var(--cta)' }}
                 >
                   Connect →
                 </a>
@@ -180,7 +180,7 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-2.5 min-w-0">
                       <span
                         className="text-[10px] font-semibold px-1.5 rounded flex-shrink-0"
-                        style={{ color: '#5A7A9A', border: '1px solid #1A3048' }}
+                        style={{ color: 'var(--t2)', border: '1px solid var(--hairline)' }}
                       >
                         {PLATFORM_LABEL[league.platform] ?? league.platform.toUpperCase()}
                       </span>
@@ -191,14 +191,14 @@ export default function SettingsPage() {
                         <button
                           onClick={() => disconnect(league.id)}
                           className="text-xs font-semibold px-2.5 py-1.5 rounded-lg"
-                          style={{ backgroundColor: '#E8404022', color: '#E84040' }}
+                          style={{ backgroundColor: 'rgba(232,80,74,.13)', color: 'var(--crit)' }}
                         >
                           Confirm
                         </button>
                         <button
                           onClick={() => setConfirmingId(null)}
                           className="text-xs px-2.5 py-1.5 rounded-lg"
-                          style={{ color: '#5A7A9A' }}
+                          style={{ color: 'var(--t2)' }}
                         >
                           Cancel
                         </button>
@@ -207,7 +207,7 @@ export default function SettingsPage() {
                       <button
                         onClick={() => setConfirmingId(league.id)}
                         className="text-xs px-2.5 py-1.5 rounded-lg flex-shrink-0 transition-all"
-                        style={{ color: '#3A5A7A', border: '1px solid #1A3048' }}
+                        style={{ color: 'var(--t3)', border: '1px solid var(--hairline)' }}
                       >
                         Disconnect
                       </button>
@@ -226,7 +226,7 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between py-1">
               <div>
                 <p className="text-sm text-white">Push notifications</p>
-                <p className="text-xs mt-0.5" style={{ color: '#3A5A7A' }}>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--t3)' }}>
                   Critical Pulse items: injuries to starters, deadlines inside 48h.
                 </p>
               </div>
@@ -238,7 +238,7 @@ export default function SettingsPage() {
                 style={{
                   width: 40,
                   height: 22,
-                  backgroundColor: data.pushEnabled ? '#185FA5' : '#1A3048',
+                  backgroundColor: data.pushEnabled ? 'var(--cta)' : 'var(--hairline)',
                 }}
               >
                 <span
@@ -247,7 +247,7 @@ export default function SettingsPage() {
                     width: 16,
                     height: 16,
                     left: data.pushEnabled ? 21 : 3,
-                    backgroundColor: data.pushEnabled ? '#FFFFFF' : '#5A7A9A',
+                    backgroundColor: data.pushEnabled ? '#FFFFFF' : 'var(--t2)',
                   }}
                 />
               </button>
@@ -269,12 +269,12 @@ function Section({
   children: React.ReactNode
 }) {
   return (
-    <div className="rounded-xl p-4" style={{ backgroundColor: '#0F2235', border: '1px solid #1A3048' }}>
-      <p className="text-xs font-semibold tracking-widest uppercase mb-1" style={{ color: '#3A5A7A' }}>
+    <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--glass-solid)', border: '1px solid var(--hairline)' }}>
+      <p className="text-xs font-semibold tracking-widest uppercase mb-1" style={{ color: 'var(--t3)' }}>
         {title}
       </p>
       {subtitle && (
-        <p className="text-xs mb-3" style={{ color: '#5A7A9A' }}>{subtitle}</p>
+        <p className="text-xs mb-3" style={{ color: 'var(--t2)' }}>{subtitle}</p>
       )}
       {!subtitle && <div className="mb-2" />}
       {children}
@@ -289,7 +289,7 @@ function Skeleton() {
         <div
           key={i}
           className="rounded-xl h-24 animate-pulse"
-          style={{ backgroundColor: '#0F2235', border: '1px solid #1A3048' }}
+          style={{ backgroundColor: 'var(--glass-solid)', border: '1px solid var(--hairline)' }}
         />
       ))}
     </div>

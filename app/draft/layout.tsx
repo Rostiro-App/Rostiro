@@ -15,7 +15,7 @@ export default async function DraftLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#0D1B2A' }}>
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--void)' }}>
       <PublicHeader />
       {children}
     </div>

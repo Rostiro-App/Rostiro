@@ -66,22 +66,22 @@ export default function EspnConnect({
   ]
 
   return (
-    <div className="rounded-xl p-6" style={{ backgroundColor: '#0A1520', border: '1.5px solid #1A3048' }}>
+    <div className="rounded-xl p-6" style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', border: '1.5px solid var(--hairline)' }}>
       <button
         onClick={onBack}
         className="text-sm mb-5 flex items-center gap-1"
-        style={{ color: '#5A7A9A' }}
+        style={{ color: 'var(--t2)' }}
       >
         ← Back
       </button>
       <h2 className="text-white font-semibold mb-1">Unlock ESPN</h2>
-      <p className="text-sm mb-5" style={{ color: '#5A7A9A' }}>
+      <p className="text-sm mb-5" style={{ color: 'var(--t2)' }}>
         ESPN doesn&apos;t have an official API — we use your browser cookies. Takes 2 minutes. Read-only.
       </p>
 
       {/* Progress bar */}
       <div className="mb-5">
-        <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: '#378ADD55' }}>
+        <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'rgba(75,163,245,.35)' }}>
           Step {guideStep} of 4
         </p>
         <div className="flex gap-1.5 mb-4">
@@ -89,16 +89,16 @@ export default function EspnConnect({
             <div
               key={s}
               className="h-0.5 flex-1 rounded-full transition-colors"
-              style={{ backgroundColor: s <= guideStep ? '#378ADD' : '#1A3048' }}
+              style={{ backgroundColor: s <= guideStep ? 'var(--signal)' : 'var(--hairline)' }}
             />
           ))}
         </div>
 
         {steps.filter((s) => s.step === guideStep).map(({ title, instruction, detail }) => (
-          <div key={guideStep} className="rounded-lg p-4" style={{ backgroundColor: '#07111C', border: '1px solid #1A3048' }}>
+          <div key={guideStep} className="rounded-lg p-4" style={{ backgroundColor: 'rgba(6, 11, 19, 0.55)', border: '1px solid var(--hairline)' }}>
             <p className="text-white font-medium text-sm mb-1">{title}</p>
-            <p className="text-sm" style={{ color: '#8AAABB' }}>{instruction}</p>
-            <p className="text-xs mt-2" style={{ color: '#5A7A9A' }}>{detail}</p>
+            <p className="text-sm" style={{ color: 'var(--t2)' }}>{instruction}</p>
+            <p className="text-xs mt-2" style={{ color: 'var(--t2)' }}>{detail}</p>
           </div>
         ))}
 
@@ -107,7 +107,7 @@ export default function EspnConnect({
             <button
               onClick={() => setGuideStep((s) => (s - 1) as GuideStep)}
               className="flex-1 py-2 rounded-lg text-sm transition-colors"
-              style={{ border: '1px solid #1A3048', color: '#5A7A9A' }}
+              style={{ border: '1px solid var(--hairline)', color: 'var(--t2)' }}
             >
               Back
             </button>
@@ -116,7 +116,7 @@ export default function EspnConnect({
             <button
               onClick={() => setGuideStep((s) => (s + 1) as GuideStep)}
               className="flex-1 py-2 rounded-lg text-sm text-white transition-all hover:brightness-110"
-              style={{ backgroundColor: '#1A3048' }}
+              style={{ backgroundColor: 'var(--hairline)' }}
             >
               Next →
             </button>
@@ -134,7 +134,7 @@ export default function EspnConnect({
             onChange={(e) => setLeagueId(e.target.value)}
             required
             className="w-full rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none"
-            style={{ backgroundColor: '#07111C', border: '1.5px solid #1A3048' }}
+            style={{ backgroundColor: 'rgba(6, 11, 19, 0.55)', border: '1.5px solid var(--hairline)' }}
           />
           <textarea
             placeholder="espn_s2 value (long string)"
@@ -143,7 +143,7 @@ export default function EspnConnect({
             required
             rows={3}
             className="w-full rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none resize-none font-mono"
-            style={{ backgroundColor: '#07111C', border: '1.5px solid #1A3048', fontSize: '11px' }}
+            style={{ backgroundColor: 'rgba(6, 11, 19, 0.55)', border: '1.5px solid var(--hairline)', fontSize: '11px' }}
           />
           <input
             type="text"
@@ -152,16 +152,16 @@ export default function EspnConnect({
             onChange={(e) => setSwid(e.target.value)}
             required
             className="w-full rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none font-mono"
-            style={{ backgroundColor: '#07111C', border: '1.5px solid #1A3048', fontSize: '11px' }}
+            style={{ backgroundColor: 'rgba(6, 11, 19, 0.55)', border: '1.5px solid var(--hairline)', fontSize: '11px' }}
           />
 
-          {error && <p className="text-sm" style={{ color: '#E84040' }}>{error}</p>}
+          {error && <p className="text-sm" style={{ color: 'var(--crit)' }}>{error}</p>}
 
           <button
             type="submit"
             disabled={loading}
             className="w-full font-semibold py-2.5 rounded-lg text-sm text-white disabled:opacity-50 transition-all hover:brightness-110"
-            style={{ backgroundColor: '#378ADD' }}
+            style={{ backgroundColor: 'var(--signal)' }}
           >
             {loading ? 'Connecting...' : 'Unlock ESPN →'}
           </button>

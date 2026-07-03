@@ -14,9 +14,9 @@ const VERDICT_LABEL: Record<TradeAnalysis['verdict'], string> = {
 }
 
 const VERDICT_COLOR: Record<TradeAnalysis['verdict'], string> = {
-  win: '#4CAF72',
-  lose: '#E84040',
-  even: '#F59E0B',
+  win: '#43C077',
+  lose: '#E8504A',
+  even: '#F5A623',
 }
 
 export default function TradesPage() {
@@ -63,7 +63,7 @@ export default function TradesPage() {
     <div className="max-w-2xl mx-auto px-4 pt-6 pb-8 md:px-6 md:pt-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white tracking-tight">Trade Analyzer</h1>
-        <p className="text-sm mt-0.5" style={{ color: '#5A7A9A' }}>
+        <p className="text-sm mt-0.5" style={{ color: 'var(--t2)' }}>
           Pick what you&apos;d give up and what you&apos;d receive.
         </p>
       </div>
@@ -89,14 +89,14 @@ export default function TradesPage() {
         onClick={analyze}
         disabled={!canAnalyze}
         className="w-full text-sm font-semibold px-4 py-3 rounded-xl text-white transition-all hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed"
-        style={{ backgroundColor: '#378ADD' }}
+        style={{ backgroundColor: 'var(--signal)' }}
       >
         {analyzing ? 'Analyzing...' : 'Analyze trade'}
       </button>
 
       {error && (
-        <div className="rounded-xl p-4 mt-4" style={{ backgroundColor: '#0A1520', border: '1px solid #1A3048' }}>
-          <p className="text-sm" style={{ color: '#E84040' }}>{error}</p>
+        <div className="rounded-xl p-4 mt-4" style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', border: '1px solid var(--hairline)' }}>
+          <p className="text-sm" style={{ color: 'var(--crit)' }}>{error}</p>
         </div>
       )}
 
@@ -130,15 +130,15 @@ function PlayerPicker({
   }, [query, players, selected])
 
   return (
-    <div className="rounded-xl p-4" style={{ backgroundColor: '#0A1520', border: '1px solid #1A3048' }}>
-      <p className="text-xs font-semibold tracking-widest uppercase mb-2" style={{ color: '#3A5A7A' }}>{label}</p>
+    <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', border: '1px solid var(--hairline)' }}>
+      <p className="text-xs font-semibold tracking-widest uppercase mb-2" style={{ color: 'var(--t3)' }}>{label}</p>
 
       <div className="flex flex-wrap gap-1.5 mb-2">
         {selected.map((p) => (
           <span
             key={p.playerId}
             className="text-xs font-medium px-2 py-1 rounded-lg flex items-center gap-1.5"
-            style={{ backgroundColor: '#378ADD18', color: '#378ADD' }}
+            style={{ backgroundColor: 'var(--signal-dim)', color: 'var(--signal)' }}
           >
             {p.name}
             <button onClick={() => onRemove(p.playerId)} className="hover:brightness-125">×</button>
@@ -153,12 +153,12 @@ function PlayerPicker({
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search a player..."
           className="w-full text-sm px-3 py-2 rounded-lg outline-none"
-          style={{ backgroundColor: '#07111C', border: '1px solid #1A3048', color: 'white' }}
+          style={{ backgroundColor: 'rgba(6, 11, 19, 0.55)', border: '1px solid var(--hairline)', color: 'white' }}
         />
         {results.length > 0 && (
           <div
             className="absolute z-10 mt-1 w-full rounded-lg overflow-hidden"
-            style={{ backgroundColor: '#07111C', border: '1px solid #1A3048' }}
+            style={{ backgroundColor: 'rgba(6, 11, 19, 0.55)', border: '1px solid var(--hairline)' }}
           >
             {results.map((p) => (
               <button
@@ -171,7 +171,7 @@ function PlayerPicker({
                 style={{ color: '#C5D6E3' }}
               >
                 <span>{p.name}</span>
-                <span className="text-xs" style={{ color: '#3A5A7A' }}>{p.position} · {p.nflTeam}</span>
+                <span className="text-xs" style={{ color: 'var(--t3)' }}>{p.position} · {p.nflTeam}</span>
               </button>
             ))}
           </div>
@@ -187,7 +187,7 @@ function AnalysisCard({ analysis }: { analysis: TradeAnalysis }) {
   return (
     <div
       className="rounded-xl p-4 mt-4"
-      style={{ backgroundColor: '#0A1520', border: '1px solid #1A3048', borderLeft: `3px solid ${color}` }}
+      style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', border: '1px solid var(--hairline)', borderLeft: `3px solid ${color}` }}
     >
       <span
         className="inline-block text-[10px] font-semibold tracking-widest uppercase px-1.5 py-0.5 rounded mb-3"
@@ -195,10 +195,10 @@ function AnalysisCard({ analysis }: { analysis: TradeAnalysis }) {
       >
         {VERDICT_LABEL[analysis.verdict]}
       </span>
-      <p className="text-sm mb-3" style={{ color: '#8AAABB' }}>{analysis.reasoning}</p>
+      <p className="text-sm mb-3" style={{ color: 'var(--t2)' }}>{analysis.reasoning}</p>
       <div className="space-y-1">
-        <p className="text-xs" style={{ color: '#3A5A7A' }}>{analysis.rosValueComparison}</p>
-        <p className="text-xs" style={{ color: '#3A5A7A' }}>{analysis.rosterImpact}</p>
+        <p className="text-xs" style={{ color: 'var(--t3)' }}>{analysis.rosValueComparison}</p>
+        <p className="text-xs" style={{ color: 'var(--t3)' }}>{analysis.rosterImpact}</p>
       </div>
     </div>
   )

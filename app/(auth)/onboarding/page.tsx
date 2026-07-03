@@ -24,14 +24,14 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen px-4 py-12" style={{ backgroundColor: '#0D1B2A' }}>
+    <div className="min-h-screen px-4 py-12" style={{ backgroundColor: 'var(--void)' }}>
       <div className="max-w-lg mx-auto">
         <div className="mb-10 text-center">
-          <p className="text-xs font-semibold tracking-[0.2em] uppercase mb-6" style={{ color: '#378ADD' }}>
+          <p className="text-xs font-semibold tracking-[0.2em] uppercase mb-6" style={{ color: 'var(--signal)' }}>
             ROSTIRO · Step 2 of 6
           </p>
           <h1 className="text-2xl font-bold text-white tracking-tight">Connect your leagues</h1>
-          <p className="text-sm mt-2" style={{ color: '#5A7A9A' }}>
+          <p className="text-sm mt-2" style={{ color: 'var(--t2)' }}>
             Connect at least one. Rostiro can&apos;t help until you do.
           </p>
         </div>
@@ -61,14 +61,14 @@ export default function OnboardingPage() {
               <button
                 onClick={() => router.push('/pulse')}
                 className="mt-6 w-full font-semibold py-3 rounded-xl text-sm text-white transition-all hover:brightness-110"
-                style={{ backgroundColor: '#378ADD' }}
+                style={{ backgroundColor: 'var(--signal)' }}
               >
                 Continue →
               </button>
             )}
 
             {connected.length === 0 && (
-              <p className="text-center text-xs pt-4" style={{ color: '#3A5A7A' }}>
+              <p className="text-center text-xs pt-4" style={{ color: 'var(--t3)' }}>
                 Skip is available — but your Pulse will be empty.
               </p>
             )}
@@ -105,8 +105,8 @@ function PlatformCard({
       onClick={onClick}
       className="w-full rounded-xl p-4 text-left transition-all flex items-center justify-between group"
       style={{
-        backgroundColor: '#0A1520',
-        border: `1.5px solid ${connected ? '#378ADD44' : '#1A3048'}`,
+        backgroundColor: 'rgba(8, 15, 26, 0.6)',
+        border: `1.5px solid ${connected ? 'rgba(75,163,245,.35)' : 'var(--hairline)'}`,
       }}
     >
       <div>
@@ -115,15 +115,15 @@ function PlatformCard({
           {connected && (
             <span
               className="text-xs px-2 py-0.5 rounded-full font-medium"
-              style={{ backgroundColor: '#1A3D1A', color: '#4CAF72', border: '1px solid #2A5A2A' }}
+              style={{ backgroundColor: '#1A3D1A', color: 'var(--live)', border: '1px solid #2A5A2A' }}
             >
               Connected
             </span>
           )}
         </div>
-        <p className="text-sm mt-0.5" style={{ color: '#5A7A9A' }}>{description}</p>
+        <p className="text-sm mt-0.5" style={{ color: 'var(--t2)' }}>{description}</p>
       </div>
-      <span className="text-lg transition-colors" style={{ color: '#3A5A7A' }}>→</span>
+      <span className="text-lg transition-colors" style={{ color: 'var(--t3)' }}>→</span>
     </button>
   )
 }

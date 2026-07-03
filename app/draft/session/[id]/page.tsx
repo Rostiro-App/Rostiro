@@ -218,7 +218,7 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
   if (error && !settings) {
     return (
       <div className="max-w-2xl mx-auto px-4 pt-12 text-center">
-        <p className="text-sm" style={{ color: '#E84040' }}>{error}</p>
+        <p className="text-sm" style={{ color: 'var(--crit)' }}>{error}</p>
       </div>
     )
   }
@@ -240,14 +240,14 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
 
       {positionRun && (
         <AlertBanner
-          color="#F59E0B"
+          color="#F5A623"
           text={`${positionRun.position} run in progress — ${positionRun.count} of the last ${positionRun.windowSize} picks were ${positionRun.position}.`}
         />
       )}
 
       {freshSnipes.length > 0 && (
         <AlertBanner
-          color="#E84040"
+          color="#E8504A"
           text={`Your queued target${freshSnipes.length > 1 ? 's were' : ' was'} just drafted by someone else. Check the best-available list below for your next option.`}
           onDismiss={() => setFreshSnipes([])}
         />
@@ -256,13 +256,13 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
       {showPanicPanel && (
         <div
           className="rounded-xl p-4 mb-4"
-          style={{ backgroundColor: '#0A1520', border: '1px solid #378ADD', borderLeft: '3px solid #378ADD' }}
+          style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', border: '1px solid var(--signal)', borderLeft: '3px solid var(--signal)' }}
         >
-          <p className="text-xs font-semibold tracking-widest uppercase mb-3" style={{ color: '#378ADD' }}>
+          <p className="text-xs font-semibold tracking-widest uppercase mb-3" style={{ color: 'var(--signal)' }}>
             {picksLeft === 0 ? "You're on the clock" : `Your turn in ${picksLeft} pick${picksLeft === 1 ? '' : 's'}`}
           </p>
           {recommendations.length === 0 ? (
-            <p className="text-sm" style={{ color: '#5A7A9A' }}>Preparing recommendations...</p>
+            <p className="text-sm" style={{ color: 'var(--t2)' }}>Preparing recommendations...</p>
           ) : (
             <div className="space-y-3">
               {recommendations.map((rec) => {
@@ -274,8 +274,8 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
                 if (!p || draftedIds.has(rec.playerId)) return null
                 return (
                   <div key={rec.playerId}>
-                    <p className="text-sm font-semibold text-white">{p.name} <span className="text-xs font-normal" style={{ color: '#3A5A7A' }}>{p.position} · ADP {Math.round(p.adpConsensus)}</span></p>
-                    <p className="text-sm mt-0.5" style={{ color: '#8AAABB' }}>{rec.reasoning}</p>
+                    <p className="text-sm font-semibold text-white">{p.name} <span className="text-xs font-normal" style={{ color: 'var(--t3)' }}>{p.position} · ADP {Math.round(p.adpConsensus)}</span></p>
+                    <p className="text-sm mt-0.5" style={{ color: 'var(--t2)' }}>{rec.reasoning}</p>
                   </div>
                 )
               })}
@@ -292,9 +292,9 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
               onClick={() => setPositionFilter(pos)}
               className="flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all"
               style={{
-                backgroundColor: positionFilter === pos ? '#378ADD' : '#0A1520',
-                color: positionFilter === pos ? 'white' : '#5A7A9A',
-                border: `1px solid ${positionFilter === pos ? '#378ADD' : '#1A3048'}`,
+                backgroundColor: positionFilter === pos ? 'var(--signal)' : 'rgba(8, 15, 26, 0.6)',
+                color: positionFilter === pos ? 'white' : 'var(--t2)',
+                border: `1px solid ${positionFilter === pos ? 'var(--signal)' : 'var(--hairline)'}`,
               }}
             >
               {pos}
@@ -305,7 +305,7 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
           value={strategy}
           onChange={(e) => changeStrategy(e.target.value as DraftStrategy)}
           className="flex-shrink-0 text-xs font-semibold px-2.5 py-1.5 rounded-lg outline-none"
-          style={{ backgroundColor: '#0A1520', border: '1px solid #1A3048', color: '#378ADD' }}
+          style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', border: '1px solid var(--hairline)', color: 'var(--signal)' }}
         >
           {Object.entries(STRATEGY_LABELS).map(([key, label]) => (
             <option key={key} value={key}>{label}</option>
@@ -313,7 +313,7 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
         </select>
       </div>
 
-      <div className="rounded-xl overflow-hidden mb-4" style={{ border: '1px solid #1A3048' }}>
+      <div className="rounded-xl overflow-hidden mb-4" style={{ border: '1px solid var(--hairline)' }}>
         {filteredBestAvailable.slice(0, 20).map((r, i) => {
           const p = r.player
           const prevTier = i > 0 ? filteredBestAvailable[i - 1].player.tier : null
@@ -324,36 +324,36 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
               {showTierDivider && (
                 <div
                   className="px-4 py-1 text-[10px] font-semibold tracking-widest uppercase"
-                  style={{ backgroundColor: '#07111C', color: '#3A5A7A' }}
+                  style={{ backgroundColor: 'rgba(6, 11, 19, 0.55)', color: 'var(--t3)' }}
                 >
                   Tier {p.tier}
                 </div>
               )}
               <div
                 className="flex items-center gap-3 px-4 py-2.5"
-                style={{ backgroundColor: '#0A1520', borderTop: i === 0 ? 'none' : '1px solid #1A3048' }}
+                style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', borderTop: i === 0 ? 'none' : '1px solid var(--hairline)' }}
               >
                 <button
                   onClick={() => toggleQueue(p.playerId)}
                   className="flex-shrink-0 text-base"
-                  style={{ color: queue.includes(p.playerId) ? '#F59E0B' : '#3A5A7A' }}
+                  style={{ color: queue.includes(p.playerId) ? 'var(--warn)' : 'var(--t3)' }}
                   aria-label="Toggle target"
                 >
                   {queue.includes(p.playerId) ? '★' : '☆'}
                 </button>
-                <span className="text-xs font-semibold flex-shrink-0 w-9" style={{ color: '#3A5A7A' }}>
+                <span className="text-xs font-semibold flex-shrink-0 w-9" style={{ color: 'var(--t3)' }}>
                   ADP {Math.round(p.adpConsensus)}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-white truncate">{p.name}</p>
-                  <p className="text-xs truncate" style={{ color: '#3A5A7A' }}>{p.position} · {p.nflTeam || 'FA'}</p>
+                  <p className="text-xs truncate" style={{ color: 'var(--t3)' }}>{p.position} · {p.nflTeam || 'FA'}</p>
                 </div>
                 {r.strategyWeight !== 0 && (
                   <span
                     className="flex-shrink-0 text-xs font-semibold px-1.5 py-0.5 rounded"
                     style={{
-                      backgroundColor: r.strategyWeight > 0 ? '#4CAF7218' : '#E8404018',
-                      color: r.strategyWeight > 0 ? '#4CAF72' : '#E84040',
+                      backgroundColor: r.strategyWeight > 0 ? 'rgba(67,192,119,.1)' : 'rgba(232,80,74,.1)',
+                      color: r.strategyWeight > 0 ? 'var(--live)' : 'var(--crit)',
                     }}
                     title={`${STRATEGY_LABELS[strategy]} is ${r.strategyWeight > 0 ? 'boosting' : 'suppressing'} this pick`}
                   >
@@ -367,20 +367,20 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
       </div>
 
       <h2 className="text-sm font-semibold text-white mb-2">My roster ({myPicks.length})</h2>
-      <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #1A3048' }}>
+      <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--hairline)' }}>
         {myPicks.length === 0 ? (
-          <div className="px-4 py-3" style={{ backgroundColor: '#0A1520' }}>
-            <p className="text-sm" style={{ color: '#5A7A9A' }}>No picks yet.</p>
+          <div className="px-4 py-3" style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)' }}>
+            <p className="text-sm" style={{ color: 'var(--t2)' }}>No picks yet.</p>
           </div>
         ) : (
           myPicks.map((p, i) => (
             <div
               key={p.playerId}
               className="flex items-center justify-between px-4 py-2.5"
-              style={{ backgroundColor: '#0A1520', borderTop: i === 0 ? 'none' : '1px solid #1A3048' }}
+              style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', borderTop: i === 0 ? 'none' : '1px solid var(--hairline)' }}
             >
               <p className="text-sm font-medium text-white">{p.playerName}</p>
-              <span className="text-xs" style={{ color: '#3A5A7A' }}>{p.position} · Round {p.round}</span>
+              <span className="text-xs" style={{ color: 'var(--t3)' }}>{p.position} · Round {p.round}</span>
             </div>
           ))
         )}
@@ -420,10 +420,10 @@ function TurnHeader({
     <div className="mb-4 flex items-baseline justify-between">
       <div>
         <h1 className="text-2xl font-bold text-white tracking-tight">Draft Copilot</h1>
-        <p className="text-sm mt-0.5" style={{ color: '#5A7A9A' }}>
+        <p className="text-sm mt-0.5" style={{ color: 'var(--t2)' }}>
           Round {round} · Pick {pickNumber}
           {picksLeft !== null && (
-            <span style={{ color: picksLeft <= 1 ? '#E84040' : picksLeft <= 3 ? '#F59E0B' : '#3A5A7A' }}>
+            <span style={{ color: picksLeft <= 1 ? 'var(--crit)' : picksLeft <= 3 ? 'var(--warn)' : 'var(--t3)' }}>
               {' '}· {picksLeft === 0 ? 'you\'re up' : `${picksLeft} to your turn`}
             </span>
           )}
@@ -434,7 +434,7 @@ function TurnHeader({
           onClick={onRefresh}
           disabled={refreshing}
           className="text-xs font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap transition-all hover:brightness-110 disabled:opacity-50"
-          style={{ backgroundColor: '#1A3048', color: '#8AAABB' }}
+          style={{ backgroundColor: 'var(--hairline)', color: 'var(--t2)' }}
         >
           {refreshing ? 'Checking...' : 'Refresh now'}
         </button>
@@ -444,7 +444,7 @@ function TurnHeader({
           target="_blank"
           rel="noopener noreferrer"
           className="text-xs font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap transition-all hover:brightness-110"
-          style={{ backgroundColor: '#378ADD22', color: '#378ADD' }}
+          style={{ backgroundColor: 'var(--signal-dim)', color: 'var(--signal)' }}
         >
           Draft on {platformLabel} →
         </a>

@@ -12,11 +12,11 @@ const POSITION_FILTERS: Array<NFLPosition | 'ALL'> = ['ALL', 'QB', 'RB', 'WR', '
 
 const POSITION_COLOR: Record<string, string> = {
   QB: '#E8A040',
-  RB: '#4CAF72',
-  WR: '#378ADD',
+  RB: '#55C58A',
+  WR: '#5FB0F5',
   TE: '#B57EDC',
-  K: '#5A7A9A',
-  DEF: '#8AAABB',
+  K: '#8FA9C0',
+  DEF: '#8FA9C0',
 }
 
 // useSearchParams requires a Suspense boundary at build time — the wrapper
@@ -185,7 +185,7 @@ function RankingsTable({ players, mode }: { players: ADPPlayer[]; mode: string }
               <span
                 className="mono-data text-[9px] tracking-[0.1em] flex-shrink-0 w-9 text-center py-0.5 rounded"
                 style={{
-                  backgroundColor: `${POSITION_COLOR[p.position] ?? '#5A7A9A'}18`,
+                  backgroundColor: `${POSITION_COLOR[p.position] ?? '#8FA9C0'}18`,
                   color: POSITION_COLOR[p.position] ?? 'var(--t2)',
                 }}
               >

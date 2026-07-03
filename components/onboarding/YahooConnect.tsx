@@ -12,22 +12,22 @@ export default function YahooConnect({
   }
 
   return (
-    <div className="rounded-xl p-6" style={{ backgroundColor: '#0A1520', border: '1.5px solid #1A3048' }}>
+    <div className="rounded-xl p-6" style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', border: '1.5px solid var(--hairline)' }}>
       <button
         onClick={onBack}
         className="text-sm mb-5 flex items-center gap-1"
-        style={{ color: '#5A7A9A' }}
+        style={{ color: 'var(--t2)' }}
       >
         ← Back
       </button>
       <h2 className="text-white font-semibold mb-1">Connect Yahoo</h2>
-      <p className="text-sm mb-5" style={{ color: '#5A7A9A' }}>
+      <p className="text-sm mb-5" style={{ color: 'var(--t2)' }}>
         You&apos;ll be redirected to Yahoo to authorize Rostiro. This allows Rostiro to read your leagues
         and submit lineup changes on your behalf.
       </p>
 
-      <div className="rounded-lg p-4 mb-5" style={{ backgroundColor: '#07111C', border: '1px solid #1A3048' }}>
-        <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: '#378ADD55' }}>
+      <div className="rounded-lg p-4 mb-5" style={{ backgroundColor: 'rgba(6, 11, 19, 0.55)', border: '1px solid var(--hairline)' }}>
+        <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: 'rgba(75,163,245,.35)' }}>
           What Rostiro can do
         </p>
         <ul className="space-y-1.5">
@@ -37,13 +37,13 @@ export default function YahooConnect({
             'Add/drop players on waivers',
             'Propose trades',
           ].map((item) => (
-            <li key={item} className="text-sm flex items-start gap-2" style={{ color: '#8AAABB' }}>
-              <span className="mt-0.5" style={{ color: '#4CAF72' }}>✓</span>
+            <li key={item} className="text-sm flex items-start gap-2" style={{ color: 'var(--t2)' }}>
+              <span className="mt-0.5" style={{ color: 'var(--live)' }}>✓</span>
               {item}
             </li>
           ))}
         </ul>
-        <p className="text-xs mt-3" style={{ color: '#3A5A7A' }}>
+        <p className="text-xs mt-3" style={{ color: 'var(--t3)' }}>
           Fantasy data provided by Yahoo Fantasy.
         </p>
       </div>

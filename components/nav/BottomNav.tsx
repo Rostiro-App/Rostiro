@@ -64,8 +64,8 @@ export default function BottomNav() {
       <nav
         className="fixed bottom-0 left-0 right-0 flex items-stretch z-40"
         style={{
-          backgroundColor: '#0A1520',
-          borderTop: '1px solid #1A3048',
+          backgroundColor: 'rgba(8, 15, 26, 0.6)',
+          borderTop: '1px solid var(--hairline)',
           height: '60px',
           // Safe area for iPhone home indicator
           paddingBottom: 'env(safe-area-inset-bottom)',
@@ -78,7 +78,7 @@ export default function BottomNav() {
               key={item.href}
               href={item.href}
               className="flex-1 flex flex-col items-center justify-center gap-0.5 transition-all"
-              style={{ color: isActive ? '#378ADD' : '#3A5A7A' }}
+              style={{ color: isActive ? 'var(--signal)' : 'var(--t3)' }}
             >
               {item.icon}
               <span className="text-[10px] font-medium leading-none">{item.label}</span>
@@ -89,7 +89,7 @@ export default function BottomNav() {
           type="button"
           onClick={() => setMoreOpen(true)}
           className="flex-1 flex flex-col items-center justify-center gap-0.5 transition-all"
-          style={{ color: moreActive ? '#378ADD' : '#3A5A7A', background: 'none', border: 'none' }}
+          style={{ color: moreActive ? 'var(--signal)' : 'var(--t3)', background: 'none', border: 'none' }}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <circle cx="5" cy="12" r="1.5" fill="currentColor" />
@@ -108,12 +108,12 @@ export default function BottomNav() {
         >
           <div
             className="w-full rounded-t-2xl p-4 pb-8"
-            style={{ backgroundColor: '#0F2235', border: '1px solid #1A3048', borderBottom: 'none' }}
+            style={{ backgroundColor: 'var(--glass-solid)', border: '1px solid var(--hairline)', borderBottom: 'none' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div
               className="w-9 h-1 rounded-full mx-auto mb-4"
-              style={{ backgroundColor: '#1A3048' }}
+              style={{ backgroundColor: 'var(--hairline)' }}
             />
             <div className="space-y-1">
               {MORE_ITEMS.map((item) => {
@@ -125,8 +125,8 @@ export default function BottomNav() {
                     onClick={() => setMoreOpen(false)}
                     className="block px-4 py-3 rounded-xl text-sm font-medium"
                     style={{
-                      color: isActive ? '#378ADD' : 'white',
-                      backgroundColor: isActive ? '#378ADD18' : 'transparent',
+                      color: isActive ? 'var(--signal)' : 'white',
+                      backgroundColor: isActive ? 'var(--signal-dim)' : 'transparent',
                     }}
                   >
                     {item.label}
@@ -134,12 +134,12 @@ export default function BottomNav() {
                 )
               })}
             </div>
-            <div style={{ height: '1px', backgroundColor: '#1A3048', margin: '10px 4px' }} />
+            <div style={{ height: '1px', backgroundColor: 'var(--hairline)', margin: '10px 4px' }} />
             <form action="/api/auth/signout" method="POST">
               <button
                 type="submit"
                 className="w-full text-left px-4 py-3 rounded-xl text-sm"
-                style={{ color: '#3A5A7A', background: 'none', border: 'none' }}
+                style={{ color: 'var(--t3)', background: 'none', border: 'none' }}
               >
                 Sign out
               </button>

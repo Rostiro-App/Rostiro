@@ -13,6 +13,7 @@
   --hairline-bright: rgba(120, 180, 240, 0.32);
   --signal: #4BA3F5;
   --signal-dim: rgba(75, 163, 245, 0.14);
+  --cta: #1B62A6; /* solid button fill — signal family, dark enough for white text */
   --live: #43C077;
   --warn: #F5A623;
   --crit: #E8504A;

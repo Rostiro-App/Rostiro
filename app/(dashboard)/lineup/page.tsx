@@ -17,11 +17,11 @@ const VERDICT_LABEL: Record<StartSitRecommendation['verdict'], string> = {
 }
 
 const VERDICT_COLOR: Record<StartSitRecommendation['verdict'], string> = {
-  start_a: '#378ADD',
-  start_b: '#4CAF72',
-  lean_a: '#378ADD',
-  lean_b: '#4CAF72',
-  toss_up: '#F59E0B',
+  start_a: '#4BA3F5',
+  start_b: '#43C077',
+  lean_a: '#4BA3F5',
+  lean_b: '#43C077',
+  toss_up: '#F5A623',
 }
 
 const CONFIDENCE_LABEL: Record<Confidence, string> = {
@@ -66,7 +66,7 @@ export default function LineupPage() {
     <div className="max-w-2xl mx-auto px-4 pt-6 pb-8 md:px-6 md:pt-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white tracking-tight">Lineups</h1>
-        <p className="text-sm mt-0.5" style={{ color: '#5A7A9A' }}>
+        <p className="text-sm mt-0.5" style={{ color: 'var(--t2)' }}>
           {leagueCount > 0
             ? `Start/sit calls across ${leagueCount} ${leagueCount === 1 ? 'league' : 'leagues'} · Sleeper`
             : 'No leagues connected yet'}
@@ -94,10 +94,10 @@ function StartSitCard({ rec, mode }: { rec: StartSitRecommendation; mode: Mode }
   return (
     <div
       className="rounded-xl p-4"
-      style={{ backgroundColor: '#0A1520', border: '1px solid #1A3048', borderLeft: `3px solid ${color}` }}
+      style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', border: '1px solid var(--hairline)', borderLeft: `3px solid ${color}` }}
     >
       <div className="flex items-start justify-between gap-2 mb-3">
-        <p className="text-xs" style={{ color: '#3A5A7A' }}>{rec.leagueName}</p>
+        <p className="text-xs" style={{ color: 'var(--t3)' }}>{rec.leagueName}</p>
         <span
           className="text-[10px] font-semibold tracking-widest uppercase px-1.5 py-0.5 rounded flex-shrink-0"
           style={{ backgroundColor: `${color}18`, color }}
@@ -108,14 +108,14 @@ function StartSitCard({ rec, mode }: { rec: StartSitRecommendation; mode: Mode }
 
       <div className="flex items-center gap-3 mb-3">
         <PlayerChip name={rec.playerA.name} position={rec.playerA.position} label="Currently started" />
-        <span className="text-sm" style={{ color: '#3A5A7A' }}>vs</span>
+        <span className="text-sm" style={{ color: 'var(--t3)' }}>vs</span>
         <PlayerChip name={rec.playerB.name} position={rec.playerB.position} label="On bench" />
       </div>
 
-      <p className="text-sm" style={{ color: '#8AAABB' }}>{rec.reasoning}</p>
+      <p className="text-sm" style={{ color: 'var(--t2)' }}>{rec.reasoning}</p>
 
       {mode === 'savant' && (
-        <p className="text-xs mt-3" style={{ color: '#3A5A7A' }}>{CONFIDENCE_LABEL[rec.confidence]}</p>
+        <p className="text-xs mt-3" style={{ color: 'var(--t3)' }}>{CONFIDENCE_LABEL[rec.confidence]}</p>
       )}
     </div>
   )
@@ -125,7 +125,7 @@ function PlayerChip({ name, position, label }: { name: string; position: string;
   return (
     <div className="min-w-0">
       <p className="text-sm font-semibold text-white truncate">{name}</p>
-      <p className="text-xs truncate" style={{ color: '#3A5A7A' }}>{position} · {label}</p>
+      <p className="text-xs truncate" style={{ color: 'var(--t3)' }}>{position} · {label}</p>
     </div>
   )
 }
@@ -137,7 +137,7 @@ function LoadingState() {
         <div
           key={i}
           className="h-24 rounded-xl animate-pulse"
-          style={{ backgroundColor: '#0A1520', border: '1px solid #1A3048' }}
+          style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', border: '1px solid var(--hairline)' }}
         />
       ))}
     </div>
@@ -146,17 +146,17 @@ function LoadingState() {
 
 function ErrorState({ message }: { message: string }) {
   return (
-    <div className="rounded-xl p-6 text-center" style={{ backgroundColor: '#0A1520', border: '1px solid #1A3048' }}>
-      <p className="text-sm" style={{ color: '#E84040' }}>{message}</p>
+    <div className="rounded-xl p-6 text-center" style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', border: '1px solid var(--hairline)' }}>
+      <p className="text-sm" style={{ color: 'var(--crit)' }}>{message}</p>
     </div>
   )
 }
 
 function NoLeaguesState() {
   return (
-    <div className="rounded-xl p-6 text-center" style={{ backgroundColor: '#0A1520', border: '1px solid #1A3048' }}>
+    <div className="rounded-xl p-6 text-center" style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', border: '1px solid var(--hairline)' }}>
       <p className="text-sm font-medium text-white">Connect a league to see start/sit calls.</p>
-      <p className="text-sm mt-1" style={{ color: '#5A7A9A' }}>
+      <p className="text-sm mt-1" style={{ color: 'var(--t2)' }}>
         Once a Sleeper league is connected, Rostiro compares your bench against your lineup every time you open this page.
       </p>
     </div>
@@ -165,9 +165,9 @@ function NoLeaguesState() {
 
 function AllClearState() {
   return (
-    <div className="rounded-xl p-6 text-center" style={{ backgroundColor: '#0A1520', border: '1px solid #1A3048' }}>
+    <div className="rounded-xl p-6 text-center" style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', border: '1px solid var(--hairline)' }}>
       <p className="text-sm font-medium text-white">Your lineup looks right.</p>
-      <p className="text-sm mt-1" style={{ color: '#5A7A9A' }}>
+      <p className="text-sm mt-1" style={{ color: 'var(--t2)' }}>
         No bench player has a clear ADP edge over your current starters.
       </p>
     </div>
