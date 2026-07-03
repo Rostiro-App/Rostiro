@@ -1,9 +1,17 @@
-# ROSTIRO — Product Requirements Document v4.3
+# ROSTIRO — Product Requirements Document v4.4
 **Run Every League.**
 The operating system for fantasy sports.
 rostiro.com | July 2026 | Pass directly to Claude Code
 
 ---
+
+## Changelog from v4.3 → v4.4
+
+| Change | Rationale |
+|---|---|
+| Rostiro OS Shell added (6.7) | Full PRD-vs-codebase audit found the UI reads as disconnected pages ("a program"), not an operating system. The shell adds ambient state (system bar), a Leagues page with Health Score (closing T-52), persistent actionable Pulse, a command palette, and mode persistence. Approved from interactive mockup July 2026. |
+| Navigation updated (7) | Leagues added to sidebar and bottom nav — it was specified in v4 but never present in the built nav. |
+| Tasks T-67 through T-71 added (12) | The five OS Shell workstreams, sequenced so each ships independently. |
 
 ## Changelog from v4.2 → v4.3
 
@@ -414,37 +422,58 @@ Win / Lose / Roughly Even verdict + reasoning. Free: 3/week. Starter+: unlimited
 
 Provider: OneSignal. Permission prompt fires after first league connected — highest-intent moment.
 
+### 6.7 Rostiro OS Shell (v4.4 — new)
+
+> **THE PROBLEM:** The built UI is a set of well-made but disconnected pages — the user navigates to a tool and operates it. That's a program. An OS holds ambient state about all leagues, interrupts only with decisions, and brings actions to the user. Three absences cause the "program" feel: no ambient state visible anywhere, no cross-cutting surface that follows the user between screens, and actions that live inside tools instead of on the intelligence that surfaced them.
+
+Approved from an interactive mockup (July 2026). Five workstreams, sequenced so each ships independently:
+
+**W1 — System Bar (T-67).** Persistent chrome on every authenticated screen. Contains: live sync status ("Synced 12s ago", ticking), per-league health dots with hover tooltips, next-hard-deadline countdown (nearest waiver cutoff / lineup lock across all leagues, ticking), mode chip, ⌘K affordance. Mobile variant condenses to dots + countdown. Backed by one `/api/system/status` endpoint (last sync, health scores, next deadline), polled on an interval. This is the single biggest "OS not program" change.
+
+**W2 — Leagues Page + Health Score (T-68).** The nav item specified in v4 but never built, plus League Health Score (6.2, closing T-52). `lib/healthScore.ts` computes the five weighted factors deterministically from Sleeper rosters + `players_cache` — no Claude call. Preseason degradation is honest: matchup/bye factors show "loads Week 1," never fake numbers. Health ring + factor bars + top flag per league card, linking to that league's Pulse items. Same computation feeds the system bar dots.
+
+**W3 — Persistent, Actionable Pulse (T-69).** Pulse items persist to the existing `pulse_items` table with a content fingerprint (dismissed items don't resurrect on regeneration). Done / Dismiss / Snooze on every card. Morning header: "Good morning, {name}. N decisions across M leagues · Est. completion X min" + progress bar. Cron generation so Pulse is pre-built before the user opens the app. Two new item types with no new data sources: `deadline_reminder` (from W1's deadline detection) and `lineup_decision` (reuses the Start/Sit ADP-gap engine). Daily ADP snapshot added to the players cron now — cheap today, impossible to backfill later — so the empty-state "ADP movers" card ships once a week of data exists.
+
+**W4 — Command Palette (T-70).** ⌘K on desktop, floating action button on mobile. Three command sources: static navigation, live Pulse actions (open items become commands — "Bench Diggs" jumps to the card/deep link), and player search (reuses `/api/draft/players`). Registry pattern so future features register commands without touching the palette.
+
+**W5 — Identity + Polish (T-71).** Mode persists to `users` table (closing T-51); localStorage remains the pre-signup cache. Real Settings page: account, mode, connected leagues with disconnect, notification prefs (UI ready for push). Terminal visual pass: `tabular-nums` on all data, tick animation on live-value updates, denser Savant layouts.
+
+**Explicitly out of scope for the shell** (separate tracks): push/OneSignal, Stripe + quota enforcement, onboarding steps 4–6, weather data, ESPN/Yahoo Pulse merge. The shell is their landing spot — notification prefs UI, deadline countdown, and Pulse actions are where they slot in.
+
 ---
 
 ## 7. Navigation Structure (v4 — new)
+
+> **v4.4:** the OS Shell system bar (6.7 W1) sits above everything on both breakpoints — sync status, health dots, deadline countdown, mode chip, ⌘K. Leagues added to both navs (it was specified here in v4 but never present in the built nav).
 
 ### Mobile (bottom nav, thumb-reachable)
 
 ```
 ┌─────────────────────────────────┐
-│                                 │
-│         [page content]          │
-│                                 │
+│ ● Synced 8s · ●●●● · Waivers 5h │  ← system bar (condensed)
 ├─────────────────────────────────┤
-│  Pulse  │ Leagues │ Draft │ ··· │
+│         [page content]          │
+│                            (⌘)  │  ← command FAB
+├─────────────────────────────────┤
+│ Pulse │ Leagues │ Draft │ ···   │
 └─────────────────────────────────┘
 ```
 
 ### Desktop (left sidebar)
 
 ```
-┌──────────┬──────────────────────┐
-│ ROSTIRO  │                      │
-│──────────│   [page content]     │
-│ Pulse    │                      │
-│ Leagues  │                      │
-│ Draft    │                      │
-│ Start/Sit│                      │
-│ Trade    │                      │
-│──────────│                      │
-│ Settings │                      │
-│ [Plan]   │                      │
-└──────────┴──────────────────────┘
+┌────────────────────────────────────────────┐
+│ ROSTIRO OS · Synced 8s · ●●●● · Waivers    │  ← system bar
+│              05:23:47 · Balanced · ⌘K      │
+├──────────┬─────────────────────────────────┤
+│ Pulse    │                                 │
+│ Leagues  │   [page content]                │
+│ Draft Kit│                                 │
+│ Lineups  │                                 │
+│ Trades   │                                 │
+│──────────│                                 │
+│ Settings │                                 │
+└──────────┴─────────────────────────────────┘
 ```
 
 ### Mode indicator
@@ -535,7 +564,17 @@ All tasks from v3 carry forward. Additional tasks from v4:
 | T-56 | Desktop left sidebar navigation |
 | T-57 | Mode indicator in nav + switch confirmation modal |
 
+Additional tasks from v4.4 (Rostiro OS Shell — see 6.7):
+
+| Task | Description |
+|---|---|
+| T-67 | System Bar — persistent chrome: live sync ticker, health dots, deadline countdown, mode chip, ⌘K affordance. `/api/system/status` endpoint. Desktop + condensed mobile variant. |
+| T-68 | Leagues page + Health Score — `/leagues` route, `lib/healthScore.ts` (PRD 6.2 five-factor formula, deterministic), health rings + factor bars, nav updates. Closes T-52. |
+| T-69 | Persistent actionable Pulse — write to `pulse_items` with content fingerprint, Done/Dismiss/Snooze, morning header + completion bar, cron generation, `deadline_reminder` + `lineup_decision` item types, daily ADP snapshot in players cron. |
+| T-70 | Command palette — ⌘K overlay + mobile FAB, command registry (navigation / Pulse actions / player search), keyboard navigation. |
+| T-71 | Identity + polish — mode persisted to `users` table (closes T-51), real Settings page, terminal visual pass (tabular-nums, update ticks, denser Savant layouts). Fixes AppShell setState-in-effect lint error. |
+
 ---
 
-*Rostiro PRD v4.0 — July 2026*
+*Rostiro PRD v4.4 — July 2026*
 *Run Every League. — rostiro.com*
