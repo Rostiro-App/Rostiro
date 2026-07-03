@@ -1,0 +1,873 @@
+# ROSTIRO — Product Requirements Document v5.2
+**Run Every League.**
+The operating system for fantasy sports.
+rostiro.com | July 2026 | Pass directly to Claude Code
+
+---
+
+## Changelog from v5.1 → v5.2
+
+| Change | Rationale |
+|---|---|
+| Yahoo status updated: application submitted, in review (5.3, 5.6) | Root cause from v5.1 refined: Fantasy Sports API access is a separate gated application (organization/product/use-case submission + Yahoo review), not a self-serve permission toggle — confirmed by reading Yahoo's own developer documentation. Application submitted July 1, 2026; in review as of this writing, turnaround unknown. Not a launch blocker — Sleeper + ESPN carry marketing and MVP launch; Yahoo write-back ships as a fast-follow the moment access is granted, no additional engineering lead time since `lib/yahoo.ts` is already built. Added note that Yahoo's attribution requirement includes their logo, not just text, wherever the integration is shown publicly. |
+| Stats, Projections & Commentary Data Sources added (5.7 — new) | Closed a real gap: 6.10 named what Film Room and the Player Intelligence Card need to show (usage, snap counts, projections, context) without ever specifying where the data comes from. nflverse specified for snap counts/usage (same cron-cache pattern as ADP/injury snapshots). Projections confirmed platform-native for ESPN (real per-league-scored projections via `statSourceId`, verified live against a free agent with zero rostered status) — no separate projections provider needed for ESPN. Qualitative "what experts are saying" explicitly scoped as a live-Claude-reasoning task, not a RAG-ingestion task, absent a licensed content source. |
+| Player Intelligence Card added (6.11 — new) | ⌘K player search (6.7 W4) becomes a decision-intelligence surface: cross-league availability, usage, snap count, projection, and trend for any player, with Claude adding only the explanatory context — same deterministic-then-explained pattern as Start/Sit and Draft Copilot. Reprioritizes its own content by the active Rostiro State (6.10), extending "components rearrange by day" down to the individual-player level. |
+
+## Changelog from v5.0 → v5.1
+
+| Change | Rationale |
+|---|---|
+| ESPN confirmed viable end-to-end (5.2, 5.6) | Live-tested against a real connected private league, not just read from code: rosters, matchups/live scoring, waivers/free agents, and league records (historical seasons) all confirmed with real HTTP 200 responses and correctly-shaped data. Live draft tracking (`mDraftDetail`) confirmed reachable with correct real-time state transitions; pick-by-pick population strongly supported but not directly witnessed in one session (mock room auto-deleted right after completion). Two lib-layer bugs found and fixed along the way: an onboarding error-reset loop, and Yahoo's OAuth scope malformation (see below) — neither ESPN-specific, found while testing the connect flow generally. |
+| Yahoo blocked, root cause isolated (5.6) | Two real bugs found and fixed in code: a malformed combined OAuth scope (`fspt-r fspt-w`) that Yahoo rejected outright, and an onboarding page that silently reset to step 1 on any connect failure instead of showing an error. Fixing both did not resolve the underlying issue — Yahoo still rejects every Fantasy Sports scope value while accepting requests with no scope at all, proving the app itself has never been granted Fantasy Sports permission in Yahoo Developer Network. This is an account-configuration blocker, not a code problem — action item for the account owner. |
+
+## Changelog from v4.5 → v5.0
+
+| Change | Rationale |
+|---|---|
+| Rostiro States added (6.10), separated from persona Modes | Modes (Focused/Balanced/Savant, Section 3) are a user's chosen density — what they want to see. States (Draft/Standard/Waiver Day/Game Day/Film Room) are what the OS decides — what week and day it is. Conflating them flattened the OS into a settings toggle. States are automatic, schedule-driven, and universal — every user on every tier feels the Sunday 1pm transformation, since that ritual moment is the emotional core of the product. |
+| Scalability & Operational Architecture added (Section 10) | Rostiro is engineered for 1,000 → 10,000 → 100,000+ paying users from day one, not retrofitted later. Deterministic-first, cache-first, centralized-sync engineering philosophy is now a top-level, non-negotiable section, with per-subsystem scalability notes and a dedicated Game Day architecture for the day every user is looking at the app at once. |
+| Emotional Experience & Product Philosophy added (Section 7) | Rostiro is a companion through the emotional arc of a season, not fantasy football software. Every day of the week now maps to a named emotion the product is designed to serve, and every feature passes a two-question filter alongside the existing North Star Pulse test. |
+| Monetization replaced (Section 9) | Four-tier pricing (Scout/Starter/Pro/Commissioner + Intelligence add-on) replaced with Free / Rostiro Pro ($9.99/mo) / 2026 Founder Season Pass ($59) / Founding 500 lifetime ($149). Sells the enhanced-season experience, not a feature count. Resolves a prior contradiction where Savant mode (meant to be a free identity choice) was partly paywalled behind the Intelligence add-on. |
+| Portfolio deprioritized out of MVP | Full roster-grade sharing product (graphics, animated reveals, social distribution) pushed to fast-follow. Underlying weekly grade/exposure data still computed and stored from launch so the eventual feature isn't cold-starting on history it could have had since day one. |
+| Social sharing deferred post-launch | Confirmed growth mechanism, not an 8/1 launch or marketing dependency. |
+| Data model reframed sport-agnostic (10.1) | No NFL-specific assumptions in core schema, even though only NFL ships for 2026. Building other sports stays out of scope (13); the schema simply doesn't foreclose it. |
+| Ahead-of-schedule status noted (12) | As of July 3, 2026, build is ahead of the original Week 3–7 plan. That room is what allowed States and the Scalability baseline to move into MVP instead of being deferred past launch. |
+
+## Changelog from v4.4 → v4.5
+
+| Change | Rationale |
+|---|---|
+| Native-OS visual redesign shipped (3, 6.7) | The approved mockup (July 2026) is implemented: token system on CSS custom properties, glass surfaces over an ambient ground, icon dock, glowing signal accents, mono live values, panel-style route transitions, detail drawer, bottom ticker strip. Marketing surfaces deliberately untouched pending designs. |
+| Experience Layer added (6.8) | Signup and every login should feel like an experience, not a form. Boot sequence, coach-mark hint registry, ticker seasonal roadmap (the ticker + Pulse are the bread and butter), features page. |
+| Product Foundations added (6.9) | Accessibility, security hardening, Daylight (light) theme, and privacy policy + data controls are now first-class build targets with acceptance criteria — not launch-week afterthoughts. |
+| Tasks T-72 through T-78 added (12) | The Experience Layer and Product Foundations workstreams. |
+| Open decisions flagged (6.8, 6.9) | Four decisions recorded with recommended defaults: meaning of "locked" in-game scores, first-run style, light-mode timing, features-page timing. Defaults apply unless overridden. |
+
+## Changelog from v4.3 → v4.4
+
+| Change | Rationale |
+|---|---|
+| Rostiro OS Shell added (6.7) | Full PRD-vs-codebase audit found the UI reads as disconnected pages ("a program"), not an operating system. The shell adds ambient state (system bar), a Leagues page with Health Score (closing T-52), persistent actionable Pulse, a command palette, and mode persistence. Approved from interactive mockup July 2026. |
+| Navigation updated (7) | Leagues added to sidebar and bottom nav — it was specified in v4 but never present in the built nav. |
+| Tasks T-67 through T-71 added (12) | The five OS Shell workstreams, sequenced so each ships independently. |
+
+## Changelog from v4.2 → v4.3
+
+| Change | Rationale |
+|---|---|
+| Draft Copilot platform research added (5.6) | Researched whether Yahoo/ESPN/CBS/NFL/Fantrax/MFL can support live draft tracking like Sleeper. Yahoo confirmed viable (official API, already has an unused `getYahooDraftResults` function). CBS and NFL Fantasy ruled out — no viable API surface. MFL and Fantrax confirmed viable, no OAuth needed. ESPN's `mDraftDetail` lead from v3 was never actually tested for read-only tracking — re-opened, not ruled out. |
+| MyFantasyLeague pulled forward in priority (5.5) | Turns out to have one of the most open fantasy APIs in the industry, live-draft-capable with no OAuth — easier to build than CBS/NFL, worth prioritizing above them in Phase 2. |
+
+## Changelog from v4.1 → v4.2
+
+| Change | Rationale |
+|---|---|
+| Draft Copilot added to Draft Kit (6.3.1) | The real drafting pain isn't pre-draft rankings — it's the mid-draft panic moment when a run starts, your target gets sniped, and the clock hits single digits. Live tracking + pre-fetched recommendations turn that panic moment into a solved problem instead of a scramble. |
+| Draft Kit reframed as companion, not draft room | Sleeper/ESPN/Yahoo have no draft-submission write API — confirmed in 5.1. Rostiro tracks and advises in real time; the user still clicks the pick on the platform's own site. Deep-link, don't replace. |
+
+## Changelog from v4.0 → v4.1
+
+| Change | Rationale |
+|---|---|
+| "Most popular" badge removed from Focused mode | No user data to support this claim pre-launch. Replaced with "Quick & clean." |
+| Step 4 league variables collapsed to 3 upfront | Full 10-variable form causes drop-off. Show scoring format, roster type, waiver system. Rest behind "Advanced settings." |
+| iOS push friction surfaced before permission prompt | "Add to Home Screen" requirement for Safari iOS must be shown before user taps — not discovered after failure. |
+| Blue-tinted dark theme confirmed as design standard | `#0D1B2A` / `#0A1520` chosen over zinc-gray — sports data terminal aesthetic, more distinctive than generic dark SaaS. |
+| Step 6 completion toast added | Closes the loop. "Rostiro is running. You'll get your first alert Saturday at 11pm." Sets a specific expectation. |
+| Three modes confirmed: Focused / Balanced / Savant | Balanced covers the largest real user cohort — wants context, makes own decision. |
+| Mode selection moved to Step 1, before account creation | Configuring an OS before committing > signing up for a tool. |
+
+## Changelog from v3 → v4.0
+
+| Change | Rationale |
+|---|---|
+| ESPN onboarding repositioned as "unlock" step, not peer platform | Cookie friction causes first-session drop-off |
+| Focused/Savant is now a first-run choice, not a toggle | Mode should shape the entire experience, not be a buried setting |
+| Design philosophy updated to mobile-first, premium dark | Saturday night push → users are on phones in bed |
+| Pulse empty state spec added | Empty inbox post-onboarding feels broken |
+| League Health Score added as always-on dashboard signal | Gives the dashboard value even with no urgent actions |
+| Season updated to 2026 throughout | Building for 2026 NFL season |
+| Stack updated to Next.js 16 | Scaffolded with 16.x |
+
+---
+
+## 1. Vision, Positioning & Core Philosophy
+
+Rostiro is not a fantasy football assistant. It is not an AI chatbot with rankings. It is the **operating system for fantasy sports** — confirmed by competitive research showing the Pulse/inbox column (PI) is empty across every major competitor in the market.
+
+Fantasy managers playing in 3-5 leagues across ESPN, Yahoo, and Sleeper are switching between apps constantly — checking injuries, setting lineups, processing waivers, analyzing trades — in 3 different UIs with 3 different notification systems and zero shared intelligence. Rostiro ends that.
+
+| Field | Value |
+|---|---|
+| Product name | Rostiro |
+| Domain | rostiro.com |
+| Tagline | Run Every League. |
+| Category | The Operating System for Fantasy Sports |
+| Target user | Fantasy managers in 2+ leagues across ESPN, Yahoo, and/or Sleeper |
+| Target persona | The savant who manages 3-5 leagues and feels the platform-switching pain daily |
+| Launch target | August 1–10, 2026 — before first major fantasy drafts |
+| Platform | Web app, mobile-first responsive. No native app for MVP. |
+| Stack | Next.js 16 · TypeScript · Supabase · Tailwind CSS · Claude API (claude-sonnet-4-6) · Stripe · Resend · OneSignal |
+| Hosting | Vercel |
+
+### The North Star Experience
+
+Every product and build decision must be evaluated against one question: **does this make the morning Pulse screen better or worse?** If it does not improve the morning screen, it does not ship in MVP.
+
+```
+ROSTIRO PULSE — Good morning, Lawrence.
+5 decisions across 3 leagues. Est. completion: 2 minutes.
+
+[CRITICAL]   Bench Stefon Diggs in 2 leagues — 31 mph winds in Buffalo at kickoff.
+[IMPORTANT]  Claim Jaylen Warren (Yahoo, League 2) — waiver cutoff 3:00 PM today.
+[REVIEW]     Trade pending — your Kupp for their Ekeler. Lean accept. Addresses RB2 gap.
+[WATCH]      Joe Mixon questionable. Monitor until 12:30 PM. Pivot: Zach Moss.
+[INTEL]      Opponent likely streaming a QB. Your defense matchup is favorable.
+
+[ Set lineups -> ]     [ Claim waiver -> ]     [ Review trade -> ]
+```
+
+### Enhancing, Not Replacing (v5.0 — new)
+
+We are not replacing ESPN, Yahoo, or Sleeper. We are enhancing the fantasy football journey that already exists on top of them. Rostiro is designed to enhance the emotional experience users already have throughout a season — not to showcase AI (see Section 7 for the full emotional philosophy).
+
+Alongside the North Star Pulse test above, every feature also passes a second filter:
+
+> **1. Does this improve the user's fantasy experience? 2. Does this enhance the emotion they are already feeling right now?**
+
+If the answer to either is no, it does not belong in Rostiro.
+
+### Core Philosophy — Non-Negotiable
+
+- **AI is infrastructure, not the headline.** Never market "AI." Market the outcome: fewer missed decisions, more wins.
+- **Surface actions, not information.** Every feature must produce something the user can act on.
+- **Cross-league before single-league.** Every intelligence call considers all connected leagues simultaneously.
+- **Explainable by default.** Every recommendation shows 2-3 sentences of reasoning. No black-box scores.
+- **Deep-link is a feature.** "Rostiro tells you exactly what to do and takes you there in one tap."
+- **Mode is identity, not a setting.** Focused and Savant are not toggles — they are the user's declared relationship with the product. Set once at onboarding, changeable anytime. **Distinct from States (6.10)** — Modes are chosen by the user; States are decided by the OS based on what day it is.
+- **Mobile is the primary surface.** Saturday night at 11pm when the push fires, users are on their phone. Design for that moment first.
+- **Deterministic first, AI second (10.1).** Claude reasons; it never calculates.
+
+> **COMPETITIVE VALIDATION:** ChatGPT deep research across 18 competitors confirms the PI (Pulse/inbox) column is empty across the entire market. No competitor has built a true cross-platform action center. This is the white space.
+
+---
+
+## 2. Product Architecture
+
+| Layer | Purpose |
+|---|---|
+| Rostiro | The consumer brand and web product at rostiro.com |
+| Rostiro OS | Core engine. Sync, normalization, intelligence, prioritization, orchestration. Users never see it — they feel it. |
+| Rostiro Draft Kit | FREE preseason acquisition product. Standalone at rostiro.com/draft. No account required to start. Funnel into Rostiro Pro. |
+| Rostiro Pulse | The daily command center and prioritized action inbox. The morning screen. The retention engine. |
+| Rostiro Intelligence | Premium reasoning layer. Natural-language queries. "Why this move, why this league, why now." Savant mode. |
+| **Rostiro States** *(v5.0 — new)* | Automatic weekly/seasonal cockpit reconfiguration — Draft / Standard / Waiver Day / Game Day / Film Room (6.10). Not a plan tier and not a user setting: every connected user moves through the same States on the same schedule. |
+
+> **Modes vs. States, in one line:** Modes are what the user chooses to see (Focused/Balanced/Savant, Section 3). States are what the OS decides it is (6.10). Both apply at once, independently.
+
+---
+
+## 3. Design Philosophy (v4 — Updated)
+
+### Premium Dark-First
+
+Rostiro should feel like a Bloomberg terminal built for fantasy sports — not ESPN, not Yahoo, not generic dark SaaS. The design language is:
+- **Blue-tinted dark backgrounds** — `#0D1B2A` (page), `#0A1520` (topbar/nav), `#0F2235` (cards). Not pure black, not zinc-gray. The blue tint makes it feel like a domain-specific tool, not a generic dashboard.
+- **Subtle borders** (`#1A3050`) — structure without weight
+- **`#378ADD` as the primary accent** — used for progress, selection state, active items, and links
+- **White as the CTA color** — primary buttons are white text on `#185FA5` or white on dark
+- **One destructive accent only** — `#E24B4A` (red) for CRITICAL priority items. Nothing else uses red.
+- **Muted text: `#4A6580`** — secondary labels, timestamps, helper text
+- **Typography: Geist** — already in the stack, feels native to the product category
+- **No gradients on content** — gradients only on hero/marketing surfaces
+
+### Information Density as Identity
+
+The product serves three distinct users. These are not modes — they are personalities:
+
+| Persona | Tagline | What they want |
+|---|---|---|
+| **Focused** ⚡ | "Tell me what to do." | 5 max actions, verdict before reasoning, one-tap execution, stats hidden by default |
+| **Balanced** ⚖️ | "Show me the key stuff." | Decisions + most relevant supporting data inline, expandable to full detail |
+| **Savant** 🧠 | "Give me everything." | Full data layer always visible, nothing hidden, AI advisory not directive |
+
+The density choice is made at onboarding Step 1 — before account creation — and persists across every session. It is always changeable from the sidebar. It shapes the entire interface: card density, data visible by default, AI voice, and Pulse item count.
+
+**Focused** — verdict shown before reasoning. Stats hidden, tap "why" to expand. Session time estimate always shown. One-tap actions, no confirmation screens.
+
+**Balanced** — matchup difficulty, injury status, weather always visible inline. Tap any item to expand to full Savant view. Trade and waiver reasoning visible by default.
+
+**Savant** — full data layer: Vegas totals, target share, snap count, usage trends, raw projection numbers, confidence intervals, opponent tendency modeling. AI recommendations shown as advisory, never directive.
+
+### Mobile-First Rules
+
+- **Minimum tap target: 44px** — no exceptions
+- **Bottom navigation on mobile** — thumb-reachable: Pulse / Leagues / Draft / More
+- **Top navigation on desktop** — standard left sidebar or top bar
+- **Cards stack vertically on mobile**, grid on desktop (≥768px)
+- **Push notification open → 2 taps to action** — the critical path on mobile must be under 2 taps from notification to completed action
+- **375px is the design target**, not an audit step
+
+---
+
+## 4. Onboarding Flow (v4 — Redesigned)
+
+### Philosophy
+
+The onboarding must deliver value before asking for anything. The sequence is:
+**value hint → mode selection → lowest-friction connection → first value moment → upgrade prompt**
+
+### Step-by-Step Onboarding Flow — 6 Steps
+
+```
+STEP 1 — MODE SELECTION (before account creation)
+First interaction. No email asked yet.
+"How do you run your leagues?"
+Three radio cards: Focused / Balanced / Savant
+Each card shows a live preview of how that mode renders the same Pulse item.
+CTA: "Continue →"
+Stored in localStorage until account is created, then persisted to users table.
+
+  Badges:
+  - Focused:  "Quick & clean"       ← NOT "Most popular" — no data to support pre-launch
+  - Balanced: "Recommended"
+  - Savant:   "Data heavy"
+
+STEP 2 — CREATE ACCOUNT
+Email + password or magic link.
+Headline: "Your Rostiro OS is ready."
+Sub-headline: "Create your account to save it."
+Never say "Sign up." Never say "Register."
+7-day full Rostiro Pro trial begins automatically on confirm.
+
+STEP 3 — CONNECT YOUR LEAGUES
+"Connect your first league. Rostiro can't help until you do."
+Skip is available but honest — not guilt-free.
+
+  [Sleeper]  Username field visible immediately. Lead with this.
+  [Yahoo]    "Connect with Yahoo →" or "Coming soon — join early access"
+  [ESPN]     "Unlock ESPN →" or "Coming soon — join early access"
+
+  Yahoo and ESPN show "Coming soon" until integrations are fully approved.
+  Early access emails are captured and become the first paid conversion list.
+
+STEP 4 — LEAGUE CONFIGURATION
+Per-league card for each connected league.
+Show only 3 variables upfront:
+  - Scoring format (Standard / Half PPR / Full PPR / TE Premium / Custom)
+  - Roster type (Standard / Superflex / 2QB / Custom)
+  - Waiver system (FAAB / Rolling / Snake / Free agent)
+All other variables (waiver cutoff, playoff weeks, trade deadline, FAAB budget,
+scoring modifiers) are behind "Advanced settings ↓" — collapsed by default.
+Yahoo and Sleeper: auto-fetch all values pre-filled. Show as "Looks right?" not a blank form.
+ESPN: manual input until auth is live.
+Never make a variable required if it can be reasonably inferred.
+
+STEP 5 — PUSH NOTIFICATIONS
+Headline: "The Saturday night advantage."
+Sub-headline: "Injury reports drop at 11pm Saturday. Rostiro alerts you instantly
+— before your opponents even check their apps."
+Show the actual notification example FIRST, then ask permission:
+
+  ┌─────────────────────────────────────────────┐
+  │ Rostiro · now                               │
+  │ Joe Mixon is OUT. Affects 2 leagues.        │
+  │ Zach Moss is your pivot — tap to act.       │
+  └─────────────────────────────────────────────┘
+
+  🚨 Injury reports — the moment they drop
+  🌩️ Weather alerts — 30mph winds changes everything
+  ⏰ Waiver deadlines — never miss a cutoff
+  📅 Sunday morning lineup checklist
+
+iOS detection: if user agent is Safari iOS, show BEFORE the permission button:
+  "On iPhone? Tap Share → Add to Home Screen first for full alert support."
+  Do not hide this. Do not show it after failure. Show it proactively.
+
+CTA: "Enable alerts 🔔"
+Skip: "Skip — I'll check manually"
+Denied: email fallback via Resend, no blocking.
+
+STEP 6 — SYNC ANIMATION → LAND ON PULSE
+Animated sync screen (2-3 seconds minimum even if sync is faster):
+  "Syncing your leagues..."
+  "Analyzing rosters..."
+  "Building your first Pulse..."
+
+Lands directly on Pulse dashboard — never a settings page, never an empty screen.
+
+Completion toast (shown for 4 seconds after Pulse loads):
+  "Rostiro is running. You'll get your first alert Saturday at 11pm."
+  This closes the loop and sets a specific, concrete expectation.
+
+If offseason / no urgent items: show Draft Kit card as first Pulse item.
+```
+
+### ESPN Onboarding — "Unlock ESPN"
+
+ESPN is not a peer to Sleeper and Yahoo in the connect flow. It is an unlock:
+- Label: **"Unlock ESPN"** — never "Connect ESPN"
+- Position: Third, collapsed by default in step 3
+- 4-step animated cookie guide (DevTools → Application → Cookies → copy espn_s2 + SWID)
+- If skipped: dashboard shows a subtle "Unlock ESPN" prompt card, never blocking
+- Copy: "ESPN doesn't have an official API — we use your browser cookies. Takes 2 minutes. Read-only."
+
+Users who complete it feel like they've done something — not jumped through a hoop.
+
+---
+
+## 5. Platform Integration Architecture
+
+> **READ FIRST:** The integration approach for each platform drives the entire product architecture. Read this section before writing any data-fetching code. Build each client in its own file: `/lib/espn.ts`, `/lib/yahoo.ts`, `/lib/sleeper.ts`.
+
+### 5.1 Read / Write / Deep-Link Framework
+
+| Platform | Access level | Notes |
+|---|---|---|
+| ESPN | Read only | Unofficial v3 endpoints + espn_s2/SWID cookie auth. No write API. Deep-link to all action pages. |
+| Yahoo | Read + Write | Official REST API, OAuth 2.0. Full read + write: lineup submission, waiver claims, trade proposals. Lead all write features here. |
+| Sleeper | Read only | Public REST API, no auth. Username lookup. Full read. No official write. Deep-link for actions. |
+
+### 5.2 ESPN
+
+> **STATUS:** No official API. Unofficial v3 endpoints. ESPN tightened access Aug 1, 2025 — espn_s2 cookie now required for all private leagues. Build behind a typed service layer with graceful degradation.
+>
+> **VERIFIED LIVE (July 3, 2026), against a real connected private league:** cookie auth (`espn_s2`/SWID) returns genuine data, not just a validation handshake. Confirmed with real HTTP 200 responses and correctly-shaped data — not from reading the code, from actually calling ESPN's API:
+> - **League settings** (`mSettings`) — real league name returned, matches ESPN's own site.
+> - **Rosters** (`mRoster`) — returns real team roster data.
+> - **Matchups/live scoring** (`mMatchup`, `mMatchupScore`) — returns real schedule + scoring data.
+> - **Waivers/free agents** (`kona_player_info`) — returns real player pool data.
+> - **League records/history** — the exact same endpoint works unchanged for past seasons by swapping the season number in the URL (confirmed against 2020, 2023, 2025, 2026 on the same league, each returning that season's real, distinct league name). This means historical league records are reachable — `SEASON` just needs to become a parameter instead of the hardcoded `2026` constant it is today in `lib/espn.ts`.
+> - **Live draft tracking** (`mDraftDetail`) — confirmed the endpoint is reachable and correctly reflects a draft going live in real time (`inProgress` flipped from `false` to `true` at the exact scheduled kickoff, polling a live public ESPN mock draft). Did not directly witness the `picks` array populating pick-by-pick in that same session — the mock room completed and was auto-deleted (ESPN tears mock leagues down right after they finish) before a clean re-poll could confirm it. Reachability and real-time state transition are proven; pick-by-pick population is likely but wants one more clean confirmation before Draft Copilot depends on it for ESPN.
+>
+> **Engineering note:** `getEspnRosters`, `getEspnMatchup`, `getEspnWaivers`, and `getEspnDraftDetail` already exist in `lib/espn.ts` and work when called directly, but as of this verification none of them are wired to an API route yet — only `validateEspnCredentials` (via `mSettings`, at connect time) is. The remaining work is wiring, not discovery.
+
+**Base URL:** `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2026/segments/0/leagues/{LEAGUE_ID}` — `2026` should become a parameter to unlock league-records access (see above).
+
+**Authentication:** espn_s2 + SWID cookies. Stored AES-256 encrypted in Supabase. See onboarding guide in Section 4.
+
+**Deep-link strategy:**
+- Button text: "Set lineup on ESPN →", "Claim on ESPN →", "Propose trade on ESPN →". Never "Go to ESPN."
+
+### 5.3 Yahoo
+
+> **STATUS:** Official REST API with OAuth 2.0. Full read and write. Attribution required: "Fantasy data provided by Yahoo Fantasy" plus the official Yahoo Fantasy logo — Yahoo's API Access and Use Agreement requires the logo specifically wherever the integration is shown on a third-party site, not just the text attribution.
+>
+> **Access status (as of July 3, 2026):** Fantasy Sports API access is a separate, gated application process from basic app registration — confirmed by reading Yahoo's own developer documentation. It is not a checkbox on the app's settings page (which is why the app shows up in the developer console with nothing flagged as blocked); it requires submitting an application describing organization, product, and use case, followed by a Yahoo review. **Application submitted July 1, 2026; currently in Yahoo's review queue (day 3 as of this writing), turnaround time unknown.** This does not block MVP launch: Sleeper and ESPN alone are sufficient to market and launch on August 1 (see 5.2, 5.4). Yahoo write-back ships as a fast-follow the moment access is granted, whether that's days or weeks out — the codebase is already built and waiting (`lib/yahoo.ts`), so there's no additional engineering lead time once approval lands, only the wait itself.
+
+**Write operations available (Phase 1):**
+- Submit lineup changes
+- Add/drop players
+- Propose trades
+
+### 5.4 Sleeper
+
+> **STATUS:** Public REST API. No auth required. Username lookup only. Lead platform for onboarding — zero friction.
+
+**Live draft endpoint:** `GET https://api.sleeper.app/v1/draft/{draft_id}/picks` — poll every 10 seconds.
+
+### 5.5 Phase 2 Platform Connectors
+
+| Platform | Priority | Draft Copilot viability (researched July 2026) |
+|---|---|---|
+| CBS Sports Commissioner | Phase 2 | **Not viable.** Legacy fantasy developer API is deprecated — `developer.cbssports.com` no longer resolves. Would need a different, unofficial approach if revisited. |
+| NFL Fantasy | Phase 2 | **Not viable.** No discoverable stable public API. Long-standing known gap in the fantasy-dev community — NFL.com has always been the hardest platform to pull data from programmatically. |
+| Fantrax | Phase 2 | **Viable.** Unofficial but well-documented `fxea` endpoints (`fantrax.com/fxea/general/getDraftPicks?leagueId=...`, `getTeamRosters`), no authentication required. Docs explicitly note results "can be retrieved live during a draft." |
+| MyFantasyLeague (MFL) | Phase 2 — **pull forward** | **Viable, arguably the easiest of the four.** MFL's official "Developer's Open API" is one of the most open in the industry — long-time favorite of fantasy-nerd tooling. Explicitly supports live draft polling, down to auction-in-progress detection ("if a player has been nominated but no winning bid specified, the auction is currently underway"). No OAuth. Recommend pulling this ahead of CBS/NFL given how little friction it'd take.
+
+### 5.6 Draft Copilot Platform Support (research findings, July 2026)
+
+> Context: v4.2 added Draft Copilot (6.3.1) — live tracking + pre-fetched recommendations during an actual draft. This section tracks which platforms can support it and why.
+
+| Platform | Status | Notes |
+|---|---|---|
+| Sleeper | **Shipped** | `GET /draft/{draft_id}/picks`, public, no auth, poll every 10s. See 5.4. |
+| Yahoo | **Pending Yahoo review (submitted July 1, 2026)** | Official API already has `getYahooDraftResults()` (`/league/{leagueKey}/draft/results`) in `lib/yahoo.ts`, unused until now. Yahoo's own docs: "If called during the draft, it includes the players that have been drafted thus far" — confirmed live-capable, not just post-draft, on paper. Live end-to-end test surfaced that Fantasy Sports API access is a separate gated application, not a self-serve permission toggle (see 5.3) — application already submitted July 1, in Yahoo's review queue as of this writing, turnaround unknown. A combined-scope encoding bug (`fspt-r fspt-w`) was found and fixed in the same investigation but was not the root blocker. No code work remains on this — `lib/yahoo.ts` is ready and waiting on Yahoo's approval. |
+| ESPN | **Confirmed viable (verified July 3, 2026)** | Live-tested against a real connected private league (see 5.2): `mDraftDetail` is reachable and correctly reflected a real mock draft going live (`inProgress` flipped exactly at scheduled kickoff). Did not directly witness the `picks` array populating pick-by-pick — the mock room was auto-deleted right after completing, before a clean re-poll. Reachability and real-time state transition are proven; recommend one more clean confirmation pass before Draft Copilot depends on this for ESPN, but no reason at this point to expect it won't work. |
+| MyFantasyLeague (MFL) | **Recommended next after Yahoo** | See 5.5 — no OAuth, confirmed live-capable including auction state. |
+| Fantrax | **Candidate** | See 5.5 — no-auth endpoints, documented as live-capable. |
+| CBS Sports / NFL Fantasy | **Ruled out** | See 5.5 — no viable API surface for either. |
+
+### 5.7 Stats, Projections & Commentary Data Sources (v5.1 — new)
+
+> Closes a real gap: 6.10 names what Film Room and the Player Intelligence Card (6.11) need to show — usage, snap counts, projections, context — without ever specifying where that data comes from. This section is that specification.
+
+**Snap counts and usage trends — nflverse.** Open source, free, no API key, community-maintained, weekly-updated during the season (static files published to GitHub releases). This is the standard source the fantasy tooling community already relies on for exactly this data. Ingest the same way ADP and injury snapshots already work (6.8 E2, 10.3): a cron job pulls the weekly file into a Supabase cache table. Deterministic, cheap, no new architectural pattern — just a new source feeding the existing pattern.
+
+**Projections — platform-native, not an external feed.** Confirmed July 3, 2026: ESPN's API returns real per-player projections (`statSourceId: 1` in the `stats` array, alongside `statSourceId: 0` for actuals) for *any* player, rostered or free agent, both per-week and full-season — and critically, already scored against that specific league's scoring settings, not a generic average. Verified live against a real league: a free agent with zero rostered status still returned a Week 1 2026 projection and a full-season 2026 projection, both computed correctly. This means Rostiro doesn't need a separate projections provider for ESPN leagues — the number is already sitting in data Rostiro is already pulling for rosters/waivers. Yahoo's API is understood to expose the equivalent (unverified — pending the access review in 5.3); Sleeper's equivalent is unverified and should be checked before assuming parity. Where a platform's native projection isn't available, fall back to an external feed rather than blocking the feature — same resilience posture as everything else in Section 10.
+
+**"What industry experts are saying" — not a data-ingestion problem.** No open, free structured API exists for qualitative fantasy commentary/analysis — that's a fundamentally different kind of data (text/sentiment, not stats) than snap counts or projections. Two real options: (a) license a commercial fantasy-content API (not free/open), or (b) let Claude do live web-grounded research at generation time when writing Film Room recaps or Player Intelligence context lines, rather than pre-ingesting a corpus. Option (b) fits the product's own Deterministic-First rule (10.1) better — synthesizing scattered sentiment into a takeaway is reasoning, which is Claude's job, not a fact to fetch and cache. Do not build a RAG pipeline for this without a licensed source to legally ingest — RAG solves *retrieval* over a corpus you already have the right to hold, it doesn't solve *not having* one.
+
+---
+
+## 6. Feature Specifications
+
+### 6.1 Rostiro Pulse — Daily Command Center
+
+> **RETENTION ENGINE:** Pulse is the product. Build Pulse after the data layer is solid.
+
+**Pulse item types:** lineup_decision, injury_alert, weather_alert, waiver_alert, trade_opportunity, opponent_intel, deadline_reminder, exposure_flag
+
+**Pulse generation flow:**
+1. Triggered on login, on demand, and on schedule (cron)
+2. Fetch fresh roster data from all connected leagues
+3. Fetch injury report, weather forecasts, waiver targets
+4. Single Claude API call → returns prioritized PulseItem array
+5. Store in pulse_items table, serve to client
+
+**View modes (v4):**
+- **Focused:** 5 cards max. Clean. One action per card. Completion % shown. For users who chose Focused mode.
+- **Savant:** Full portfolio intelligence. All rosters, exposure bars, weather overlays, Vegas totals. For users who chose Savant mode.
+
+**Pulse empty state (v4 — new):**
+
+The empty state is not a blank screen. It shows:
+```
+ROSTIRO PULSE
+Your Pulse is ready for the season.
+
+┌─────────────────────────────────────────┐
+│ Preseason intel active                  │
+│                                         │
+│ • Training camp injury watch: 3 players │
+│   on your roster flagged                │
+│ • ADP movers: 2 players you own have    │
+│   moved +10 spots this week             │
+│ • Week 1 schedule: your matchups load   │
+│   August 28                             │
+└─────────────────────────────────────────┘
+
+Push notifications: ON  ← prompt if not set
+```
+Never show a blank inbox. In the offseason, show preseason intel, ADP movers, and training camp updates.
+
+### 6.2 League Health Score (v4 — new)
+
+Every league card on the dashboard shows a **Health Score: 0–100**.
+
+Factors:
+| Factor | Weight |
+|---|---|
+| Starter injury risk (% of starters questionable/out) | 30% |
+| Bye week exposure this week | 20% |
+| Waiver opportunity (top available player value) | 20% |
+| Matchup difficulty (opponent projected score vs. league avg) | 20% |
+| Roster depth (bench quality relative to starters) | 10% |
+
+Display:
+- **80–100:** Green — "Healthy"
+- **60–79:** Yellow — "Monitor"
+- **0–59:** Red — "Action needed"
+
+This gives the dashboard a reason to exist even when there's no urgent Pulse item. Users open the app to check their health score, not just to react to alerts.
+
+### 6.3 Draft Kit — Free Acquisition Product
+
+> **ACQUISITION FUNNEL:** Free. No account required to start.
+
+User flow unchanged from v3. Key addition: Sleeper auto-sync is the default demo path in all marketing — zero friction, best technical sync.
+
+### 6.3.1 Draft Copilot — Live Panic-Proofing (v4.2 — new)
+
+> **THE PROBLEM:** Pre-draft rankings solve the wrong moment. The moment that actually costs a manager their draft is mid-draft: a run starts, three picks go off-plan, a targeted player gets sniped, and the clock drops under 10 seconds while the manager re-derives "okay, given what's gone, who do I actually take" from scratch. That's the moment Rostiro needs to have already solved.
+
+**Access constraint (see 5.1):** no platform exposes a draft-submission write API. Rostiro tracks the draft in real time and advises — the manager still makes the pick on the platform's own site. Sleeper's live draft picks endpoint (`GET /draft/{draft_id}/picks`) is polled every 10 seconds per 5.4; no manual refresh.
+
+**Four pieces, shipped together as v1 — they solve one problem, not four separate ones:**
+
+1. **Always-current board.** The full player pool is cached locally (`players_cache`); a pick landing on the next poll removes that player from "available" instantly. No per-view API call — this is a local filter over already-cached data, updated on every 10-second poll.
+2. **Turn prediction.** From snake draft position + team count + current pick number, Rostiro computes every future pick number that belongs to the manager (`myNextPickNumbers`) and therefore how many picks remain until their turn.
+3. **Pre-fetched recommendations.** When the manager is within ~3 picks of their turn, Rostiro generates Claude's reasoning for the top best-available-by-need candidates *before* the clock starts — never during it. The explanation is already rendered the instant the panic moment arrives. A live Claude call during a sub-10-second window is the wrong architecture; a call two picks earlier, during calm time, is the right one.
+4. **Run + snipe alerts.** Three or more picks at one position within a short window surfaces a "position run in progress" flag, unprompted. If a manager has queued (starred) a target player and someone else takes them, Rostiro surfaces the next-best option immediately instead of waiting for the manager to notice and re-scan.
+
+**What Claude does and doesn't decide, consistent with 6.4/6.5:** best-available filtering and turn prediction are deterministic (ADP + roster need + draft position math). Claude only writes the explanation for candidates the deterministic layer already surfaced — it is never the thing deciding who's recommended.
+
+### 6.4 Start/Sit Engine
+
+Recommendations across all leagues simultaneously. Free: 3/week. Pro: unlimited.
+
+### 6.5 Trade Analyzer
+
+Win / Lose / Roughly Even verdict + reasoning. Free: 3/week. Pro: unlimited.
+
+### 6.6 Web Push Notifications
+
+**Primary channel.** Saturday night at 11pm injury report push is the core retention mechanic.
+
+Provider: OneSignal. Permission prompt fires after first league connected — highest-intent moment.
+
+### 6.7 Rostiro OS Shell (v4.4 — new)
+
+> **THE PROBLEM:** The built UI is a set of well-made but disconnected pages — the user navigates to a tool and operates it. That's a program. An OS holds ambient state about all leagues, interrupts only with decisions, and brings actions to the user. Three absences cause the "program" feel: no ambient state visible anywhere, no cross-cutting surface that follows the user between screens, and actions that live inside tools instead of on the intelligence that surfaced them.
+
+Approved from an interactive mockup (July 2026). Five workstreams, sequenced so each ships independently:
+
+**W1 — System Bar (T-67).** Persistent chrome on every authenticated screen. Contains: live sync status ("Synced 12s ago", ticking), per-league health dots with hover tooltips, next-hard-deadline countdown (nearest waiver cutoff / lineup lock across all leagues, ticking), mode chip, ⌘K affordance. Mobile variant condenses to dots + countdown. Backed by one `/api/system/status` endpoint (last sync, health scores, next deadline), polled on an interval. This is the single biggest "OS not program" change. *v5.0: the System Bar's accent tone also shifts with the active Rostiro State (6.10) — see 6.10 design language note.*
+
+**W2 — Leagues Page + Health Score (T-68).** The nav item specified in v4 but never built, plus League Health Score (6.2, closing T-52). `lib/healthScore.ts` computes the five weighted factors deterministically from Sleeper rosters + `players_cache` — no Claude call. Preseason degradation is honest: matchup/bye factors show "loads Week 1," never fake numbers. Health ring + factor bars + top flag per league card, linking to that league's Pulse items. Same computation feeds the system bar dots.
+
+**W3 — Persistent, Actionable Pulse (T-69).** Pulse items persist to the existing `pulse_items` table with a content fingerprint (dismissed items don't resurrect on regeneration). Done / Dismiss / Snooze on every card. Morning header: "Good morning, {name}. N decisions across M leagues · Est. completion X min" + progress bar. Cron generation so Pulse is pre-built before the user opens the app. Two new item types with no new data sources: `deadline_reminder` (from W1's deadline detection) and `lineup_decision` (reuses the Start/Sit ADP-gap engine). Daily ADP snapshot added to the players cron now — cheap today, impossible to backfill later — so the empty-state "ADP movers" card ships once a week of data exists.
+
+**W4 — Command Palette (T-70).** ⌘K on desktop, floating action button on mobile. Three command sources: static navigation, live Pulse actions (open items become commands — "Bench Diggs" jumps to the card/deep link), and player search (reuses `/api/draft/players`). Registry pattern so future features register commands without touching the palette.
+
+**W5 — Identity + Polish (T-71).** Mode persists to `users` table (closing T-51); localStorage remains the pre-signup cache. Real Settings page: account, mode, connected leagues with disconnect, notification prefs (UI ready for push). Terminal visual pass: `tabular-nums` on all data, tick animation on live-value updates, denser Savant layouts.
+
+**Explicitly out of scope for the shell** (separate tracks): push/OneSignal, Stripe + quota enforcement, onboarding steps 4–6, weather data, ESPN/Yahoo Pulse merge. The shell is their landing spot — notification prefs UI, deadline countdown, and Pulse actions are where they slot in.
+
+### 6.8 Experience Layer (v4.5 — new)
+
+> **THE THESIS:** The ticker and Pulse are the bread and butter. Signing up and every login should feel like stepping into a running system, not opening a website. An OS doesn't make you watch a tutorial video — it teaches through its chrome.
+
+**E1 — Boot sequence + coach marks (T-72).** First login only: a ~5-second skippable boot moment — system bar comes alive, ticker types out, Pulse panels land in sequence. Then progressive, dismissable coach marks anchored to the crucial instruments: health dots, ⌘K, Pulse actions (Done/Snooze), the ticker, the mode chip. Contextual hints appear on first *use* of a surface (Draft Copilot hint on first draft join), not all on day one. Infrastructure: one `<Hint>` component with a registry (mirroring the palette's command registry), dismissed-forever state persisted per user (`seen_hints` jsonb on `users`), "replay tour" available from Settings and the command palette. Every-login experience stays light: morning header + greeting (built), ticker warm-up on load — no repeated tutorials, daily friction kills retention.
+*Open decision (default: boot + coach marks, no modal step-by-step tour).*
+
+**E2 — Ticker seasonal roadmap (T-73).** The bottom strip's data source rotates with the season; the response shape stays fixed so the component never changes:
+- **Pre-draft (built):** ADP movement over a 7-day window from `adp_snapshots`; honest "DAY N OF 7" fallback while history accumulates.
+- **Post-draft / in-season:** top waiver claims of the week from each connected league's transactions (Sleeper `/league/{id}/transactions` — *your leagues'* actual claims, not generic trends) + injury news from designation *changes*. Prerequisite shipped early: daily injury-status snapshots start now (same "cheap today, impossible to backfill" logic as ADP).
+- **Game day:** live scores. Surfaced in the ticker and as Pulse items.
+*Open decision on "locked" in-game scores (default: premium-gated — free users see them blurred with an upgrade prompt). To be confirmed before build.*
+*v5.0: this rotation is now driven by the same Rostiro States engine (6.10, `lib/rostiroState.ts`) rather than a parallel date check — one source of truth for "what week is it."*
+
+**E3 — Features page (T-74).** Marketing page telling the OS story: what Rostiro does (ambient monitoring, the decision queue, Draft Copilot, Health Score, modes) and how it's different (deterministic numbers, Claude only explains; actions come to you; one system for every league). Embeds the *real living components* — an actual ticking ticker, a live demo Pulse card — never screenshots.
+*Open decision (default: build after the incoming marketing designs land, in one pass with the rest of the marketing surface).*
+
+### 6.9 Product Foundations (v4.5 — new)
+
+Genuine build targets with acceptance criteria — not launch-week afterthoughts.
+
+**F1 — Accessibility (T-75).** Acceptance criteria: WCAG AA contrast on all text (known issue: `--t3` dim text at small sizes needs an audit pass), visible focus states on every interactive element, full keyboard operability (palette ✓, drawer focus-trap needed, cards ✓), `prefers-reduced-motion` honored everywhere (✓), ticker marked `aria-hidden` with a static screen-reader alternative, `aria-live` regions for value updates kept polite/off where noisy, semantic landmarks per screen. Audit + fix pass, then a11y checks added to the pre-launch checklist.
+
+**F2 — Security hardening (T-76).** Pre-launch pass: security headers in `next.config` (CSP, HSTS, X-Frame-Options, Referrer-Policy), rate limiting on API routes (especially Claude-backed ones), dependency audit, full `/security-review` run with findings triaged. Already in place and staying: RLS on every table, Zod on every body, encrypted OAuth tokens, CRON_SECRET on crons, service-role keys server-only.
+
+**F3 — Daylight theme (T-77).** Light mode as designed work, not inversion — the glow-and-glass identity needs light equivalents (white translucency + soft tinted shadows instead of glows). Structurally cheap: every color is already a CSS custom property, so the theme is a `:root` swap behind a toggle in Settings + system-preference detection (`prefers-color-scheme`), persisted alongside mode on `users`.
+*Open decision (default: post-launch fast-follow — launch is dark-first, it's the brand identity).*
+
+**F4 — Privacy policy + data controls (T-78).** Quietly launch-critical: Yahoo OAuth app review requires a public privacy-policy URL; Stripe expects one. Public `/privacy` page (drafted for review, plain language) covering: what's collected, platform credentials handling (encrypted, never logged), AI processing disclosure (league data sent to Claude for explanations), retention, contact. Backed by real controls in Settings: export my data (JSON), delete my account (cascade — schema already cascades on `users.id`), disconnect leagues (✓ built). Analytics opt-out lands here if/when analytics are added.
+
+### 6.10 Rostiro States — Adaptive Weekly & Seasonal Cockpit (v5.0 — new)
+
+> **THE PROBLEM THIS SOLVES:** Not "Rostiro should change pages." Rostiro should transform its cockpit through the week and the season, automatically, for every user, regardless of plan. Sundays already feel different because of football; rooting for multiple fantasy teams makes it feel more different still. Rostiro attaches itself to that feeling. At 1pm ET on Sunday — the moment there's nothing left to do but watch — the OS should visibly become a different instrument than it was at 8am.
+
+**Distinct from Modes.** Focused / Balanced / Savant (Section 3) are personas the user chooses — how much they want to see. Rostiro States are what the OS decides — what week and day it is. A Savant user in Draft State sees dense data about drafting; a Focused user in the same State sees the single most important draft decision. The two axes are independent and both apply simultaneously.
+
+**Five states:**
+
+1. **Draft State.** Preseason through the user's last draft completes. Emotion: "This is my year." Prioritizes: Draft Copilot, ADP, sleepers, queue. Ticker: ADP movement, position runs (E2 pre-draft source, unchanged). Motion: opportunity, forward momentum.
+
+2. **Standard State.** Wednesday through Saturday. Emotion: preparation, planning. Close to the dashboard already built — the resting state. Prioritizes: trade discussion, roster optimization, upcoming matchup prep.
+
+3. **Waiver Day State.** The day each user's connected leagues actually process waivers — for most leagues that's Tuesday night into Wednesday morning; Rostiro detects the specific cutoff per league rather than assuming one universal day (see Multi-League Alignment below). Emotion: "Mission Briefing" — opportunity, preparation. Prioritizes: priority waiver targets, recommended drops, projected roster-health improvement, FAAB budget context.
+
+4. **Game Day State.** Any day with a live NFL game involving a roster the user owns a player on: Thursday night (lower intensity), Sunday (full intensity — the signature moment), Monday night (lower intensity). Emotion: Mission Control — anticipation shifting to suspense as kickoff nears. Prioritizes: Pulse, live matchups, injuries, weather, lineup-lock countdowns, live scores in the ticker. Visual language: cockpit, telemetry, mission status. This is the state the product is emotionally built around — see 10.2 Game Day Architecture for how it's served without a polling storm.
+
+5. **Film Room State.** Monday night through Tuesday morning, before Waiver Day takes over. Emotion: "What happened?" Prioritizes: injuries, usage/snap counts, waiver trends, buy-low/sell-high signals, AI weekly recap. Visual language: review, analysis.
+
+**Playoffs and Championship Week are not additional States** — they're a theming layer applied on top of whichever State is active during weeks 15–17: heightened-stakes visual treatment (more saturated accents, "stakes" framing in copy), without changing which components are prioritized. A Tuesday in Week 16 is still Waiver Day mechanically; it just carries more weight emotionally.
+
+**Trigger mechanics — deterministic, not AI-decided (ties to 10.1: Deterministic First).** State is computed from: (a) day of week / time of day in the user's local timezone, cross-referenced against (b) the NFL schedule (kickoff times for Thu/Sun/Mon games, bye weeks, holiday-schedule irregularities like the Thanksgiving slate and international early-window games), and (c) each connected league's actual waiver-processing cutoff. No Claude call. A lightweight `lib/rostiroState.ts` service computes the active state; the client re-checks only near known transition boundaries (e.g., every 60s in the 10-minute window around a scheduled kickoff or waiver cutoff), never continuously polling all day — this keeps the "living system" feeling without a background timer running full-time for every user.
+
+**Multi-league alignment.** A user's leagues may not agree — one league's waivers clear Tuesday night, another's Wednesday morning; one league has a Thursday-night game affecting a roster, another doesn't. Global chrome (System Bar, Ticker, Pulse ordering) reflects the earliest/broadest applicable transition across the user's connected leagues — if any connected league is in a live game right now, the user is in Game Day State — while individual League cards still show that league's specific status underneath.
+
+**Universal, not paywalled.** Every user, free or paid, feels the State transformation — this is deliberately not a Pro-gated feature, it's the retention/growth hook (9 Monetization: "States are universal, depth is the paywall"). What's gated is depth within a state — e.g., a free user's Game Day still visibly becomes Mission Control at 1pm, but live-score detail may be blurred per E2's existing gating default; a free user's Film Room still shows the "what happened" framing, but deep usage analytics are Pro-only.
+
+**MVP phasing.** We are ahead of schedule as of July 3, 2026, which is why this is in MVP rather than deferred:
+- **Draft State** and **Standard State** ship for the 8/1 launch — Draft State is close to already-built Draft Kit/Copilot work, Standard State is close to the existing dashboard.
+- **Waiver Day, Game Day, and Film Room States** target **end of August 2026**. There are no regular-season games until Week 1 (~Sept 4, 2026), so there's no live cost to shipping these slightly later, and August preseason games (starting ~Aug 6) are a real, lower-stakes test bed: Game Day State can be validated against actual preseason kickoffs before real Week 1 traffic hits it.
+- Ships behind a feature flag (10.1: Feature Flags) — this is new logic activating automatically for 100% of users on the highest-traffic day of the week; an instant kill switch back to Standard State is required.
+
+**Design language per state** (flagged here so it isn't lost — needs a design pass, not fully specified): System Bar accent tone, ticker copy voice, and card border/glow treatment should each shift subtly per state — e.g., Game Day leans toward the cockpit/telemetry mono-value language already established in Section 3, Film Room leans toward a calmer review palette, Waiver Day leans toward the opportunity-green already used for Draft.
+
+### 6.11 Player Intelligence Card (v5.1 — new)
+
+> **THE IDEA:** ⌘K already has player search as one of its three command sources (6.7 W4) — today it only navigates. This turns it into decision intelligence: type a player, get an instant card with everything needed to make a call about them, right now, today.
+
+**What it shows, for any player, at any time:**
+- **Availability per league** — rostered, free agent, or on waivers, checked across every league the user has connected (cross-league before single-league, the standing Core Philosophy rule in Section 1)
+- **Usage rate and snap count** — from nflverse (5.7), cron-cached
+- **Projection** — platform-native where available (5.7): ESPN returns real per-league-scored projections for any player, rostered or not, confirmed live July 3, 2026
+- **Trend** — direction of usage/snap share over the recent window, from the same nflverse cache
+- **Context** — one or two sentences of Claude reasoning synthesizing the above into "why this matters right now," the same deterministic-data-then-Claude-explains pattern as Start/Sit (6.4) and Draft Copilot (6.3.1); never the thing deciding the numbers, only explaining them
+
+**This is where Rostiro States (6.10) reach the individual-player level, not just the ambient chrome.** The same card reprioritizes what it leads with based on the active State — one card, contents reordered by day, matching the "components rearrange" principle already governing 6.10:
+- **Draft State:** ADP, tier, sleeper/bust signal
+- **Waiver Day:** usage trend, snap share change, buy-low/sell-high signal
+- **Game Day:** live score impact, matchup context
+- **Film Room:** what happened this week, usage delta from last week
+- **Standard:** projection and availability, the general-purpose default
+
+**Engineering note:** reuses the existing player search plumbing (`/api/draft/players`, 6.7 W4) for lookup; the card itself is new UI, and its data dependencies (nflverse ingestion, per-league availability check) are the same 5.7 pipeline Film Room needs — building one builds the other.
+
+---
+
+## 7. Emotional Experience & Product Philosophy (v5.0 — new)
+
+Rostiro is not fantasy football software. It is a companion through an NFL season, designed to enhance the emotional experience users already have — not to showcase AI. We are not replacing ESPN, Yahoo, or Sleeper; we are enhancing the journey that already exists on top of them.
+
+Every feature answers two questions before it ships (also stated in Section 1): **(1) does this improve the user's fantasy experience, and (2) does this enhance the emotion they are already feeling right now?** This sits alongside the North Star Pulse test (6.1) as the second filter every feature passes through.
+
+### The Weekly Emotional Arc
+
+Maps directly onto the Rostiro States (6.10) that carry it:
+
+| Day / period | Emotion | Carried by State | Rostiro's job |
+|---|---|---|---|
+| Draft season | Hope, excitement, optimism | Draft | Mission preparation — Draft Copilot, ADP movement, portfolio groundwork |
+| Post-draft | Pride, ownership | Standard (light beat, see 13) | Let users admire what they built — roster grade appears in Pulse even without a full Portfolio product at MVP |
+| Sunday morning | Anticipation, nervousness, confidence | Game Day (ramping) | Mission Control — calmly organize everything requiring attention before kickoff |
+| During games | Suspense, excitement, momentum | Game Day | Alive without overwhelming — subtle animation, context-aware alerts, no unnecessary interruptions |
+| Monday (win) | Celebration | Film Room | "Mission Complete" framing — leagues won, portfolio health improved, best move of the week |
+| Monday (loss) | Support, not punishment | Film Room | Never punitive — "not your week, here's what we already found for Tuesday" |
+| Tuesday | Opportunity, preparation | Waiver Day | Mission Briefing — priority targets, recommended drops, projected improvement |
+| Wed–Sat | Preparation, optimization | Standard | Trade discussion, planning, confidence-building |
+| Playoffs (theming layer) | Pressure, urgency | Any state, themed | Communicate higher stakes while staying calm |
+| Championship week (theming layer) | Focus, legacy | Any state, themed | Special animations, historical comparisons |
+
+### Motion Philosophy
+
+Animation reinforces the emotional moment, never fights it:
+- **Winning:** celebratory, tasteful — never gaudy.
+- **Losing:** supportive, never negative or alarming.
+- **New recommendation:** confident, never alarming.
+- **Mission completed (Pulse fully cleared):** rewarding.
+
+This is the emotional rulebook that the boot sequence and coach marks (6.8) and state transitions (6.10) are built to follow.
+
+---
+
+## 8. Navigation Structure (v4 — new)
+
+> **v4.4:** the OS Shell system bar (6.7 W1) sits above everything on both breakpoints — sync status, health dots, deadline countdown, mode chip, ⌘K. Leagues added to both navs (it was specified here in v4 but never present in the built nav). **v5.0:** system bar accent tone and ticker copy voice shift with the active Rostiro State (6.10) — the nav itself doesn't restructure, but its chrome reflects Draft / Standard / Waiver Day / Game Day / Film Room.
+
+### Mobile (bottom nav, thumb-reachable)
+
+```
+┌─────────────────────────────────┐
+│ ● Synced 8s · ●●●● · Waivers 5h │  ← system bar (condensed)
+├─────────────────────────────────┤
+│         [page content]          │
+│                            (⌘)  │  ← command FAB
+├─────────────────────────────────┤
+│ Pulse │ Leagues │ Draft │ ···   │
+└─────────────────────────────────┘
+```
+
+### Desktop (left sidebar)
+
+```
+┌────────────────────────────────────────────┐
+│ ROSTIRO OS · Synced 8s · ●●●● · Waivers    │  ← system bar
+│              05:23:47 · Balanced · ⌘K      │
+├──────────┬─────────────────────────────────┤
+│ Pulse    │                                 │
+│ Leagues  │   [page content]                │
+│ Draft Kit│                                 │
+│ Lineups  │                                 │
+│ Trades   │                                 │
+│──────────│                                 │
+│ Settings │                                 │
+└──────────┴─────────────────────────────────┘
+```
+
+### Mode indicator
+
+Always visible in the header/nav:
+- Focused mode: subtle "Focused" chip
+- Savant mode: subtle "Savant" chip
+- Tap to switch — with a "are you sure? this changes your dashboard density" confirmation
+
+---
+
+## 9. Monetization (v5.0 — replaced)
+
+> Pricing sells the enhanced-season experience, not a feature count. See Section 7 for the philosophy this reflects.
+
+| Plan | Price | Includes |
+|---|---|---|
+| **Free** | $0 | 1 league. Morning Pulse (basic). Basic ticker. Rostiro States — full ambient experience, universal (6.10: states are never paywalled, only depth within them is). Limited Draft Copilot. Basic AI: 3 start/sit and 3 trade analyses per week. |
+| **Rostiro Pro** | $9.99/mo | Unlimited leagues. Unlimited Pulse across all leagues. Full Draft Copilot (pre-fetched reasoning). Full state depth (unblurred live scores, full Film Room recap, full Waiver Day detail). Unlimited Start/Sit + Trade Analyzer. Push notifications. Complete OS experience. |
+| **2026 Founder Season Pass** | $59 | Rostiro Pro for the full 2026 season. Launch-window pricing — never offered again after this window closes. |
+| **Founding 500** | $149 lifetime | Strictly the first 500 users. Lifetime access, founder badge, priority feedback access, early feature previews. Never returns once sold out. |
+
+**Open decision — free tier depth after trial.** Every new signup gets the existing 7-day full-Pro trial (built in onboarding Step 2, Section 4). Recommended default: after the trial expires, Free settles to the limited tier above rather than staying at full access indefinitely — this is what creates upgrade pressure, and it's consistent with what's already built. The alternative (full features forever on 1 league) is more generous and simpler to reason about, but removes the only lever pushing single-league casual users to convert. Flagged as open since it's a business call, not an engineering one — confirm before Stripe integration (T-85).
+
+**Future pricing roadmap:** 2027 adds a Season Pass price increase, NBA support, and a possible all-sports pass. 2028+ multi-sport expansion. No additional pricing complexity introduced before it's justified.
+
+---
+
+## 10. Scalability & Operational Architecture (v5.0 — new)
+
+> This is Rostiro's engineering constitution. Every subsystem in Section 6 is built against these rules whether or not each spec calls them out individually. Rostiro is being designed for 1,000 → 10,000 → 100,000+ paying users without a rewrite at any threshold.
+
+### 10.1 Engineering Philosophy
+
+**Deterministic First, AI Second.** Claude reasons; it never calculates. Rankings, ADP movement, snake-draft math, run/snipe detection, League Health scoring, countdown timers, and ticker generation are deterministic code (already true for 6.2, 6.3.1, 6.10) — now stated as a standing rule for every future feature. Claude is called only to explain what the deterministic layer has already decided.
+
+**API Calls.** No user ever independently calls a third-party API. All Sleeper/Yahoo/ESPN traffic flows through centralized sync jobs with league-level deduplication (two users in the same league share one fetch), shared caches, background refresh workers, and event-driven updates where the platform supports them. A user opening the app reads a cache; they never trigger a live upstream fetch.
+
+**Caching.** Everything expensive assumes a cache in front of it: Pulse, league data, player data, AI outputs, trade analyses, ticker content, weather, injuries. Cache invalidation is explicit and tied to sync-job completion, not TTL guessing alone.
+
+**Rate Limits.** Every external API is assumed to have limits. Standard pattern: retry with exponential backoff, request queueing, circuit breakers per platform (if Yahoo is erroring, stop hammering it and serve cache), graceful degradation over hard failure.
+
+**Observability.** Track from day one: API latency per platform, Claude latency, cache hit rate, league sync time, ticker freshness, queue depth, failed-sync count. Without this, "it's slow for some users" is undiagnosable at 10,000+ users.
+
+**Feature Flags.** Every expensive or new-and-risky feature is toggleable without a deploy: Ticker, Draft Copilot, AI Pulse, Live Scores, Push Notifications, and Rostiro States (6.10) — the highest-risk addition, since it activates automatically for every user on the highest-traffic day.
+
+**Cost Controls.** Every AI request documents, before it ships: expected latency, cache strategy, token estimate, monthly cost at projected scale, and fallback behavior if the call fails or a budget cap is hit.
+
+**Data Model.** Schema assumes NFL, NBA, MLB, NHL, and future fantasy sports from day one — no sport-specific assumptions in the core tables (players, rosters, leagues, scoring). NFL is the only sport that ships in 2026 (13 Out of Scope is unchanged on that point) — this is a schema discipline, not a build-scope change.
+
+**Performance Budget.** Dashboard load <2s. Cached Pulse <500ms. Command Palette open <100ms. Animations at 60fps. Zero layout shift.
+
+**Resilience — degraded mode per dependency.** If Claude fails: serve the deterministic recommendation without the explanation, don't block the action. If Sleeper/Yahoo/ESPN fails: serve last-cached data with a visible staleness indicator, never a blank screen. If live scores fail: show last successful refresh timestamp rather than nothing.
+
+### 10.2 Game Day Architecture
+
+> The dedicated architecture for Sundays — the day every user is looking at Rostiro at once, and the day 6.10's Game Day State creates the product's signature moment.
+
+- **Cached reads first.** No client ever fetches live scores directly from an upstream provider. One shared background job polls scores on a fixed interval and writes to a shared cache; every user's client reads that cache.
+- **Shared polling, not per-user polling.** The 60-second state-transition check in 6.10 and the score-refresh job are the only things polling — never one poll per open client. At 100,000 concurrent Sunday users, per-client polling of any kind is the single biggest scaling risk in the product; this section exists specifically to rule it out before it's ever built.
+- **Background refresh with graceful stale indicators.** If a refresh cycle is late, the UI shows the last-known value with a subtle "as of Xs ago" marker rather than blocking or spinning.
+- **No polling storms at kickoff.** Because Game Day State activates for every user near the same kickoff windows, the transition-check and score-refresh jobs are staggered/jittered rather than firing for all users at the exact same second.
+
+### 10.3 Per-Subsystem Scalability Considerations
+
+| Subsystem | Considerations |
+|---|---|
+| **Pulse** | Generated by cron ahead of the user opening the app (already true per 6.7 W3), not on-demand per login. Claude called once per user per generation cycle, not per item. |
+| **Draft Copilot** | Sleeper poll (10s) is per-draft, not per-user-in-that-draft — multiple managers in the same draft share one poll. Pre-fetched reasoning (6.3.1) is generated once per candidate set, cached, and reused if multiple users hit the same draft state. |
+| **League Health** | Fully deterministic (`lib/healthScore.ts`, 6.2/6.7 W2) — zero AI cost, computed from already-cached roster/player data. Scales linearly with league count, not user count, since leagues are deduplicated. |
+| **Ticker** | One shared content pipeline per data source (ADP snapshot, transactions, injury deltas, scores) feeds all users; nothing is generated per-request. |
+| **Start/Sit** | Deterministic ranking + Claude explanation, same pattern as Draft Copilot — explanation cached per player/matchup, not regenerated per user asking about the same matchup. |
+| **Trade Analyzer** | Same pattern — verdict is deterministic value comparison; Claude explanation cacheable per proposed trade shape. |
+| **Notifications** | Fan-out from one detection event (e.g., one injury designation change) to all affected users' queues — never one third-party check per user per notification type. |
+| **Portfolio** (deferred, 13) | Even without the sharing UI, weekly grade/exposure numbers are computed and stored from launch — cheap now, impossible to backfill later (same principle already applied to ADP/injury snapshots in 6.8 E2). |
+| **Authentication** | Standard Supabase auth; scales without custom work at these tiers. |
+| **League Sync** | The core centralization point — one sync per league per platform, shared across every user in that league, on a schedule plus event-driven triggers where the platform allows them. |
+| **Analytics** | Deferred until it exists; when added, respect the same cost-controls and cache-first rules as everything else — no per-event third-party calls in the hot path. |
+
+---
+
+## 11. Technical Architecture
+
+### Stack
+
+| Layer | Decision |
+|---|---|
+| Frontend | Next.js 16 + TypeScript — App Router |
+| Styling | Tailwind CSS — mobile-first, dark-first |
+| Backend | Next.js API routes |
+| Database | Supabase (PostgreSQL) |
+| AI | Claude API — claude-sonnet-4-6 exclusively |
+| Push | OneSignal |
+| Email | Resend |
+| Payments | Stripe |
+| Hosting | Vercel |
+
+### Database schema, API routes, build order
+
+See v3 Section 7–11. All unchanged except season defaults updated to 2026, and schema discipline per 10.1 (sport-agnostic core tables).
+
+---
+
+## 12. Build Phases
+
+### Completed (as of July 2026)
+
+| Task | Status |
+|---|---|
+| T-01 through T-13 | Complete |
+| Supabase schema live | ✓ |
+| Sleeper live data verified | ✓ |
+| Auth (login/signup) live on Vercel | ✓ |
+| Onboarding flow built | ✓ |
+
+### Status: ahead of schedule (v5.0)
+
+As of July 3, 2026, build is ahead of the original Week 3–7 plan. That room is what allowed Rostiro States (6.10) and the Scalability & Operational Architecture baseline (10) to move into MVP scope rather than being deferred past launch.
+
+### Remaining build order
+
+Week 3: Dashboard + AI layer (T-14–T-23)
+Week 4-5: Draft Kit (T-24–T-37)
+Week 6: Pulse + Pulse empty state + League Health Score (T-38–T-46)
+Week 7: Mobile audit + landing page + launch (T-47–T-50)
+
+**8/1–8/10: Launch.** Draft State + Standard State live. Free / Pro / Founder Season Pass / Founding 500 pricing live.
+
+**Through end of August (pre-Week-1, using live preseason games as a test bed):** Waiver Day, Game Day, and Film Room States (T-79–T-83) built and validated against real preseason kickoffs (~Aug 6 onward) before Week 1 traffic (~Sept 4, 2026) arrives. Scalability baseline (feature flags, caching audit, observability, circuit breakers — T-84) also lands in this window, ahead of the first real Sunday.
+
+**GO / NO-GO GATE:** Yahoo OAuth returning live roster data AND ESPN cookie auth returning league data. Both must pass before dashboard UI is finalized.
+
+---
+
+## 13. Out of Scope for MVP
+
+**Out of scope entirely** (unchanged from v3): native app, CBS/NFL/Fantrax/MFL platform connectors (Phase 2 per 5.5), DFS, dynasty features, basketball/baseball/hockey (the schema stays sport-agnostic per 10.1 — building for them does not), historical analytics, commissioner tools, in-app messaging.
+
+**Deferred to fast-follow** (v5.0 — new; post-launch, not MVP, but not "never"):
+- **Full Portfolio product** — shareable roster-grade graphics, animated reveals, exposure-summary cards for X / Instagram / league-chat distribution. Underlying weekly grade/exposure data is still computed and stored from launch (10.3) so this isn't a cold start when it ships.
+- **Social sharing infrastructure** — confirmed as a growth mechanic worth building, but not an 8/1 launch or marketing dependency.
+
+---
+
+## 14. Updated Task List
+
+All tasks from v3 carry forward. Additional tasks from v4:
+
+| Task | Description |
+|---|---|
+| T-51 | Mode selection screen — onboarding step 3. Store user mode preference in users table. |
+| T-52 | League Health Score — calculation service + display on dashboard cards |
+| T-53 | Pulse empty state — preseason intel view with ADP movers and training camp flags |
+| T-54 | ESPN "Unlock ESPN" repositioning — framing, copy, and placement in onboarding |
+| T-55 | Mobile bottom navigation — Pulse / Leagues / Draft / More, 44px targets |
+| T-56 | Desktop left sidebar navigation |
+| T-57 | Mode indicator in nav + switch confirmation modal |
+
+Additional tasks from v4.4 (Rostiro OS Shell — see 6.7):
+
+| Task | Description |
+|---|---|
+| T-67 | System Bar — persistent chrome: live sync ticker, health dots, deadline countdown, mode chip, ⌘K affordance. `/api/system/status` endpoint. Desktop + condensed mobile variant. |
+| T-68 | Leagues page + Health Score — `/leagues` route, `lib/healthScore.ts` (PRD 6.2 five-factor formula, deterministic), health rings + factor bars, nav updates. Closes T-52. |
+| T-69 | Persistent actionable Pulse — write to `pulse_items` with content fingerprint, Done/Dismiss/Snooze, morning header + completion bar, cron generation, `deadline_reminder` + `lineup_decision` item types, daily ADP snapshot in players cron. |
+| T-70 | Command palette — ⌘K overlay + mobile FAB, command registry (navigation / Pulse actions / player search), keyboard navigation. |
+| T-71 | Identity + polish — mode persisted to `users` table (closes T-51), real Settings page, terminal visual pass (tabular-nums, update ticks, denser Savant layouts). Fixes AppShell setState-in-effect lint error. |
+
+Additional tasks from v4.5 (Experience Layer + Product Foundations — see 6.8, 6.9):
+
+| Task | Description |
+|---|---|
+| T-72 | Boot sequence + coach marks — first-login boot moment (skippable, never repeats), `<Hint>` registry component, `seen_hints` persistence, contextual first-use hints, replay from Settings/palette. |
+| T-73 | Ticker seasonal sources — injury-status snapshots start immediately (backfill-proofing); in-season: per-league top waiver claims (Sleeper transactions) + injury designation changes; game day: live scores (gating decision pending). Response shape stays fixed. Driven by the Rostiro States engine (T-79) rather than a parallel date check. |
+| T-74 | Features page — the OS story with live embedded components (real ticker, demo Pulse card), no screenshots. Timing: with the marketing-designs pass (default). |
+| T-75 | Accessibility baseline — WCAG AA contrast audit (`--t3` flagged), drawer focus-trap, ticker screen-reader alternative, keyboard operability pass, a11y in pre-launch checklist. |
+| T-76 | Security hardening — security headers, API rate limiting, dependency audit, full /security-review with triage. |
+| T-77 | Daylight theme — designed light mode behind a Settings toggle + `prefers-color-scheme`, persisted on `users`. Default timing: post-launch fast-follow. |
+| T-78 | Privacy policy + data controls — public `/privacy` page (Yahoo OAuth review prerequisite), data export, account deletion (cascade), AI-processing disclosure. |
+
+Additional tasks from v5.0 (Rostiro States, Scalability baseline, Emotional layer, Pricing — see 6.10, 7, 9, 10):
+
+| Task | Description |
+|---|---|
+| T-79 | Rostiro States engine — `lib/rostiroState.ts`, deterministic state computation from local time + NFL schedule + per-league waiver cutoffs. Feature-flagged. |
+| T-80 | Waiver Day State — layout reprioritization, Mission Briefing Pulse framing, ticker tie-in. |
+| T-81 | Game Day State — layout reprioritization, cockpit/telemetry visual pass, kickoff-triggered transition animation, staggered/jittered shared score refresh (10.2). |
+| T-82 | Film Room State — layout reprioritization, weekly AI recap, usage/snap-count surfacing. |
+| T-83 | Playoffs/Championship theming layer — visual treatment applied across active States for weeks 15–17, no new components. |
+| T-84 | Scalability baseline — feature-flag framework, cache-hit/API-latency/queue-depth observability, circuit breakers per platform, staggered background jobs. |
+| T-85 | Pricing rebuild — Free / Pro / Founder Season Pass / Founding 500 in Stripe, update onboarding trial copy (Step 2, done in this PRD), update Start/Sit and Trade Analyzer tier gating from Starter→Pro (done in this PRD, 6.4/6.5). |
+| T-86 | Portfolio data plumbing (no UI) — weekly roster grade + exposure snapshot storage, so fast-follow Portfolio has history at launch. |
+
+Additional tasks from v5.2 (Stats/Projections/Commentary data sources, Player Intelligence Card — see 5.7, 6.11):
+
+| Task | Description |
+|---|---|
+| T-87 | nflverse ingestion — cron job pulling weekly snap-count/usage data into a Supabase cache table, same pattern as `adp_snapshots`/`injury_snapshots`. |
+| T-88 | ESPN native projections wiring — surface `statSourceId: 1` from already-fetched roster/player-pool responses (no new API call, data is already in hand from `getEspnRosters`/waiver-pool fetches once those are wired per 5.2's engineering note); verify Yahoo/Sleeper equivalents before assuming parity. |
+| T-89 | Player Intelligence Card — ⌘K result becomes a full card (availability/usage/snap/projection/trend/context), reprioritized by active Rostiro State, reusing `/api/draft/players` for lookup. |
+
+---
+
+*Rostiro PRD v5.2 — July 2026*
+*Run Every League. — rostiro.com*

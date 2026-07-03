@@ -180,6 +180,45 @@ export interface EspnDraftDetailResponse {
   }
 }
 
+// ─── Projections (T-88) ────────────────────────────────────────────────────────
+// STATUS: VERIFIED LIVE July 3, 2026. ESPN's own stat entries carry
+// statSourceId 0 (actual) vs 1 (projected), scoringPeriodId 0 (season total)
+// vs a week number — already scored to the specific league's scoring
+// settings, since it comes back in the context of that leagueId. Confirmed
+// against a free agent with zero rostered status: both a current-week and a
+// full-season 2026 projection were present. No separate projections
+// provider is needed for ESPN leagues (see PRD 5.7).
+
+interface EspnPlayerStatLine {
+  statSourceId: 0 | 1
+  scoringPeriodId: number
+  seasonId: number
+  appliedTotal: number
+}
+
+export interface EspnPlayerProjection {
+  weekProjection: number | null
+  seasonProjection: number | null
+  seasonActualToDate: number | null
+}
+
+export function getEspnPlayerProjection(
+  stats: EspnPlayerStatLine[] | undefined,
+  season: number,
+  currentWeek: number
+): EspnPlayerProjection {
+  const forSeason = (stats ?? []).filter((s) => s.seasonId === season)
+  const weekProjection = forSeason.find((s) => s.statSourceId === 1 && s.scoringPeriodId === currentWeek)
+  const seasonProjection = forSeason.find((s) => s.statSourceId === 1 && s.scoringPeriodId === 0)
+  const seasonActual = forSeason.find((s) => s.statSourceId === 0 && s.scoringPeriodId === 0)
+
+  return {
+    weekProjection: weekProjection?.appliedTotal ?? null,
+    seasonProjection: seasonProjection?.appliedTotal ?? null,
+    seasonActualToDate: seasonActual?.appliedTotal ?? null,
+  }
+}
+
 // ─── Deep-link helpers ─────────────────────────────────────────────────────────
 // Never say "Go to ESPN." Use these exact button labels per PRD.
 

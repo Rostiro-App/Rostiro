@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/cron/nfl-schedule",
+      "schedule": "0 8 * * *"
+    },
+    {
       "path": "/api/cron/players",
       "schedule": "0 9 * * *"
     },
