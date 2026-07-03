@@ -42,7 +42,30 @@ export async function GET(request: NextRequest) {
       synced += chunk.length
     }
 
-    return NextResponse.json({ synced, source: 'sleeper' })
+    // T-69: daily ADP snapshot — top of the board only. Powers the "ADP
+    // movers" Pulse card once a week of history exists; cheap to collect
+    // now, impossible to backfill later. Best-effort: snapshot failure (e.g.
+    // migration_os_shell.sql not run yet) never fails the player sync.
+    const today = new Date().toISOString().slice(0, 10)
+    const snapshotRows = rows
+      .filter((r) => r.adp_sleeper !== null)
+      .sort((a, b) => a.adp_sleeper! - b.adp_sleeper!)
+      .slice(0, 300)
+      .map((r) => ({
+        snapshot_date: today,
+        player_id: r.player_id,
+        platform: 'sleeper' as const,
+        adp: r.adp_sleeper!,
+      }))
+    let snapshotted = 0
+    if (snapshotRows.length > 0) {
+      const { error: snapError } = await admin
+        .from('adp_snapshots')
+        .upsert(snapshotRows, { onConflict: 'snapshot_date,player_id,platform' })
+      if (!snapError) snapshotted = snapshotRows.length
+    }
+
+    return NextResponse.json({ synced, snapshotted, source: 'sleeper' })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })

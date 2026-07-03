@@ -1,0 +1,395 @@
+// T-69: Pulse generation + persistence sync (PRD 6.7 W3).
+//
+// buildPulseItemsForUser computes what deserves the user's attention right
+// now — deterministic, no Claude call. syncPulseItems reconciles that
+// against pulse_items using content fingerprints: a dismissed item never
+// resurrects, a stale item disappears, a snoozed item wakes on time.
+// Shared by GET /api/pulse/sleeper (on-demand) and /api/cron/pulse (daily).
+//
+// Fingerprints are the identity of a piece of intelligence, not of a DB row:
+//   injury:{leagueRowId}:{playerId}:{status}   — status change = new item
+//   waiver:{leagueRowId}:{playerId}            — different best FA = new item
+//   deadline:draft:{leagueRowId}:{startTime}   — reschedule = new item
+//   lineup:{leagueRowId}:{starterId}:{benchId} — specific swap suggestion
+
+import { getSleeperDrafts, getSleeperRosters } from '@/lib/sleeper'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { AffectedLeague, PulseItem, PulseItemStatus, PulseItemType, PulsePriority } from '@/types'
+
+const DRAFT_REMINDER_WINDOW_MS = 14 * 24 * 60 * 60 * 1000
+const DRAFT_CRITICAL_WINDOW_MS = 48 * 60 * 60 * 1000
+// A bench player must beat the starter's ADP by this many picks before we
+// suggest a swap — inside the margin it's noise, not a decision.
+const LINEUP_ADP_MARGIN = 20
+
+interface LeagueRow {
+  id: string
+  league_id: string
+  league_name: string
+  team_id: string | null
+}
+
+interface CachedPlayer {
+  player_id: string
+  name: string
+  position: string | null
+  injury_status: string | null
+  adp_sleeper: number | null
+}
+
+export interface BuiltPulseItem {
+  fingerprint: string
+  type: PulseItemType
+  priority: PulsePriority
+  headline: string
+  reasoning: string
+  affectedLeagues: AffectedLeague[]
+  deadline: string | null
+  actionUrl: string | null
+}
+
+export interface PulseItemRow {
+  id: string
+  user_id: string
+  type: PulseItemType
+  priority: PulsePriority
+  headline: string
+  reasoning: string
+  affected_leagues_json: AffectedLeague[]
+  deadline: string | null
+  action_url: string | null
+  platform: 'espn' | 'yahoo' | 'sleeper' | null
+  status: PulseItemStatus
+  created_at: string
+}
+
+// ─── Generation ────────────────────────────────────────────────────────────────
+
+export async function buildPulseItemsForUser(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<{ items: BuiltPulseItem[]; leagueCount: number }> {
+  const { data: leagues, error } = await supabase
+    .from('connected_leagues')
+    .select('id, league_id, league_name, team_id')
+    .eq('user_id', userId)
+    .eq('platform', 'sleeper')
+
+  if (error) throw new Error(error.message)
+  const rows = (leagues ?? []) as LeagueRow[]
+  if (rows.length === 0) return { items: [], leagueCount: 0 }
+
+  // One free-agent pool query serves every league (same pattern as
+  // /api/system/status): top of the ADP board, filtered per league.
+  const { data: topPlayers } = await supabase
+    .from('players_cache')
+    .select('player_id, name, position, injury_status, adp_sleeper')
+    .eq('platform', 'sleeper')
+    .not('adp_sleeper', 'is', null)
+    .order('adp_sleeper', { ascending: true })
+    .limit(200)
+  const topPool = (topPlayers ?? []) as CachedPlayer[]
+
+  const results = await Promise.allSettled(
+    rows.map((league) => buildLeagueItems(supabase, league, topPool))
+  )
+
+  // One league failing (Sleeper down, league deleted) shouldn't blank the
+  // whole feed for the user's other leagues.
+  const items = results.flatMap((r) => (r.status === 'fulfilled' ? r.value : []))
+
+  const PRIORITY_RANK: Record<PulsePriority, number> = { critical: 0, important: 1, info: 2 }
+  items.sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority])
+
+  return { items, leagueCount: rows.length }
+}
+
+async function buildLeagueItems(
+  supabase: SupabaseClient,
+  league: LeagueRow,
+  topPool: CachedPlayer[]
+): Promise<BuiltPulseItem[]> {
+  const [rosters, drafts] = await Promise.all([
+    getSleeperRosters(league.league_id),
+    getSleeperDrafts(league.league_id).catch(() => []),
+  ])
+
+  const affectedLeague: AffectedLeague = {
+    leagueId: league.id,
+    leagueName: league.league_name,
+    platform: 'sleeper',
+  }
+  const leagueLink = `https://sleeper.com/leagues/${league.league_id}`
+  const items: BuiltPulseItem[] = []
+  const now = Date.now()
+
+  // ─── Draft deadline reminders ────────────────────────────────────────────
+  for (const draft of drafts) {
+    if (draft.status !== 'pre_draft' || !draft.start_time) continue
+    const untilStart = draft.start_time - now
+    if (untilStart <= 0 || untilStart > DRAFT_REMINDER_WINDOW_MS) continue
+
+    const startDate = new Date(draft.start_time)
+    const when = startDate.toLocaleString('en-US', {
+      weekday: 'long', month: 'short', day: 'numeric',
+      hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York', timeZoneName: 'short',
+    })
+    items.push({
+      fingerprint: `deadline:draft:${league.id}:${draft.start_time}`,
+      type: 'deadline_reminder',
+      priority: untilStart < DRAFT_CRITICAL_WINDOW_MS ? 'critical' : 'important',
+      headline: `${league.league_name} drafts ${when}`,
+      reasoning:
+        untilStart < DRAFT_CRITICAL_WINDOW_MS
+          ? 'Your draft starts in under 48 hours. Lock in your rankings and strategy in the Draft Kit now.'
+          : 'Your draft is on the calendar. Set your rankings and strategy in the Draft Kit before draft day.',
+      affectedLeagues: [affectedLeague],
+      deadline: startDate.toISOString(),
+      actionUrl: `https://sleeper.com/draft/nfl/${draft.draft_id}`,
+    })
+  }
+
+  const myRoster = rosters.find((r) => String(r.roster_id) === league.team_id)
+  if (!myRoster) return items
+
+  const myPlayerIds = Array.isArray(myRoster.players) ? myRoster.players : []
+  // Sleeper pads unfilled starter slots with '0'.
+  const starterIds = (Array.isArray(myRoster.starters) ? myRoster.starters : []).filter(
+    (id) => id && id !== '0'
+  )
+  const starterSet = new Set(starterIds)
+
+  let myPlayers: CachedPlayer[] = []
+  if (myPlayerIds.length > 0) {
+    const { data } = await supabase
+      .from('players_cache')
+      .select('player_id, name, position, injury_status, adp_sleeper')
+      .eq('platform', 'sleeper')
+      .in('player_id', myPlayerIds)
+    myPlayers = (data ?? []) as CachedPlayer[]
+  }
+
+  // ─── Injuries on my roster ───────────────────────────────────────────────
+  for (const p of myPlayers) {
+    if (!p.injury_status) continue
+    const isStarter = starterSet.has(p.player_id)
+    const priority = injuryPriority(p.injury_status, isStarter)
+    if (!priority) continue
+
+    items.push({
+      fingerprint: `injury:${league.id}:${p.player_id}:${p.injury_status.toLowerCase()}`,
+      type: 'injury_alert',
+      priority,
+      headline: `${p.name} — ${formatInjuryStatus(p.injury_status)}`,
+      reasoning: isStarter
+        ? `${p.name} is in your starting lineup and listed as ${formatInjuryStatus(p.injury_status).toLowerCase()}. Check for a bench replacement before kickoff.`
+        : `${p.name} is on your bench and listed as ${formatInjuryStatus(p.injury_status).toLowerCase()}.`,
+      affectedLeagues: [affectedLeague],
+      deadline: null,
+      actionUrl: leagueLink,
+    })
+  }
+
+  // ─── Lineup decisions — bench clearly outranks a starter ────────────────
+  // Only when starters are actually set; preseason rosters skip this whole
+  // block because starterIds is empty.
+  const byId = new Map(myPlayers.map((p) => [p.player_id, p]))
+  for (const starterId of starterIds) {
+    const starter = byId.get(starterId)
+    if (!starter || starter.adp_sleeper === null || !starter.position) continue
+
+    const bestBench = myPlayers
+      .filter(
+        (p) =>
+          !starterSet.has(p.player_id) &&
+          p.position === starter.position &&
+          p.adp_sleeper !== null &&
+          p.adp_sleeper < starter.adp_sleeper! - LINEUP_ADP_MARGIN &&
+          !isSidelined(p.injury_status)
+      )
+      .sort((a, b) => a.adp_sleeper! - b.adp_sleeper!)[0]
+    if (!bestBench) continue
+
+    const gap = Math.round(starter.adp_sleeper - bestBench.adp_sleeper!)
+    items.push({
+      fingerprint: `lineup:${league.id}:${starter.player_id}:${bestBench.player_id}`,
+      type: 'lineup_decision',
+      priority: gap > 40 ? 'important' : 'info',
+      headline: `Start ${bestBench.name} over ${starter.name}?`,
+      reasoning: `${bestBench.name} (ADP ${Math.round(bestBench.adp_sleeper!)}) is on your bench while ${starter.name} (ADP ${Math.round(starter.adp_sleeper)}) starts at ${starter.position}. A ${gap}-pick ADP gap says take a look.`,
+      affectedLeagues: [affectedLeague],
+      deadline: null,
+      actionUrl: leagueLink,
+    })
+  }
+
+  // ─── Waiver opportunity ──────────────────────────────────────────────────
+  const rosteredIds = new Set(rosters.flatMap((r) => (Array.isArray(r.players) ? r.players : [])))
+  const bestWaiver = topPool.find((p) => !rosteredIds.has(p.player_id))
+  if (bestWaiver) {
+    items.push({
+      fingerprint: `waiver:${league.id}:${bestWaiver.player_id}`,
+      type: 'waiver_alert',
+      priority: bestWaiver.adp_sleeper! < 100 ? 'important' : 'info',
+      headline: `${bestWaiver.name} is unrostered`,
+      reasoning: `${bestWaiver.name} (${bestWaiver.position}) has an ADP of ${Math.round(bestWaiver.adp_sleeper!)} and isn't on any roster in this league yet.`,
+      affectedLeagues: [affectedLeague],
+      deadline: null,
+      actionUrl: leagueLink,
+    })
+  }
+
+  return items
+}
+
+function injuryPriority(status: string, isStarter: boolean): PulsePriority | null {
+  const s = status.toLowerCase()
+  if (s === 'out' || s === 'ir') return isStarter ? 'critical' : 'important'
+  if (s === 'doubtful') return isStarter ? 'important' : 'info'
+  if (s === 'questionable') return isStarter ? 'important' : 'info'
+  return null
+}
+
+function isSidelined(status: string | null): boolean {
+  const s = status?.toLowerCase()
+  return s === 'out' || s === 'ir' || s === 'doubtful'
+}
+
+function formatInjuryStatus(status: string): string {
+  const s = status.toLowerCase()
+  if (s === 'ir') return 'IR'
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+// ─── Persistence sync ──────────────────────────────────────────────────────────
+
+// Reconciles freshly built items against the DB. Returns false when the
+// pulse persistence columns don't exist yet (migration_os_shell.sql not run) —
+// callers degrade to serving the built items live, exactly like before T-69.
+export async function syncPulseItems(
+  admin: SupabaseClient,
+  userId: string,
+  built: BuiltPulseItem[]
+): Promise<boolean> {
+  const { data: existing, error } = await admin
+    .from('pulse_items')
+    .select('id, fingerprint, status, snoozed_until')
+    .eq('user_id', userId)
+    .not('fingerprint', 'is', null)
+
+  if (error) return false
+
+  const rows = (existing ?? []) as Array<{
+    id: string
+    fingerprint: string
+    status: PulseItemStatus
+    snoozed_until: string | null
+  }>
+
+  // Wake snoozes that have expired.
+  const nowIso = new Date().toISOString()
+  const wakeIds = rows
+    .filter((r) => r.status === 'snoozed' && r.snoozed_until && r.snoozed_until <= nowIso)
+    .map((r) => r.id)
+  if (wakeIds.length > 0) {
+    await admin
+      .from('pulse_items')
+      .update({ status: 'open', snoozed_until: null })
+      .in('id', wakeIds)
+    for (const r of rows) {
+      if (wakeIds.includes(r.id)) r.status = 'open'
+    }
+  }
+
+  const byFingerprint = new Map(rows.map((r) => [r.fingerprint, r]))
+  const builtFingerprints = new Set(built.map((b) => b.fingerprint))
+
+  // Insert genuinely new intelligence.
+  const toInsert = built.filter((b) => !byFingerprint.has(b.fingerprint))
+  if (toInsert.length > 0) {
+    await admin.from('pulse_items').insert(
+      toInsert.map((b) => ({
+        user_id: userId,
+        type: b.type,
+        priority: b.priority,
+        headline: b.headline,
+        reasoning: b.reasoning,
+        affected_leagues_json: b.affectedLeagues,
+        deadline: b.deadline,
+        action_url: b.actionUrl,
+        platform: 'sleeper',
+        fingerprint: b.fingerprint,
+        status: 'open',
+      }))
+    )
+  }
+
+  // Refresh content on still-open items — a draft reminder's priority
+  // escalates to critical inside 48h under the same fingerprint.
+  for (const b of built) {
+    const row = byFingerprint.get(b.fingerprint)
+    if (!row || row.status !== 'open') continue
+    await admin
+      .from('pulse_items')
+      .update({
+        priority: b.priority,
+        headline: b.headline,
+        reasoning: b.reasoning,
+        deadline: b.deadline,
+        action_url: b.actionUrl,
+      })
+      .eq('id', row.id)
+  }
+
+  // Drop open items whose underlying signal vanished (player healthy again,
+  // FA got claimed). Done/dismissed/snoozed rows are never touched — that's
+  // the user's history and their explicit choices.
+  const staleIds = rows
+    .filter((r) => r.status === 'open' && !builtFingerprints.has(r.fingerprint))
+    .map((r) => r.id)
+  if (staleIds.length > 0) {
+    await admin.from('pulse_items').delete().in('id', staleIds)
+  }
+
+  return true
+}
+
+// ─── Shaping ───────────────────────────────────────────────────────────────────
+
+export function rowToPulseItem(row: PulseItemRow): PulseItem {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    type: row.type,
+    priority: row.priority,
+    headline: row.headline,
+    reasoning: row.reasoning,
+    affectedLeagues: row.affected_leagues_json ?? [],
+    deadline: row.deadline,
+    actionUrl: row.action_url,
+    platform: row.platform,
+    isDismissed: row.status === 'dismissed',
+    status: row.status,
+    createdAt: row.created_at,
+  }
+}
+
+// Fallback shape when persistence isn't available yet: the built item served
+// directly, fingerprint doubling as the id (stable across refreshes).
+export function builtToPulseItem(built: BuiltPulseItem, userId: string): PulseItem {
+  return {
+    id: built.fingerprint,
+    userId,
+    type: built.type,
+    priority: built.priority,
+    headline: built.headline,
+    reasoning: built.reasoning,
+    affectedLeagues: built.affectedLeagues,
+    deadline: built.deadline,
+    actionUrl: built.actionUrl,
+    platform: 'sleeper',
+    isDismissed: false,
+    status: 'open',
+    createdAt: new Date().toISOString(),
+  }
+}

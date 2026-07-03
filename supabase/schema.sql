@@ -258,6 +258,13 @@ create table public.pulse_items (
   action_url            text,
   platform              text check (platform in ('espn', 'yahoo', 'sleeper')),
   is_dismissed          boolean not null default false,
+  -- T-69: stable identity for a piece of intelligence so regeneration can tell
+  -- "same item, don't resurrect it if dismissed" from "new item, insert it".
+  fingerprint           text,
+  status                text not null default 'open'
+                          check (status in ('open', 'done', 'dismissed', 'snoozed')),
+  snoozed_until         timestamptz,
+  completed_at          timestamptz,
   created_at            timestamptz not null default now()
 );
 
@@ -268,6 +275,29 @@ create policy "Users can manage own pulse items" on public.pulse_items
 
 create index idx_pulse_items_user_active on public.pulse_items
   (user_id, is_dismissed, created_at desc);
+
+create unique index idx_pulse_items_user_fingerprint on public.pulse_items
+  (user_id, fingerprint) where fingerprint is not null;
+
+-- ─── ADP Snapshots ─────────────────────────────────────────────────────────────
+-- One row per player per day, written by the players cron. Powers the
+-- "ADP movers" preseason Pulse card once a week of history exists.
+
+create table public.adp_snapshots (
+  snapshot_date date not null,
+  player_id     text not null,
+  platform      text not null check (platform in ('espn', 'yahoo', 'sleeper')),
+  adp           numeric not null,
+  primary key (snapshot_date, player_id, platform)
+);
+
+alter table public.adp_snapshots enable row level security;
+
+create policy "Authenticated users can read adp snapshots" on public.adp_snapshots
+  for select using (auth.role() = 'authenticated');
+
+create policy "Service role can manage adp snapshots" on public.adp_snapshots
+  for all using (auth.role() = 'service_role');
 
 -- ─── AI Queries (Logging) ─────────────────────────────────────────────────────
 -- Tracks Claude usage for rate limiting free tier and debugging.

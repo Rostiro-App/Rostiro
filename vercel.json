@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/players",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/pulse",
+      "schedule": "0 10 * * *"
     }
   ]
 }

@@ -196,6 +196,10 @@ export interface AffectedLeague {
   platform: Platform
 }
 
+// T-69: lifecycle state — Pulse items persist in the DB so acting on one
+// (done/dismiss/snooze) survives regeneration instead of resurrecting daily.
+export type PulseItemStatus = 'open' | 'done' | 'dismissed' | 'snoozed'
+
 export interface PulseItem {
   id: string
   userId: string
@@ -208,6 +212,7 @@ export interface PulseItem {
   actionUrl: string | null
   platform: Platform | null
   isDismissed: boolean
+  status: PulseItemStatus
   createdAt: string
 }
 
