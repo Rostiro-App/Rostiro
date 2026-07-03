@@ -1,12 +1,12 @@
 'use client'
 
-// T-69: Pulse is now persistent and actionable. The feed comes from
-// pulse_items (synced by fingerprint server-side), the header frames the day
-// as a work queue ("N decisions · est X min"), and every card can be marked
-// done, snoozed, or dismissed — state that survives refreshes and the daily
-// cron. Until migration_os_shell.sql is run the API reports
-// persistent: false and the action buttons stay hidden (live-only mode,
-// identical to pre-T-69 behavior).
+// T-69 + OS redesign: the Pulse queue on glass. Cards carry a glowing
+// priority stripe, all metadata is mono, and clicking a card opens the
+// right-hand detail drawer (glass over a blurred veil) instead of
+// navigating away. Done/Snooze animate the card out of the queue and the
+// progress bar advances — the day is a finite work queue, not a feed.
+// Live behavior unchanged from T-69: persistent items, optimistic PATCH
+// with rollback, persistent: false hides actions until the migration runs.
 
 import { useEffect, useState } from 'react'
 import { useMode, type Mode } from '@/components/nav/AppShell'
@@ -14,21 +14,26 @@ import type { PulseItem, PulseItemType, PulsePriority } from '@/types'
 
 // ─── Priority + type config ────────────────────────────────────────────────────
 
-const PRIORITY_BORDER: Record<PulsePriority, string> = {
-  critical: '#E84040',
-  important: '#F59E0B',
-  info: '#378ADD',
+const PRIORITY_COLOR: Record<PulsePriority, string> = {
+  critical: 'var(--crit)',
+  important: 'var(--warn)',
+  info: 'var(--signal)',
+}
+const PRIORITY_GLOW: Record<PulsePriority, string> = {
+  critical: '0 0 10px rgba(232,80,74,.8)',
+  important: '0 0 10px rgba(245,166,35,.7)',
+  info: '0 0 10px rgba(75,163,245,.6)',
 }
 
-const TYPE_CONFIG: Record<PulseItemType, { symbol: string; color: string; label: string }> = {
-  injury_alert:      { symbol: '⚠', color: '#E84040', label: 'INJURY' },
-  lineup_decision:   { symbol: '⚡', color: '#378ADD', label: 'START/SIT' },
-  waiver_alert:      { symbol: '↑', color: '#4CAF72', label: 'WAIVER' },
-  weather_alert:     { symbol: '⛈', color: '#F59E0B', label: 'WEATHER' },
-  trade_opportunity: { symbol: '⇄', color: '#378ADD', label: 'TRADE' },
-  opponent_intel:    { symbol: '◎', color: '#8AAABB', label: 'INTEL' },
-  deadline_reminder: { symbol: '◷', color: '#F59E0B', label: 'DEADLINE' },
-  exposure_flag:     { symbol: '▲', color: '#E84040', label: 'EXPOSURE' },
+const TYPE_CONFIG: Record<PulseItemType, { color: string; label: string }> = {
+  injury_alert:      { color: 'var(--crit)',   label: 'INJURY' },
+  lineup_decision:   { color: 'var(--signal)', label: 'START/SIT' },
+  waiver_alert:      { color: 'var(--live)',   label: 'WAIVER' },
+  weather_alert:     { color: 'var(--warn)',   label: 'WEATHER' },
+  trade_opportunity: { color: 'var(--signal)', label: 'TRADE' },
+  opponent_intel:    { color: 'var(--t2)',     label: 'INTEL' },
+  deadline_reminder: { color: 'var(--warn)',   label: 'DEADLINE' },
+  exposure_flag:     { color: 'var(--crit)',   label: 'EXPOSURE' },
 }
 
 type PulseAction = 'done' | 'dismiss' | 'snooze'
@@ -47,6 +52,7 @@ interface PulseResponse {
 export default function PulsePage() {
   const mode = useMode()
   const [items, setItems] = useState<PulseItem[]>([])
+  const [leaving, setLeaving] = useState<Set<string>>(new Set())
   const [leagueCount, setLeagueCount] = useState(0)
   const [doneToday, setDoneToday] = useState(0)
   const [estMinutes, setEstMinutes] = useState(0)
@@ -54,6 +60,7 @@ export default function PulsePage() {
   const [persistent, setPersistent] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [detail, setDetail] = useState<PulseItem | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -84,11 +91,29 @@ export default function PulsePage() {
     }
   }, [])
 
+  // Escape dismisses the drawer.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setDetail(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   async function handleAction(item: PulseItem, action: PulseAction) {
-    // Optimistic: the card leaves the queue immediately; on failure it
-    // comes back with the error surfaced.
-    setItems((prev) => prev.filter((i) => i.id !== item.id))
+    setDetail(null)
+    // Animate out, then drop from state; on failure the card comes back.
+    setLeaving((prev) => new Set(prev).add(item.id))
     if (action === 'done') setDoneToday((n) => n + 1)
+
+    window.setTimeout(() => {
+      setItems((prev) => prev.filter((i) => i.id !== item.id))
+      setLeaving((prev) => {
+        const next = new Set(prev)
+        next.delete(item.id)
+        return next
+      })
+    }, 340)
 
     try {
       const res = await fetch(`/api/pulse/items/${item.id}`, {
@@ -98,7 +123,7 @@ export default function PulsePage() {
       })
       if (!res.ok) throw new Error()
     } catch {
-      setItems((prev) => [item, ...prev])
+      setItems((prev) => (prev.some((i) => i.id === item.id) ? prev : [item, ...prev]))
       if (action === 'done') setDoneToday((n) => Math.max(0, n - 1))
       setError('Could not update that item — try again.')
       setTimeout(() => setError(null), 4000)
@@ -112,36 +137,43 @@ export default function PulsePage() {
 
       {/* Morning header — the day framed as a finite work queue */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white tracking-tight">
+        <h1 className="text-[22px] font-semibold tracking-tight" style={{ color: 'var(--t1)' }}>
           {greeting()}{firstName ? `, ${firstName}` : ''}.
         </h1>
-        <p className="text-sm mt-0.5" style={{ color: '#5A7A9A' }}>
+        <p className="text-[13px] mt-0.5" style={{ color: 'var(--t2)' }}>
           {leagueCount === 0
             ? 'No leagues connected yet'
             : items.length === 0
               ? `All clear across ${leagueCount} ${leagueCount === 1 ? 'league' : 'leagues'}`
-              : `${items.length} ${items.length === 1 ? 'decision' : 'decisions'} across ${leagueCount} ${leagueCount === 1 ? 'league' : 'leagues'}${estMinutes > 0 ? ` · Est. ${estMinutes} min` : ''}`}
+              : (
+                <>
+                  <b style={{ color: 'var(--t1)', fontWeight: 600 }}>
+                    {items.length} {items.length === 1 ? 'decision' : 'decisions'}
+                  </b>
+                  {` across ${leagueCount} ${leagueCount === 1 ? 'league' : 'leagues'}`}
+                  {estMinutes > 0 && (
+                    <> · Est. <b style={{ color: 'var(--t1)', fontWeight: 600 }}>{estMinutes} min</b></>
+                  )}
+                </>
+              )}
         </p>
 
         {persistent && totalToday > 0 && (
-          <div className="mt-3">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[11px] font-semibold tracking-wider" style={{ color: '#3A5A7A' }}>
-                TODAY&apos;S PROGRESS
-              </span>
-              <span className="text-[11px]" style={{ color: '#5A7A9A', fontVariantNumeric: 'tabular-nums' }}>
-                {doneToday} / {totalToday}
-              </span>
-            </div>
-            <div className="h-1 rounded-full overflow-hidden" style={{ backgroundColor: '#1A3048' }}>
+          <div className="mono-data mt-3.5 flex items-center gap-3 text-[10px] tracking-[0.1em]" style={{ color: 'var(--t3)' }}>
+            <span>TODAY</span>
+            <div className="flex-1 h-[3px] rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(90,150,210,.12)' }}>
               <div
                 className="h-full rounded-full transition-all duration-500"
                 style={{
                   width: `${Math.round((doneToday / totalToday) * 100)}%`,
-                  backgroundColor: doneToday === totalToday ? '#4CAF72' : '#378ADD',
+                  background: doneToday === totalToday
+                    ? 'var(--live)'
+                    : 'linear-gradient(90deg, var(--signal), #6FC7FF)',
+                  boxShadow: '0 0 10px rgba(75,163,245,.6)',
                 }}
               />
             </div>
+            <span>{doneToday} / {totalToday}</span>
           </div>
         )}
       </div>
@@ -149,11 +181,11 @@ export default function PulsePage() {
       {/* Mode label — only show in Focused so user knows what they're seeing */}
       {mode === 'focused' && items.length > 0 && (
         <div className="mb-4 flex items-center gap-2">
-          <div className="h-px flex-1" style={{ backgroundColor: '#1A3048' }} />
-          <span className="text-xs font-semibold tracking-widest uppercase" style={{ color: '#3A5A7A' }}>
-            {items.length} items · Focused
+          <div className="h-px flex-1" style={{ backgroundColor: 'var(--hairline)' }} />
+          <span className="mono-data text-[9px] tracking-[0.18em]" style={{ color: 'var(--t3)' }}>
+            {items.length} ITEMS · FOCUSED
           </span>
-          <div className="h-px flex-1" style={{ backgroundColor: '#1A3048' }} />
+          <div className="h-px flex-1" style={{ backgroundColor: 'var(--hairline)' }} />
         </div>
       )}
 
@@ -171,10 +203,20 @@ export default function PulsePage() {
               key={item.id}
               item={item}
               mode={mode}
+              isLeaving={leaving.has(item.id)}
+              onOpen={() => setDetail(item)}
               onAction={persistent ? handleAction : null}
             />
           ))}
         </div>
+      )}
+
+      {detail && (
+        <DetailDrawer
+          item={detail}
+          onClose={() => setDetail(null)}
+          onAction={persistent ? handleAction : null}
+        />
       )}
     </div>
   )
@@ -191,20 +233,85 @@ function greeting(): string {
 
 type ActionHandler = ((item: PulseItem, action: PulseAction) => void) | null
 
-function PulseCard({ item, mode, onAction }: { item: PulseItem; mode: Mode; onAction: ActionHandler }) {
-  const border = PRIORITY_BORDER[item.priority]
+function PulseCard({
+  item,
+  mode,
+  isLeaving,
+  onOpen,
+  onAction,
+}: {
+  item: PulseItem
+  mode: Mode
+  isLeaving: boolean
+  onOpen: () => void
+  onAction: ActionHandler
+}) {
   const typeConf = TYPE_CONFIG[item.type]
 
-  if (mode === 'focused') return <FocusedCard item={item} border={border} typeConf={typeConf} onAction={onAction} />
-  if (mode === 'savant')  return <SavantCard  item={item} border={border} typeConf={typeConf} onAction={onAction} />
-  return                         <BalancedCard item={item} border={border} typeConf={typeConf} onAction={onAction} />
-}
+  return (
+    <article
+      onClick={onOpen}
+      onKeyDown={(e) => { if (e.key === 'Enter') onOpen() }}
+      tabIndex={0}
+      className={`glass card-hover relative rounded-xl cursor-pointer ${isLeaving ? 'card-leave' : ''} ${mode === 'savant' ? 'p-3 pl-[18px]' : 'px-4 py-3 pl-[18px]'}`}
+    >
+      {/* Glowing priority stripe */}
+      <span
+        aria-hidden="true"
+        className="absolute left-0 top-2.5 bottom-2.5 w-[2.5px] rounded-full"
+        style={{ backgroundColor: PRIORITY_COLOR[item.priority], boxShadow: PRIORITY_GLOW[item.priority] }}
+      />
 
-type CardProps = {
-  item: PulseItem
-  border: string
-  typeConf: { symbol: string; color: string; label: string }
-  onAction: ActionHandler
+      <div className="flex items-start justify-between gap-2.5">
+        <div className="min-w-0">
+          <p className={`font-semibold leading-tight ${mode === 'focused' ? 'text-[13px] truncate' : 'text-[13.5px]'}`} style={{ color: 'var(--t1)' }}>
+            {item.headline}
+          </p>
+          <p className="mono-data text-[10px] mt-1" style={{ color: 'var(--t3)' }}>
+            {leagueLabel(item).toUpperCase()}
+            {item.platform ? ` · ${item.platform.toUpperCase()}` : ''}
+          </p>
+        </div>
+        <span
+          className="mono-data text-[8.5px] tracking-[0.16em] px-1.5 py-0.5 rounded flex-shrink-0"
+          style={{ color: typeConf.color, backgroundColor: 'color-mix(in srgb, currentColor 12%, transparent)' }}
+        >
+          {typeConf.label}
+        </span>
+      </div>
+
+      {mode !== 'focused' && (
+        <p className="text-[12.5px] mt-2 leading-normal" style={{ color: 'var(--t2)', maxWidth: '60ch' }}>
+          {item.reasoning}
+        </p>
+      )}
+
+      <div className="flex items-center justify-between gap-2 mt-2.5 flex-wrap">
+        <div className="flex items-center gap-1.5">
+          {item.actionUrl && (
+            <a
+              href={item.actionUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="mono-data text-[10.5px] px-2.5 py-1 rounded-[7px] transition-all hover:shadow-[0_0_12px_rgba(75,163,245,.25)]"
+              style={{ color: 'var(--signal)', border: '1px solid rgba(75,163,245,.35)' }}
+            >
+              Open ↗
+            </a>
+          )}
+          {mode === 'savant' && (
+            <span className="mono-data text-[10px] ml-1" style={{ color: 'var(--t3)' }}>
+              {item.deadline
+                ? `DEADLINE ${new Date(item.deadline).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).toUpperCase()}`
+                : new Date(item.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+            </span>
+          )}
+        </div>
+        <ActionRow item={item} onAction={onAction} />
+      </div>
+    </article>
+  )
 }
 
 function leagueLabel(item: PulseItem): string {
@@ -216,25 +323,26 @@ function leagueLabel(item: PulseItem): string {
 function ActionRow({ item, onAction }: { item: PulseItem; onAction: ActionHandler }) {
   if (!onAction) return null
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
       <button
         onClick={() => onAction(item, 'done')}
-        className="text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-all hover:brightness-110"
-        style={{ backgroundColor: '#4CAF7222', color: '#4CAF72' }}
+        className="mono-data text-[10.5px] px-2.5 py-1 rounded-[7px] transition-all hover:shadow-[0_0_12px_rgba(67,192,119,.25)]"
+        style={{ color: 'var(--live)', border: '1px solid rgba(67,192,119,.35)' }}
       >
         ✓ Done
       </button>
       <button
         onClick={() => onAction(item, 'snooze')}
-        className="text-xs px-2.5 py-1.5 rounded-lg transition-all hover:brightness-110"
-        style={{ backgroundColor: '#0F2235', color: '#5A7A9A', border: '1px solid #1A3048' }}
+        className="mono-data text-[10.5px] px-2.5 py-1 rounded-[7px] transition-all"
+        style={{ color: 'var(--t2)', border: '1px solid var(--hairline)' }}
       >
         Snooze
       </button>
       <button
         onClick={() => onAction(item, 'dismiss')}
-        className="text-xs px-2.5 py-1.5 rounded-lg transition-all hover:brightness-110"
-        style={{ backgroundColor: 'transparent', color: '#3A5A7A' }}
+        aria-label="Dismiss"
+        className="mono-data text-[10.5px] px-2 py-1 rounded-[7px] transition-all hover:text-[var(--t1)]"
+        style={{ color: 'var(--t3)' }}
       >
         ✕
       </button>
@@ -242,131 +350,112 @@ function ActionRow({ item, onAction }: { item: PulseItem; onAction: ActionHandle
   )
 }
 
-// Focused — one line, no extra data
-function FocusedCard({ item, border, typeConf, onAction }: CardProps) {
-  return (
-    <div
-      className="px-4 py-3 rounded-xl"
-      style={{ backgroundColor: '#0A1520', border: '1px solid #1A3048', borderLeft: `3px solid ${border}` }}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="text-base flex-shrink-0" style={{ color: typeConf.color }}>{typeConf.symbol}</span>
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-white truncate">{item.headline}</p>
-            <p className="text-xs truncate" style={{ color: '#3A5A7A' }}>{leagueLabel(item)}</p>
-          </div>
-        </div>
-        {item.actionUrl && (
-          <a
-            href={item.actionUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap transition-all hover:brightness-110"
-            style={{ backgroundColor: '#378ADD22', color: '#378ADD' }}
-          >
-            View →
-          </a>
-        )}
-      </div>
-      {onAction && (
-        <div className="mt-2 ml-7">
-          <ActionRow item={item} onAction={onAction} />
-        </div>
-      )}
-    </div>
-  )
-}
+// ─── Detail drawer — glass layer over the receded queue ──────────────────────
 
-// Balanced — headline + reasoning + action
-function BalancedCard({ item, border, typeConf, onAction }: CardProps) {
+function DetailDrawer({
+  item,
+  onClose,
+  onAction,
+}: {
+  item: PulseItem
+  onClose: () => void
+  onAction: ActionHandler
+}) {
+  const typeConf = TYPE_CONFIG[item.type]
+
   return (
     <div
-      className="rounded-xl p-4"
-      style={{ backgroundColor: '#0A1520', border: '1px solid #1A3048', borderLeft: `3px solid ${border}` }}
+      className="fixed inset-0 z-40 flex justify-end"
+      style={{
+        backgroundColor: 'rgba(3, 7, 13, 0.45)',
+        backdropFilter: 'blur(6px)',
+        WebkitBackdropFilter: 'blur(6px)',
+      }}
+      onClick={onClose}
     >
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="flex items-start gap-2.5">
-          <span className="text-base mt-0.5 flex-shrink-0" style={{ color: typeConf.color }}>{typeConf.symbol}</span>
-          <div>
-            <p className="text-sm font-semibold text-white leading-tight">{item.headline}</p>
-            <p className="text-xs mt-0.5" style={{ color: '#3A5A7A' }}>{leagueLabel(item)}</p>
-          </div>
-        </div>
-        <span
-          className="text-[10px] font-semibold tracking-widest uppercase px-1.5 py-0.5 rounded flex-shrink-0"
-          style={{ backgroundColor: `${typeConf.color}18`, color: typeConf.color }}
+      <aside
+        className="glass-heavy panel-enter w-full max-w-[380px] h-full overflow-y-auto p-6 relative"
+        style={{ boxShadow: '-30px 0 70px rgba(0,0,0,.45)' }}
+        onClick={(e) => e.stopPropagation()}
+        aria-label="Item detail"
+      >
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute top-3.5 right-3.5 px-2 py-1 text-[15px]"
+          style={{ color: 'var(--t3)' }}
         >
+          ✕
+        </button>
+
+        <span className="mono-data text-[9px] tracking-[0.16em]" style={{ color: typeConf.color }}>
           {typeConf.label}
         </span>
-      </div>
+        <h2 className="text-[17px] font-semibold mt-2 leading-snug" style={{ color: 'var(--t1)', textWrap: 'balance' }}>
+          {item.headline}
+        </h2>
+        <p className="mono-data text-[10px] mt-1.5" style={{ color: 'var(--t3)' }}>
+          {leagueLabel(item).toUpperCase()}
+          {item.platform ? ` · ${item.platform.toUpperCase()}` : ''}
+        </p>
 
-      <p className="text-sm mb-3 ml-7" style={{ color: '#8AAABB' }}>{item.reasoning}</p>
+        <p className="text-[12.5px] mt-4 leading-relaxed" style={{ color: 'var(--t2)' }}>
+          {item.reasoning}
+        </p>
 
-      <div className="ml-7 flex items-center justify-between gap-2 flex-wrap">
-        {item.actionUrl ? (
-          <a
-            href={item.actionUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block text-xs font-semibold px-3 py-1.5 rounded-lg transition-all hover:brightness-110 text-white"
-            style={{ backgroundColor: '#378ADD' }}
-          >
-            Open in Sleeper →
-          </a>
-        ) : <span />}
-        <ActionRow item={item} onAction={onAction} />
-      </div>
-    </div>
-  )
-}
-
-// Savant — everything visible, no hidden data; denser than Balanced (T-71)
-function SavantCard({ item, border, typeConf, onAction }: CardProps) {
-  return (
-    <div
-      className="rounded-xl p-3"
-      style={{ backgroundColor: '#0A1520', border: '1px solid #1A3048', borderLeft: `3px solid ${border}` }}
-    >
-      <div className="flex items-start justify-between gap-2 mb-1">
-        <div className="flex items-start gap-2.5">
-          <span className="text-base mt-0.5 flex-shrink-0" style={{ color: typeConf.color }}>{typeConf.symbol}</span>
-          <div>
-            <p className="text-sm font-bold text-white leading-tight">{item.headline}</p>
-            <p className="text-xs mt-0.5" style={{ color: '#3A5A7A' }}>{leagueLabel(item)}</p>
+        <div className="mono-data mt-4 rounded-[10px] px-3.5 py-3 text-[11px] space-y-1.5" style={{ border: '1px solid var(--hairline)' }}>
+          <div className="flex justify-between">
+            <span style={{ color: 'var(--t3)' }}>PRIORITY</span>
+            <span style={{ color: PRIORITY_COLOR[item.priority] }}>{item.priority.toUpperCase()}</span>
+          </div>
+          {item.deadline && (
+            <div className="flex justify-between">
+              <span style={{ color: 'var(--t3)' }}>DEADLINE</span>
+              <span style={{ color: 'var(--t1)' }}>
+                {new Date(item.deadline).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).toUpperCase()}
+              </span>
+            </div>
+          )}
+          <div className="flex justify-between">
+            <span style={{ color: 'var(--t3)' }}>SURFACED</span>
+            <span style={{ color: 'var(--t1)' }}>
+              {new Date(item.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).toUpperCase()}
+            </span>
           </div>
         </div>
-        <span
-          className="text-[10px] font-semibold tracking-widest uppercase px-1.5 py-0.5 rounded flex-shrink-0"
-          style={{ backgroundColor: `${typeConf.color}18`, color: typeConf.color }}
-        >
-          {typeConf.label}
-        </span>
-      </div>
 
-      <p className="text-sm mt-2 ml-7" style={{ color: '#8AAABB' }}>{item.reasoning}</p>
-
-      <div className="ml-7 mt-3 flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 mt-5 flex-wrap">
           {item.actionUrl && (
             <a
               href={item.actionUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all hover:brightness-110 text-white"
-              style={{ backgroundColor: '#378ADD' }}
+              className="mono-data text-[10.5px] px-3 py-1.5 rounded-[7px] transition-all hover:shadow-[0_0_12px_rgba(75,163,245,.25)]"
+              style={{ color: 'var(--signal)', border: '1px solid rgba(75,163,245,.35)' }}
             >
-              Open in Sleeper →
+              Open ↗
             </a>
           )}
-          <span className="text-xs" style={{ color: '#3A5A7A' }}>
-            {item.deadline
-              ? `Deadline ${new Date(item.deadline).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`
-              : new Date(item.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-          </span>
+          {onAction && (
+            <>
+              <button
+                onClick={() => onAction(item, 'done')}
+                className="mono-data text-[10.5px] px-3 py-1.5 rounded-[7px] transition-all hover:shadow-[0_0_12px_rgba(67,192,119,.25)]"
+                style={{ color: 'var(--live)', border: '1px solid rgba(67,192,119,.35)' }}
+              >
+                ✓ Mark done
+              </button>
+              <button
+                onClick={() => onAction(item, 'snooze')}
+                className="mono-data text-[10.5px] px-3 py-1.5 rounded-[7px]"
+                style={{ color: 'var(--t2)', border: '1px solid var(--hairline)' }}
+              >
+                Snooze 24h
+              </button>
+            </>
+          )}
         </div>
-        <ActionRow item={item} onAction={onAction} />
-      </div>
+      </aside>
     </div>
   )
 }
@@ -377,11 +466,7 @@ function LoadingState() {
   return (
     <div className="space-y-2">
       {Array.from({ length: 4 }).map((_, i) => (
-        <div
-          key={i}
-          className="h-16 rounded-xl animate-pulse"
-          style={{ backgroundColor: '#0A1520', border: '1px solid #1A3048' }}
-        />
+        <div key={i} className="glass h-16 rounded-xl animate-pulse" />
       ))}
     </div>
   )
@@ -389,17 +474,17 @@ function LoadingState() {
 
 function ErrorState({ message }: { message: string }) {
   return (
-    <div className="rounded-xl p-6 text-center mb-3" style={{ backgroundColor: '#0A1520', border: '1px solid #1A3048' }}>
-      <p className="text-sm" style={{ color: '#E84040' }}>{message}</p>
+    <div className="glass rounded-xl p-6 text-center mb-3">
+      <p className="text-sm" style={{ color: 'var(--crit)' }}>{message}</p>
     </div>
   )
 }
 
 function NoLeaguesState() {
   return (
-    <div className="rounded-xl p-6 text-center" style={{ backgroundColor: '#0A1520', border: '1px solid #1A3048' }}>
-      <p className="text-sm font-medium text-white">Connect a league to activate Pulse.</p>
-      <p className="text-sm mt-1" style={{ color: '#5A7A9A' }}>
+    <div className="glass rounded-xl p-6 text-center">
+      <p className="text-sm font-medium" style={{ color: 'var(--t1)' }}>Connect a league to activate Pulse.</p>
+      <p className="text-sm mt-1" style={{ color: 'var(--t2)' }}>
         Once a Sleeper league is connected, Rostiro checks it every time you open this page.
       </p>
     </div>
@@ -408,11 +493,11 @@ function NoLeaguesState() {
 
 function AllClearState({ doneToday }: { doneToday: number }) {
   return (
-    <div className="rounded-xl p-6 text-center" style={{ backgroundColor: '#0A1520', border: '1px solid #1A3048' }}>
-      <p className="text-sm font-medium text-white">
+    <div className="glass rounded-xl p-6 text-center">
+      <p className="text-sm font-medium" style={{ color: 'var(--t1)' }}>
         {doneToday > 0 ? `Queue cleared — ${doneToday} handled today.` : 'Nothing needs you right now.'}
       </p>
-      <p className="text-sm mt-1" style={{ color: '#5A7A9A' }}>
+      <p className="text-sm mt-1" style={{ color: 'var(--t2)' }}>
         {doneToday > 0
           ? 'New intelligence lands here as soon as something changes.'
           : 'No injuries on your rosters and no standout waiver adds. Check back later.'}

@@ -1,19 +1,26 @@
 'use client'
 
-// T-68: Leagues page — the nav item PRD v4 specified that never got built,
-// plus League Health Score (PRD 6.2, closes T-52). Reads the same
-// /api/system/status payload the system bar polls: one computation, two
-// surfaces. Factors with score: null render their note ("Loads Week 1")
-// instead of a bar — honest preseason degradation, never a fake number.
+// T-68 + OS redesign: league health on glass. Rings glow in their status
+// color, factors are dense mono rows, and null factors still render their
+// note ("Loads Week 1") instead of a bar — honest preseason degradation,
+// never a fake number. Same /api/system/status payload the system bar
+// polls: one computation, two surfaces.
 
 import { useEffect, useState } from 'react'
 import type { LeagueHealthFactor, LeagueHealthStatus, SystemStatus, SystemStatusLeague } from '@/types'
 
 const STATUS_COLOR: Record<LeagueHealthStatus, string> = {
-  healthy: '#4CAF72',
-  monitor: '#F59E0B',
-  action: '#E84040',
-  unknown: '#3A5A7A',
+  healthy: 'var(--live)',
+  monitor: 'var(--warn)',
+  action: 'var(--crit)',
+  unknown: 'var(--t3)',
+}
+
+const STATUS_GLOW: Record<LeagueHealthStatus, string> = {
+  healthy: 'drop-shadow(0 0 5px rgba(67,192,119,.6))',
+  monitor: 'drop-shadow(0 0 5px rgba(245,166,35,.6))',
+  action: 'drop-shadow(0 0 5px rgba(232,80,74,.6))',
+  unknown: 'none',
 }
 
 const STATUS_LABEL: Record<LeagueHealthStatus, string> = {
@@ -60,8 +67,8 @@ export default function LeaguesPage() {
   return (
     <div className="max-w-3xl mx-auto px-4 pt-6 pb-8 md:px-6 md:pt-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white tracking-tight">Leagues</h1>
-        <p className="text-sm mt-0.5" style={{ color: '#5A7A9A' }}>
+        <h1 className="text-[22px] font-semibold tracking-tight" style={{ color: 'var(--t1)' }}>Leagues</h1>
+        <p className="text-[13px] mt-0.5" style={{ color: 'var(--t2)' }}>
           {leagues.length > 0
             ? `${leagues.length} ${leagues.length === 1 ? 'league' : 'leagues'} · Health recalculated on every sync`
             : 'Health recalculated on every sync'}
@@ -70,7 +77,7 @@ export default function LeaguesPage() {
 
       {loading && <SkeletonGrid />}
       {!loading && error && (
-        <p className="text-sm" style={{ color: '#E84040' }}>{error}</p>
+        <p className="text-sm" style={{ color: 'var(--crit)' }}>{error}</p>
       )}
       {!loading && !error && leagues.length === 0 && <NoLeagues />}
       {!loading && !error && leagues.length > 0 && (
@@ -89,33 +96,25 @@ function LeagueCard({ league }: { league: SystemStatusLeague }) {
   const color = STATUS_COLOR[health.status]
 
   return (
-    <div
-      className="rounded-xl p-4"
-      style={{ backgroundColor: '#0F2235', border: '1px solid #1A3048' }}
-    >
+    <div className="glass card-hover rounded-[14px] p-4">
       <div className="flex items-start gap-4">
-        <HealthRing score={health.score} color={color} />
+        <HealthRing score={health.score} color={color} glow={STATUS_GLOW[health.status]} />
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-white truncate">{league.name}</p>
-          <div className="flex items-center gap-2 mt-1">
-            <span
-              className="text-[10px] font-semibold px-1.5 rounded"
-              style={{ color: '#5A7A9A', border: '1px solid #1A3048' }}
-            >
+          <p className="text-[13.5px] font-semibold truncate" style={{ color: 'var(--t1)' }}>{league.name}</p>
+          <div className="mono-data flex items-center gap-2 mt-1.5 text-[9px] tracking-[0.1em]">
+            <span className="px-1.5 py-px rounded" style={{ color: 'var(--t3)', border: '1px solid var(--hairline)' }}>
               {PLATFORM_LABEL[league.platform] ?? league.platform.toUpperCase()}
             </span>
-            <span className="text-[11px] font-bold tracking-wider" style={{ color }}>
-              {STATUS_LABEL[health.status]}
-            </span>
+            <span style={{ color }}>{STATUS_LABEL[health.status]}</span>
           </div>
           {health.topFlag && (
-            <p className="text-xs mt-2" style={{ color: '#5A7A9A' }}>{health.topFlag}</p>
+            <p className="text-[11.5px] mt-2" style={{ color: 'var(--t2)' }}>{health.topFlag}</p>
           )}
         </div>
       </div>
 
       {health.factors.length > 0 && (
-        <div className="mt-4 space-y-1.5">
+        <div className="mt-4 space-y-[7px]">
           {health.factors.map((factor) => (
             <FactorRow key={factor.key} factor={factor} />
           ))}
@@ -127,34 +126,31 @@ function LeagueCard({ league }: { league: SystemStatusLeague }) {
 
 function FactorRow({ factor }: { factor: LeagueHealthFactor }) {
   const barColor =
-    factor.score === null ? '#1A3048'
-    : factor.score >= 70 ? '#4CAF72'
-    : factor.score >= 50 ? '#F59E0B'
-    : '#E84040'
+    factor.score === null ? 'var(--hairline)'
+    : factor.score >= 70 ? 'var(--live)'
+    : factor.score >= 50 ? 'var(--warn)'
+    : 'var(--crit)'
 
   return (
-    <div className="grid items-center gap-2" style={{ gridTemplateColumns: '128px 1fr 34px' }}>
-      <span className="text-[10.5px]" style={{ color: '#3A5A7A' }}>
+    <div className="mono-data grid items-center gap-2 text-[9.5px]" style={{ gridTemplateColumns: '108px 1fr 30px' }}>
+      <span style={{ color: 'var(--t3)' }}>
         {factor.label}
-        <span className="ml-1" style={{ color: '#2A4258' }}>{factor.weight}%</span>
+        <span className="ml-1" style={{ color: 'var(--t4)' }}>{factor.weight}%</span>
       </span>
       {factor.score !== null ? (
         <>
-          <div className="h-[3px] rounded-full overflow-hidden" style={{ backgroundColor: '#1A3048' }}>
+          <div className="h-[3px] rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(90,150,210,.1)' }}>
             <div
-              className="h-full rounded-full"
+              className="h-full rounded-full transition-all duration-1000"
               style={{ width: `${factor.score}%`, backgroundColor: barColor }}
             />
           </div>
-          <span
-            className="text-[10.5px] text-right"
-            style={{ color: '#5A7A9A', fontVariantNumeric: 'tabular-nums' }}
-          >
+          <span className="text-right" style={{ color: 'var(--t2)' }}>
             {factor.score}
           </span>
         </>
       ) : (
-        <span className="text-[10.5px] col-span-2" style={{ color: '#2A4258' }}>
+        <span className="col-span-2" style={{ color: 'var(--t4)' }}>
           {factor.note}
         </span>
       )}
@@ -162,26 +158,27 @@ function FactorRow({ factor }: { factor: LeagueHealthFactor }) {
   )
 }
 
-function HealthRing({ score, color }: { score: number | null; color: string }) {
-  const r = 24
+function HealthRing({ score, color, glow }: { score: number | null; color: string; glow: string }) {
+  const r = 23
   const circumference = 2 * Math.PI * r
   const filled = score !== null ? (circumference * score) / 100 : 0
 
   return (
-    <div className="relative flex-shrink-0" style={{ width: 58, height: 58 }}>
-      <svg width="58" height="58" viewBox="0 0 58 58" style={{ transform: 'rotate(-90deg)' }}>
-        <circle cx="29" cy="29" r={r} fill="none" stroke="#1A3048" strokeWidth="4" />
+    <div className="relative flex-shrink-0" style={{ width: 56, height: 56 }}>
+      <svg width="56" height="56" viewBox="0 0 56 56" style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx="28" cy="28" r={r} fill="none" stroke="rgba(90,150,210,.12)" strokeWidth="4" />
         {score !== null && (
           <circle
-            cx="29" cy="29" r={r} fill="none"
+            cx="28" cy="28" r={r} fill="none"
             stroke={color} strokeWidth="4" strokeLinecap="round"
             strokeDasharray={`${filled} ${circumference - filled}`}
+            style={{ filter: glow }}
           />
         )}
       </svg>
       <span
-        className="absolute inset-0 flex items-center justify-center text-base font-bold"
-        style={{ color, fontVariantNumeric: 'tabular-nums' }}
+        className="mono-data absolute inset-0 flex items-center justify-center text-[15px] font-bold"
+        style={{ color }}
       >
         {score !== null ? score : '—'}
       </span>
@@ -193,11 +190,7 @@ function SkeletonGrid() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       {[0, 1].map((i) => (
-        <div
-          key={i}
-          className="rounded-xl h-48 animate-pulse"
-          style={{ backgroundColor: '#0F2235', border: '1px solid #1A3048' }}
-        />
+        <div key={i} className="glass rounded-[14px] h-48 animate-pulse" />
       ))}
     </div>
   )
@@ -205,18 +198,15 @@ function SkeletonGrid() {
 
 function NoLeagues() {
   return (
-    <div
-      className="rounded-xl p-8 text-center"
-      style={{ backgroundColor: '#0F2235', border: '1px solid #1A3048' }}
-    >
-      <p className="text-sm font-semibold text-white mb-1">No leagues connected</p>
-      <p className="text-xs mb-4" style={{ color: '#5A7A9A' }}>
+    <div className="glass rounded-[14px] p-8 text-center">
+      <p className="text-sm font-semibold mb-1" style={{ color: 'var(--t1)' }}>No leagues connected</p>
+      <p className="text-xs mb-4" style={{ color: 'var(--t2)' }}>
         Connect a league and Rostiro starts scoring its health on every sync.
       </p>
       <a
         href="/onboarding"
-        className="inline-block text-sm font-semibold px-4 py-2 rounded-lg text-white"
-        style={{ backgroundColor: '#185FA5' }}
+        className="inline-block text-sm font-semibold px-4 py-2 rounded-lg transition-all hover:shadow-[0_0_18px_rgba(75,163,245,0.35)]"
+        style={{ backgroundColor: 'var(--signal-dim)', color: 'var(--signal)', border: '1px solid rgba(75,163,245,.4)' }}
       >
         Connect a league →
       </a>

@@ -217,17 +217,20 @@ export default function CommandPalette({
           type="button"
           aria-label="Open command palette"
           onClick={openPalette}
-          className="md:hidden fixed z-40 flex items-center justify-center rounded-full shadow-lg"
+          className="md:hidden fixed z-40 flex items-center justify-center rounded-full"
           style={{
             right: 16,
             bottom: 'calc(76px + env(safe-area-inset-bottom))',
             width: 48,
             height: 48,
-            backgroundColor: '#185FA5',
-            border: '1px solid #378ADD55',
+            backgroundColor: 'rgba(12, 24, 40, 0.85)',
+            border: '1px solid rgba(75,163,245,.45)',
+            boxShadow: '0 8px 24px rgba(0,0,0,.5), 0 0 18px rgba(75,163,245,.25)',
+            backdropFilter: 'blur(14px)',
+            WebkitBackdropFilter: 'blur(14px)',
           }}
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--signal)" strokeWidth="2" strokeLinecap="round">
             <circle cx="11" cy="11" r="7" />
             <line x1="21" y1="21" x2="16.5" y2="16.5" />
           </svg>
@@ -236,18 +239,25 @@ export default function CommandPalette({
 
       {open && (
         <div
-          className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-[15vh]"
-          style={{ backgroundColor: '#000000A0' }}
+          className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-[14vh]"
+          style={{
+            backgroundColor: 'rgba(3, 7, 13, 0.45)',
+            backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
+          }}
           onClick={close}
         >
           <div
-            className="w-full max-w-lg rounded-2xl overflow-hidden flex flex-col"
-            style={{ backgroundColor: '#0F2235', border: '1.5px solid #1A3048', maxHeight: '60vh' }}
+            className="glass-heavy panel-enter w-full max-w-[560px] rounded-[15px] overflow-hidden flex flex-col"
+            style={{
+              maxHeight: '60vh',
+              boxShadow: '0 30px 90px rgba(0,0,0,.6), 0 0 50px rgba(75,163,245,.10)',
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Input */}
-            <div className="flex items-center gap-2.5 px-4 py-3" style={{ borderBottom: '1px solid #1A3048' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5A7A9A" strokeWidth="2" strokeLinecap="round">
+            <div className="flex items-center gap-3 px-[18px] py-3.5" style={{ borderBottom: '1px solid var(--hairline)' }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" strokeWidth="2" strokeLinecap="round">
                 <circle cx="11" cy="11" r="7" />
                 <line x1="21" y1="21" x2="16.5" y2="16.5" />
               </svg>
@@ -259,12 +269,13 @@ export default function CommandPalette({
                   setSelected(0)
                 }}
                 onKeyDown={onInputKeyDown}
-                placeholder="Search pages, players, or your Pulse…"
-                className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-[#3A5A7A]"
+                placeholder="Jump anywhere — pages, decisions, players…"
+                className="flex-1 bg-transparent text-[14.5px] outline-none"
+                style={{ color: 'var(--t1)' }}
               />
               <kbd
-                className="hidden md:inline text-[10px] font-semibold px-1.5 py-0.5 rounded"
-                style={{ color: '#3A5A7A', border: '1px solid #1A3048' }}
+                className="mono-data hidden md:inline text-[9.5px] px-1.5 py-0.5 rounded"
+                style={{ color: 'var(--t3)', border: '1px solid var(--hairline)', borderBottomWidth: '2px' }}
               >
                 ESC
               </kbd>
@@ -273,7 +284,7 @@ export default function CommandPalette({
             {/* Results */}
             <div ref={listRef} className="flex-1 overflow-y-auto py-2">
               {commands.length === 0 && (
-                <p className="text-sm text-center py-6" style={{ color: '#3A5A7A' }}>
+                <p className="text-[12.5px] text-center py-6" style={{ color: 'var(--t3)' }}>
                   No matches{q.length === 1 ? ' — keep typing for player search' : ''}.
                 </p>
               )}
@@ -284,8 +295,8 @@ export default function CommandPalette({
                   <div key={cmd.id}>
                     {isFirstOfSection && (
                       <p
-                        className="px-4 pt-2 pb-1 text-[10px] font-semibold tracking-widest uppercase"
-                        style={{ color: '#3A5A7A' }}
+                        className="mono-data px-[18px] pt-2.5 pb-1 text-[8.5px] tracking-[0.18em] uppercase"
+                        style={{ color: 'var(--t3)' }}
                       >
                         {cmd.section}
                       </p>
@@ -295,17 +306,23 @@ export default function CommandPalette({
                       data-index={i}
                       onClick={cmd.run}
                       onMouseMove={() => setSelected(i)}
-                      className="w-full flex items-center justify-between gap-3 px-4 py-2 text-left"
-                      style={{ backgroundColor: isSelected ? '#378ADD18' : 'transparent' }}
+                      className="w-full flex items-center justify-between gap-3 px-[18px] py-2 text-left"
+                      style={{
+                        backgroundColor: isSelected ? 'var(--signal-dim)' : 'transparent',
+                        borderLeft: `2px solid ${isSelected ? 'var(--signal)' : 'transparent'}`,
+                      }}
                     >
                       <span
-                        className="text-sm truncate"
-                        style={{ color: isSelected ? '#FFFFFF' : '#8AAABB' }}
+                        className="text-[13px] truncate"
+                        style={{ color: isSelected ? 'var(--t1)' : 'var(--t2)' }}
                       >
                         {cmd.label}
                       </span>
                       {cmd.hint && (
-                        <span className="text-xs flex-shrink-0 truncate max-w-[45%]" style={{ color: '#3A5A7A' }}>
+                        <span
+                          className="mono-data text-[10px] flex-shrink-0 truncate max-w-[45%]"
+                          style={{ color: isSelected ? 'var(--signal)' : 'var(--t3)' }}
+                        >
                           {cmd.hint}
                         </span>
                       )}
@@ -313,6 +330,16 @@ export default function CommandPalette({
                   </div>
                 )
               })}
+            </div>
+
+            {/* Footer hints */}
+            <div
+              className="mono-data flex gap-4 px-[18px] py-2 text-[9.5px]"
+              style={{ borderTop: '1px solid var(--hairline)', color: 'var(--t3)' }}
+            >
+              <span>↑↓ NAVIGATE</span>
+              <span>↵ RUN</span>
+              <span className="hidden md:inline">⌘1–5 PANELS</span>
             </div>
           </div>
         </div>

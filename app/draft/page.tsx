@@ -78,27 +78,27 @@ function DraftPageInner() {
       {/* Header */}
       <div className="mb-5">
         <div className="flex items-baseline justify-between">
-          <h1 className="text-2xl font-bold text-white tracking-tight">Draft Kit</h1>
+          <h1 className="text-[22px] font-semibold tracking-tight" style={{ color: 'var(--t1)' }}>Draft Kit</h1>
           {lastUpdated && (
-            <span className="text-xs" style={{ color: '#3A5A7A' }}>
-              Updated {formatRelative(lastUpdated)}
+            <span className="mono-data text-[10px] tracking-[0.08em]" style={{ color: 'var(--t3)' }}>
+              UPDATED {formatRelative(lastUpdated).toUpperCase()}
             </span>
           )}
         </div>
         <Link
           href="/draft/join"
-          className="flex items-center justify-between gap-3 rounded-xl px-4 py-3 mb-4 transition-all hover:brightness-110"
-          style={{ backgroundColor: '#378ADD18', border: '1px solid #378ADD40' }}
+          className="glass card-hover flex items-center justify-between gap-3 rounded-xl px-4 py-3 my-4"
+          style={{ borderColor: 'rgba(75,163,245,.3)' }}
         >
           <div>
-            <p className="text-sm font-semibold" style={{ color: '#378ADD' }}>Drafting right now? Try Draft Copilot →</p>
-            <p className="text-xs mt-0.5" style={{ color: '#5A7A9A' }}>
+            <p className="text-sm font-semibold" style={{ color: 'var(--signal)' }}>Drafting right now? Try Draft Copilot →</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--t2)' }}>
               Live tracking during your actual draft — best available, a heads-up before your turn, and an alert the moment a run starts.
             </p>
           </div>
         </Link>
-        <p className="text-sm mt-0.5" style={{ color: '#5A7A9A' }}>
-          Consensus ADP from Sleeper · {players.length} players
+        <p className="mono-data text-[10px] tracking-[0.08em] mt-0.5" style={{ color: 'var(--t3)' }}>
+          CONSENSUS ADP · SLEEPER · {players.length} PLAYERS
         </p>
       </div>
 
@@ -108,8 +108,8 @@ function DraftPageInner() {
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Search players..."
-        className="w-full text-sm px-4 py-2.5 rounded-xl mb-3 outline-none"
-        style={{ backgroundColor: '#0A1520', border: '1px solid #1A3048', color: 'white' }}
+        className="glass w-full text-sm px-4 py-2.5 rounded-xl mb-3 outline-none focus:border-[var(--signal)]"
+        style={{ color: 'var(--t1)' }}
       />
 
       {/* Position filter tabs */}
@@ -120,11 +120,12 @@ function DraftPageInner() {
             <button
               key={pos}
               onClick={() => setPosition(pos)}
-              className="flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all"
+              className="mono-data flex-shrink-0 text-[11px] tracking-[0.06em] px-3 py-1.5 rounded-lg transition-all"
               style={{
-                backgroundColor: isActive ? '#378ADD' : '#0A1520',
-                color: isActive ? 'white' : '#5A7A9A',
-                border: `1px solid ${isActive ? '#378ADD' : '#1A3048'}`,
+                backgroundColor: isActive ? 'var(--signal-dim)' : 'rgba(8, 15, 26, 0.6)',
+                color: isActive ? 'var(--signal)' : 'var(--t3)',
+                border: `1px solid ${isActive ? 'rgba(75,163,245,.45)' : 'var(--hairline)'}`,
+                boxShadow: isActive ? '0 0 14px rgba(75,163,245,.18)' : 'none',
               }}
             >
               {pos}
@@ -141,7 +142,7 @@ function DraftPageInner() {
         <RankingsTable players={filtered} mode={mode} />
       )}
 
-      <p className="text-xs text-center mt-8" style={{ color: '#3A5A7A' }}>
+      <p className="text-xs text-center mt-8" style={{ color: 'var(--t3)' }}>
         Rankings refresh daily · Create a free account to sync this draft to your league
       </p>
     </div>
@@ -155,7 +156,7 @@ function RankingsTable({ players, mode }: { players: ADPPlayer[]; mode: string }
   const showInjury = mode === 'savant'
 
   return (
-    <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #1A3048' }}>
+    <div className="glass rounded-[14px] overflow-hidden">
       {players.map((p, i) => {
         const prevTier = i > 0 ? players[i - 1].tier : null
         const showTierDivider = showTier && p.tier !== prevTier && i > 0
@@ -164,45 +165,45 @@ function RankingsTable({ players, mode }: { players: ADPPlayer[]; mode: string }
           <div key={`${p.playerId}-${p.position}`}>
             {showTierDivider && (
               <div
-                className="px-4 py-1 text-[10px] font-semibold tracking-widest uppercase"
-                style={{ backgroundColor: '#07111C', color: '#3A5A7A' }}
+                className="mono-data px-4 py-1 text-[8.5px] tracking-[0.18em] uppercase"
+                style={{ backgroundColor: 'rgba(6, 11, 19, 0.55)', color: 'var(--t3)' }}
               >
                 Tier {p.tier}
               </div>
             )}
             <div
-              className="flex items-center gap-3 px-4 py-2.5"
-              style={{ backgroundColor: '#0A1520', borderTop: i === 0 ? 'none' : '1px solid #1A3048' }}
+              className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-[rgba(75,163,245,0.05)]"
+              style={{ borderTop: i === 0 ? 'none' : '1px solid rgba(90,150,210,.07)' }}
             >
               <span
-                className="text-xs font-semibold flex-shrink-0 w-7 text-right"
-                style={{ color: '#3A5A7A' }}
+                className="mono-data text-[11px] flex-shrink-0 w-7 text-right"
+                style={{ color: 'var(--t3)' }}
               >
                 {Math.round(p.adpConsensus)}
               </span>
 
               <span
-                className="text-[10px] font-bold flex-shrink-0 w-9 text-center py-0.5 rounded"
+                className="mono-data text-[9px] tracking-[0.1em] flex-shrink-0 w-9 text-center py-0.5 rounded"
                 style={{
                   backgroundColor: `${POSITION_COLOR[p.position] ?? '#5A7A9A'}18`,
-                  color: POSITION_COLOR[p.position] ?? '#5A7A9A',
+                  color: POSITION_COLOR[p.position] ?? 'var(--t2)',
                 }}
               >
                 {p.position}
               </span>
 
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-white truncate">{p.name}</p>
-                <p className="text-xs truncate" style={{ color: '#3A5A7A' }}>
+                <p className="text-[12.5px] font-medium truncate" style={{ color: 'var(--t1)' }}>{p.name}</p>
+                <p className="mono-data text-[10px] truncate" style={{ color: 'var(--t3)' }}>
                   {p.nflTeam || 'FA'}
                   {showInjury && p.injuryStatus && (
-                    <span style={{ color: '#E84040' }}> · {p.injuryStatus}</span>
+                    <span style={{ color: 'var(--crit)' }}> · {p.injuryStatus.toUpperCase()}</span>
                   )}
                 </p>
               </div>
 
               {mode === 'savant' && (
-                <span className="text-xs flex-shrink-0" style={{ color: '#3A5A7A' }}>
+                <span className="mono-data text-[10.5px] flex-shrink-0" style={{ color: 'var(--t3)' }}>
                   ADP {p.adpConsensus.toFixed(1)}
                 </span>
               )}
@@ -220,11 +221,7 @@ function LoadingState() {
   return (
     <div className="space-y-2">
       {Array.from({ length: 8 }).map((_, i) => (
-        <div
-          key={i}
-          className="h-12 rounded-xl animate-pulse"
-          style={{ backgroundColor: '#0A1520', border: '1px solid #1A3048' }}
-        />
+        <div key={i} className="glass h-12 rounded-xl animate-pulse" />
       ))}
     </div>
   )
@@ -232,16 +229,16 @@ function LoadingState() {
 
 function ErrorState({ message }: { message: string }) {
   return (
-    <div className="rounded-xl p-6 text-center" style={{ backgroundColor: '#0A1520', border: '1px solid #1A3048' }}>
-      <p className="text-sm" style={{ color: '#E84040' }}>{message}</p>
+    <div className="glass rounded-xl p-6 text-center">
+      <p className="text-sm" style={{ color: 'var(--crit)' }}>{message}</p>
     </div>
   )
 }
 
 function EmptyState() {
   return (
-    <div className="rounded-xl p-6 text-center" style={{ backgroundColor: '#0A1520', border: '1px solid #1A3048' }}>
-      <p className="text-sm" style={{ color: '#5A7A9A' }}>No players match your search.</p>
+    <div className="glass rounded-xl p-6 text-center">
+      <p className="text-sm" style={{ color: 'var(--t2)' }}>No players match your search.</p>
     </div>
   )
 }
