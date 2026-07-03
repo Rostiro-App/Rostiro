@@ -4,6 +4,7 @@ import { createContext, useContext, useSyncExternalStore } from 'react'
 import Sidebar from './Sidebar'
 import BottomNav from './BottomNav'
 import SystemBar from './SystemBar'
+import CommandPalette from '@/components/palette/CommandPalette'
 
 export type Mode = 'focused' | 'balanced' | 'savant'
 
@@ -46,6 +47,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {/* T-67: OS Shell system bar — full width, above everything, both
             breakpoints. Replaces the old mobile-only header. */}
         <SystemBar mode={mode} onModeChange={handleModeChange} />
+
+        {/* T-70: ⌘K palette + mobile FAB — listens for the system bar's
+            'rostiro:open-command-palette' event and the keyboard shortcut. */}
+        <CommandPalette mode={mode} onModeChange={handleModeChange} />
 
         <div className="flex flex-1 min-h-0">
           {/* Desktop sidebar — hidden on mobile */}

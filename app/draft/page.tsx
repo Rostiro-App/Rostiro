@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { useMode } from '@/components/nav/AppShell'
 import type { ADPPlayer, NFLPosition } from '@/types'
 
@@ -18,13 +19,25 @@ const POSITION_COLOR: Record<string, string> = {
   DEF: '#8AAABB',
 }
 
+// useSearchParams requires a Suspense boundary at build time — the wrapper
+// exists only for that.
 export default function DraftPage() {
+  return (
+    <Suspense fallback={null}>
+      <DraftPageInner />
+    </Suspense>
+  )
+}
+
+function DraftPageInner() {
   const mode = useMode()
+  const searchParams = useSearchParams()
   const [players, setPlayers] = useState<ADPPlayer[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [position, setPosition] = useState<NFLPosition | 'ALL'>('ALL')
-  const [search, setSearch] = useState('')
+  // T-70: the command palette deep-links players here as /draft?q=Name.
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
 
   useEffect(() => {
     let cancelled = false
