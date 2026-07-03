@@ -59,3 +59,9 @@ create policy "Authenticated users can read adp snapshots" on public.adp_snapsho
 drop policy if exists "Service role can manage adp snapshots" on public.adp_snapshots;
 create policy "Service role can manage adp snapshots" on public.adp_snapshots
   for all using (auth.role() = 'service_role');
+
+-- Table-level grants — RLS policies alone aren't enough; the API roles also
+-- need Postgres privileges on the table (confirmed live: without these the
+-- service role gets "permission denied for table adp_snapshots").
+grant select on public.adp_snapshots to authenticated;
+grant select, insert, update, delete on public.adp_snapshots to service_role;

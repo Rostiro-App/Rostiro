@@ -303,6 +303,9 @@ create policy "Authenticated users can read adp snapshots" on public.adp_snapsho
 create policy "Service role can manage adp snapshots" on public.adp_snapshots
   for all using (auth.role() = 'service_role');
 
+grant select on public.adp_snapshots to authenticated;
+grant select, insert, update, delete on public.adp_snapshots to service_role;
+
 -- ─── AI Queries (Logging) ─────────────────────────────────────────────────────
 -- Tracks Claude usage for rate limiting free tier and debugging.
 
