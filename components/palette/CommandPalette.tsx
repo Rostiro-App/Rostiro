@@ -89,11 +89,18 @@ export default function CommandPalette({
   }, [])
 
   // Open triggers: ⌘K / Ctrl+K anywhere, or the system bar chip's event.
+  // ⌘1–5 jump straight to a panel (the dock tooltips advertise these).
   useEffect(() => {
+    const PANEL_KEYS = ['/pulse', '/leagues', '/draft', '/lineup', '/trades']
     function onKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         openPalette()
+        return
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '5') {
+        e.preventDefault()
+        router.push(PANEL_KEYS[Number(e.key) - 1])
       }
     }
     function onOpenEvent() {
@@ -105,7 +112,7 @@ export default function CommandPalette({
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('rostiro:open-command-palette', onOpenEvent)
     }
-  }, [openPalette])
+  }, [openPalette, router])
 
   useEffect(() => {
     if (open) inputRef.current?.focus()

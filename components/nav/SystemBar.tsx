@@ -1,12 +1,11 @@
 'use client'
 
-// T-67: the OS Shell system bar (PRD 6.7 W1). Persistent ambient state on
-// every authenticated screen: live sync ticker, per-league health dots,
-// next-deadline countdown, mode chip, ⌘K affordance. Polls
-// /api/system/status once a minute; the 1-second ticker in between renders
-// "Synced Xs ago" and the countdown from data it already has — no extra
-// requests. Desktop shows everything; mobile condenses to
-// sync + dots + countdown + mode (⌘K becomes a FAB in T-70).
+// T-67 → OS redesign: the system bar is now glass over the ambient ground,
+// set entirely in mono — it reads as instrument chrome, not a header. Live
+// behavior unchanged: polls /api/system/status once a minute, the 1-second
+// ticker renders "SYNCED XS AGO" and the countdown from data it already
+// has, and a failed poll degrades to last-known state rather than blanking.
+// The sync dot pings on a loop: visible evidence the OS is monitoring.
 
 import { useEffect, useRef, useState } from 'react'
 import { type Mode, ModeButton, ModeSwitcher } from './AppShell'
@@ -15,10 +14,16 @@ import type { LeagueHealthStatus, SystemStatus } from '@/types'
 const POLL_INTERVAL_MS = 60_000
 
 const DOT_COLOR: Record<LeagueHealthStatus, string> = {
-  healthy: '#4CAF72',
-  monitor: '#F59E0B',
-  action: '#E84040',
-  unknown: '#3A5A7A',
+  healthy: 'var(--live)',
+  monitor: 'var(--warn)',
+  action: 'var(--crit)',
+  unknown: 'transparent',
+}
+const DOT_GLOW: Record<LeagueHealthStatus, string> = {
+  healthy: '0 0 7px rgba(67,192,119,.7)',
+  monitor: '0 0 7px rgba(245,166,35,.7)',
+  action: '0 0 7px rgba(232,80,74,.7)',
+  unknown: 'none',
 }
 
 export default function SystemBar({
@@ -72,10 +77,10 @@ export default function SystemBar({
   }, [])
 
   const syncLabel = syncing && lastSyncAt === null
-    ? 'Syncing…'
+    ? 'SYNCING…'
     : lastSyncAt !== null
       ? formatSyncAge(now - lastSyncAt)
-      : 'Offline'
+      : 'OFFLINE'
 
   const deadline = status?.nextDeadline ?? null
   const deadlineMs = deadline ? new Date(deadline.at).getTime() - now : null
@@ -83,32 +88,34 @@ export default function SystemBar({
   return (
     <>
       <div
-        className="flex items-center gap-3 md:gap-5 px-3 md:px-4 flex-shrink-0"
-        style={{
-          backgroundColor: '#0A1520',
-          borderBottom: '1px solid #1A3048',
-          height: '40px',
-          fontVariantNumeric: 'tabular-nums',
-        }}
+        className="glass-bar mono-data flex items-center gap-3 md:gap-5 px-3 md:px-4 flex-shrink-0 relative z-20"
+        style={{ borderBottom: '1px solid var(--hairline)', height: '42px', fontSize: '11px' }}
       >
         {/* Wordmark — desktop only (mobile keeps every pixel for state) */}
-        <span className="hidden md:flex items-baseline flex-shrink-0">
-          <span className="text-white font-bold tracking-[0.15em] text-xs">ROSTIRO</span>
+        <span className="hidden md:flex items-baseline gap-1.5 flex-shrink-0">
+          <span className="font-bold tracking-[0.18em] text-[11.5px]" style={{ color: 'var(--t1)' }}>
+            ROSTIRO
+          </span>
           <span
-            className="ml-1.5 text-[9px] font-bold tracking-[0.1em] px-1 rounded"
-            style={{ color: '#378ADD', border: '1px solid #378ADD66' }}
+            className="text-[8.5px] font-bold tracking-[0.14em] px-1 rounded"
+            style={{
+              color: 'var(--signal)',
+              border: '1px solid rgba(75,163,245,0.45)',
+              textShadow: '0 0 12px rgba(75,163,245,0.65)',
+            }}
           >
             OS
           </span>
         </span>
 
-        {/* Sync state */}
-        <span className="flex items-center gap-1.5 text-xs flex-shrink-0" style={{ color: '#5A7A9A' }}>
+        {/* Sync state — the ping is the heartbeat */}
+        <span className="flex items-center gap-2 flex-shrink-0" style={{ color: 'var(--t2)' }}>
           <span
-            className="w-1.5 h-1.5 rounded-full"
+            className="ping-dot w-1.5 h-1.5 rounded-full"
             style={{
-              backgroundColor: syncing ? '#378ADD' : '#4CAF72',
-              boxShadow: syncing ? '0 0 5px #378ADD' : '0 0 5px #4CAF7280',
+              color: syncing ? 'var(--signal)' : 'var(--live)',
+              backgroundColor: syncing ? 'var(--signal)' : 'var(--live)',
+              boxShadow: syncing ? '0 0 8px rgba(75,163,245,.8)' : '0 0 8px rgba(67,192,119,.8)',
             }}
           />
           {/* Re-keyed on each successful poll so the label ticks exactly
@@ -118,29 +125,29 @@ export default function SystemBar({
 
         {/* League health dots */}
         {status && status.leagues.length > 0 && (
-          <span className="flex items-center gap-2">
-            <span
-              className="hidden md:inline text-[10px] font-semibold tracking-[0.12em] uppercase"
-              style={{ color: '#3A5A7A' }}
-            >
-              Leagues
+          <span className="flex items-center gap-2.5">
+            <span className="hidden md:inline text-[9px] tracking-[0.14em]" style={{ color: 'var(--t3)' }}>
+              LEAGUES
             </span>
-            {status.leagues.map((l) => (
+            {status.leagues.map((l, i) => (
               <span key={l.id} className="relative group">
                 <span
-                  className="block w-2 h-2 rounded-full cursor-default"
-                  style={{ backgroundColor: DOT_COLOR[l.health.status] }}
+                  className={l.health.status === 'healthy' || l.health.status === 'monitor' ? 'breathe block w-2 h-2 rounded-full cursor-default' : 'block w-2 h-2 rounded-full cursor-default'}
+                  style={{
+                    backgroundColor: DOT_COLOR[l.health.status],
+                    boxShadow: DOT_GLOW[l.health.status],
+                    border: l.health.status === 'unknown' ? '1px solid var(--t3)' : 'none',
+                    animationDelay: `${i * 1.4}s`,
+                  }}
                 />
                 <span
-                  className="hidden group-hover:block absolute top-4 left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] px-2.5 py-1.5 rounded-lg z-50"
-                  style={{
-                    backgroundColor: '#071019',
-                    border: '1px solid #1A3048',
-                    color: 'white',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-                  }}
+                  className="glass-heavy hidden group-hover:block absolute top-4 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10.5px] px-2.5 py-1.5 rounded-lg z-50"
+                  style={{ color: 'var(--t1)' }}
                 >
-                  {l.name} · {l.health.score !== null ? l.health.score : '—'}
+                  {l.name} ·{' '}
+                  <b style={{ color: 'var(--signal)', fontWeight: 600 }}>
+                    {l.health.score !== null ? l.health.score : '—'}
+                  </b>
                 </span>
               </span>
             ))}
@@ -151,32 +158,40 @@ export default function SystemBar({
 
         {/* Deadline countdown */}
         {deadline && deadlineMs !== null && deadlineMs > 0 && (
-          <span className="flex items-center gap-2 text-xs flex-shrink-0">
+          <span className="flex items-baseline gap-2 flex-shrink-0">
             <span
-              className="text-[10px] font-bold tracking-[0.1em] uppercase truncate max-w-28 md:max-w-none"
-              style={{ color: '#F59E0B' }}
+              className="text-[9px] tracking-[0.14em] uppercase truncate max-w-28 md:max-w-none"
+              style={{ color: 'var(--warn)' }}
             >
               {deadline.label} · {deadline.leagueName}
             </span>
-            <span className="font-mono text-xs text-white">{formatCountdown(deadlineMs)}</span>
+            <span
+              className="text-xs"
+              style={{ color: 'var(--t1)', textShadow: '0 0 14px rgba(245,166,35,0.25)' }}
+            >
+              {formatCountdown(deadlineMs)}
+            </span>
           </span>
         )}
 
         {/* Mode chip */}
         <ModeButton mode={mode} onClick={() => setSwitcherOpen(true)} />
 
-        {/* ⌘K affordance — palette itself lands in T-70; this dispatches the
-            event it will listen for so the wiring is already in place. */}
+        {/* ⌘K affordance */}
         <button
           type="button"
           onClick={() => window.dispatchEvent(new CustomEvent('rostiro:open-command-palette'))}
-          className="hidden md:flex items-center gap-1.5 text-[11px] px-2 py-1 rounded-lg transition-all"
-          style={{ color: '#5A7A9A', border: '1px solid #1A3048', backgroundColor: '#0D1B2A' }}
+          className="hidden md:flex items-center gap-1.5 text-[10.5px] px-2.5 py-1 rounded-lg transition-all hover:shadow-[0_0_14px_rgba(75,163,245,0.18)]"
+          style={{ color: 'var(--t2)', border: '1px solid var(--hairline)' }}
         >
           Command
           <kbd
-            className="font-mono text-[10px] px-1 rounded"
-            style={{ backgroundColor: '#0A1520', border: '1px solid #1A3048', color: '#3A5A7A' }}
+            className="text-[9.5px] px-1 rounded"
+            style={{
+              border: '1px solid var(--hairline)',
+              borderBottomWidth: '2px',
+              color: 'var(--t3)',
+            }}
           >
             ⌘K
           </kbd>
@@ -199,10 +214,10 @@ export default function SystemBar({
 
 function formatSyncAge(ms: number): string {
   const sec = Math.max(0, Math.floor(ms / 1000))
-  if (sec < 60) return `Synced ${sec}s ago`
+  if (sec < 60) return `SYNCED ${sec}S AGO`
   const min = Math.floor(sec / 60)
-  if (min < 60) return `Synced ${min}m ago`
-  return `Synced ${Math.floor(min / 60)}h ago`
+  if (min < 60) return `SYNCED ${min}M AGO`
+  return `SYNCED ${Math.floor(min / 60)}H AGO`
 }
 
 function formatCountdown(ms: number): string {
@@ -212,6 +227,6 @@ function formatCountdown(ms: number): string {
   const m = Math.floor((totalSec % 3_600) / 60)
   const s = totalSec % 60
   const pad = (n: number) => String(n).padStart(2, '0')
-  if (days > 0) return `${days}d ${pad(h)}:${pad(m)}:${pad(s)}`
+  if (days > 0) return `${days}D ${pad(h)}:${pad(m)}:${pad(s)}`
   return `${pad(h)}:${pad(m)}:${pad(s)}`
 }

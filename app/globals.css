@@ -1,8 +1,29 @@
 @import "tailwindcss";
 
+/* ═══ Rostiro OS design tokens (native-OS redesign, approved mockup) ═══
+   Ground is near-black blue; surfaces are translucent glass over it; one
+   glowing signal hue; semantic colors stay separate from the accent. Every
+   live value renders in mono with tabular numerals. */
 :root {
-  --background: #0D1B2A;
-  --foreground: #e2eaf3;
+  --void: #060B13;
+  --glass: rgba(15, 30, 48, 0.55);
+  --glass-heavy: rgba(12, 24, 40, 0.82);
+  --glass-solid: #0C1828; /* fallback ground where blur isn't wanted */
+  --hairline: rgba(90, 150, 210, 0.14);
+  --hairline-bright: rgba(120, 180, 240, 0.32);
+  --signal: #4BA3F5;
+  --signal-dim: rgba(75, 163, 245, 0.14);
+  --live: #43C077;
+  --warn: #F5A623;
+  --crit: #E8504A;
+  --t1: #E8F0F8;
+  --t2: #8FA9C0;
+  --t3: #45607A;
+  --t4: #2E4258;
+  --ease-os: cubic-bezier(0.32, 0.72, 0.22, 1);
+
+  --background: var(--void);
+  --foreground: var(--t1);
 }
 
 @theme inline {
@@ -18,6 +39,136 @@ body {
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
 
+/* ═══ Shared surface treatments ═══ */
+.glass {
+  background: var(--glass);
+  backdrop-filter: blur(16px) saturate(1.25);
+  -webkit-backdrop-filter: blur(16px) saturate(1.25);
+  border: 1px solid var(--hairline);
+}
+.glass-heavy {
+  background: var(--glass-heavy);
+  backdrop-filter: blur(26px) saturate(1.4);
+  -webkit-backdrop-filter: blur(26px) saturate(1.4);
+  border: 1px solid var(--hairline-bright);
+}
+.glass-bar {
+  background: rgba(8, 15, 26, 0.72);
+  backdrop-filter: blur(18px) saturate(1.3);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+}
+.card-hover {
+  transition: transform 0.22s var(--ease-os), border-color 0.22s var(--ease-os),
+    box-shadow 0.22s var(--ease-os);
+}
+.card-hover:hover {
+  transform: translateY(-1.5px);
+  border-color: var(--hairline-bright);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35), 0 0 22px rgba(75, 163, 245, 0.08);
+}
+.mono-data {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ═══ Ambient ground — two slow drifting glows: the OS is alive ═══ */
+.ambient-ground {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+.ambient-ground::before,
+.ambient-ground::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+}
+.ambient-ground::before {
+  width: 55vw;
+  height: 55vw;
+  left: -12vw;
+  top: -18vw;
+  background: radial-gradient(circle, rgba(35, 90, 160, 0.16), transparent 65%);
+  animation: drift-a 46s var(--ease-os) infinite alternate;
+}
+.ambient-ground::after {
+  width: 45vw;
+  height: 45vw;
+  right: -10vw;
+  bottom: -14vw;
+  background: radial-gradient(circle, rgba(20, 120, 110, 0.1), transparent 65%);
+  animation: drift-b 58s var(--ease-os) infinite alternate;
+}
+@keyframes drift-a {
+  to { transform: translate(6vw, 5vh); }
+}
+@keyframes drift-b {
+  to { transform: translate(-5vw, -6vh); }
+}
+
+/* ═══ Live-state animations ═══ */
+@keyframes rostiro-ping {
+  0% { transform: scale(1); opacity: 0.9; }
+  30% { transform: scale(3.2); opacity: 0; }
+  100% { transform: scale(3.2); opacity: 0; }
+}
+.ping-dot {
+  position: relative;
+}
+.ping-dot::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  opacity: 0;
+  animation: rostiro-ping 4s var(--ease-os) infinite;
+}
+
+@keyframes rostiro-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.25); }
+}
+.breathe { animation: rostiro-breathe 5s ease-in-out infinite; }
+
+/* T-71: terminal tick — brief flash when a live value updates. Applied by
+   re-keying the element on the value it tracks. */
+@keyframes rostiro-tick {
+  0% { color: #ffffff; text-shadow: 0 0 10px rgba(75, 163, 245, 0.9); }
+  100% { color: inherit; text-shadow: none; }
+}
+.value-tick { animation: rostiro-tick 600ms ease-out; }
+
+/* Panel entrance — every route change lands like a layer, not a page load */
+@keyframes panel-enter {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); filter: blur(4px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+.panel-enter { animation: panel-enter 0.38s var(--ease-os); }
+
+/* Card dismissal collapse */
+@keyframes card-leave {
+  to { opacity: 0; transform: translateX(12px); max-height: 0; margin-top: -9px;
+       padding-top: 0; padding-bottom: 0; border-width: 0; }
+}
+.card-leave {
+  overflow: hidden;
+  max-height: 300px;
+  animation: card-leave 0.34s var(--ease-os) forwards;
+}
+
+/* Ticker crawl */
+@keyframes ticker-crawl {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.ticker-crawl {
+  animation: ticker-crawl 38s linear infinite;
+}
+.ticker-pause:hover .ticker-crawl { animation-play-state: paused; }
+
 /* iOS safe area support for bottom nav */
 @supports (padding: env(safe-area-inset-bottom)) {
   .pb-safe {
@@ -25,13 +176,13 @@ body {
   }
 }
 
-/* T-71: terminal tick — brief flash when a live value updates. Applied by
-   re-keying the element on the value it tracks (key change remounts and
-   replays the animation). */
-@keyframes rostiro-tick {
-  0% { color: #ffffff; }
-  100% { color: inherit; }
-}
-.value-tick {
-  animation: rostiro-tick 600ms ease-out;
+@media (prefers-reduced-motion: reduce) {
+  .ambient-ground::before,
+  .ambient-ground::after,
+  .ping-dot::after,
+  .breathe,
+  .ticker-crawl {
+    animation: none;
+  }
+  .panel-enter { animation-duration: 0.01ms; }
 }
