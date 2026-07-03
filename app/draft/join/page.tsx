@@ -5,13 +5,16 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { Platform } from '@/types'
+import type { DraftStrategy, Platform } from '@/types'
+import { STRATEGY_LABELS, STRATEGY_DESCRIPTIONS } from '@/lib/draftBoard'
 
 type SupportedPlatform = Extract<Platform, 'sleeper' | 'yahoo'>
+const STRATEGIES: DraftStrategy[] = ['balanced', 'zero_rb', 'hero_rb', 'hero_wr']
 
 export default function JoinDraftPage() {
   const router = useRouter()
   const [platform, setPlatform] = useState<SupportedPlatform>('sleeper')
+  const [strategy, setStrategy] = useState<DraftStrategy>('balanced')
 
   const [draftId, setDraftId] = useState('')
   const [username, setUsername] = useState('')
@@ -64,10 +67,10 @@ export default function JoinDraftPage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (platform === 'sleeper') {
-      submitJoin({ platform: 'sleeper', draftId: draftId.trim(), username: username.trim() })
+      submitJoin({ platform: 'sleeper', draftId: draftId.trim(), username: username.trim(), strategy })
       return
     }
-    const body: Record<string, unknown> = { platform: 'yahoo', yahooLeagueId: yahooLeagueId.trim() }
+    const body: Record<string, unknown> = { platform: 'yahoo', yahooLeagueId: yahooLeagueId.trim(), strategy }
     if (needsManualSlot && manualSlot.trim()) {
       body.manualDraftPosition = Number(manualSlot.trim())
     }
@@ -108,6 +111,34 @@ export default function JoinDraftPage() {
             {p === 'sleeper' ? 'Sleeper' : 'Yahoo'}
           </button>
         ))}
+      </div>
+
+      <div className="mb-4">
+        <p className="text-xs font-medium mb-1.5 text-center" style={{ color: '#5A7A9A' }}>Draft strategy</p>
+        <div className="grid grid-cols-2 gap-1.5">
+          {STRATEGIES.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setStrategy(s)}
+              className="text-left px-3 py-2 rounded-lg transition-all"
+              style={{
+                backgroundColor: strategy === s ? '#378ADD18' : '#0A1520',
+                border: `1px solid ${strategy === s ? '#378ADD' : '#1A3048'}`,
+              }}
+            >
+              <p className="text-xs font-semibold" style={{ color: strategy === s ? '#378ADD' : 'white' }}>
+                {STRATEGY_LABELS[s]}
+              </p>
+              <p className="text-[11px] mt-0.5 leading-tight" style={{ color: '#5A7A9A' }}>
+                {STRATEGY_DESCRIPTIONS[s]}
+              </p>
+            </button>
+          ))}
+        </div>
+        <p className="text-xs mt-2 text-center" style={{ color: '#3A5A7A' }}>
+          You can change this mid-draft as things develop.
+        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="rounded-xl p-5 space-y-4" style={{ backgroundColor: '#0A1520', border: '1px solid #1A3048' }}>

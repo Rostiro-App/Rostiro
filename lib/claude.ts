@@ -5,7 +5,8 @@
 // already computed, not open-ended reasoning — keep it cheap and fast.
 
 import Anthropic from '@anthropic-ai/sdk'
-import { ClaudeAPIError } from '@/types'
+import { ClaudeAPIError, type DraftStrategy } from '@/types'
+import { STRATEGY_DESCRIPTIONS } from '@/lib/draftBoard'
 
 const MODEL = 'claude-sonnet-5'
 
@@ -125,6 +126,7 @@ interface DraftRecommendationsInput {
   candidates: DraftRecommendationCandidate[]
   round: number
   pickNumber: number
+  strategy: DraftStrategy
   rosterSoFar: Array<{ name: string; position: string }>
 }
 
@@ -163,6 +165,10 @@ export async function generateDraftPickRecommendations(
   const rosterList = input.rosterSoFar.length > 0
     ? input.rosterSoFar.map((p) => `${p.name} (${p.position})`).join(', ')
     : 'no picks yet'
+  const strategyContext =
+    input.strategy === 'balanced'
+      ? null
+      : `The manager is drafting a "${input.strategy}" strategy this draft: ${STRATEGY_DESCRIPTIONS[input.strategy]}`
 
   let message
   try {
@@ -175,11 +181,11 @@ export async function generateDraftPickRecommendations(
         format: { type: 'json_schema', schema: RECOMMENDATION_SCHEMA },
       },
       system:
-        'You write short, factual fantasy football draft pick explanations. Use only the ADP numbers, positions, and roster given to you. Never invent stats, injuries, or team needs that were not provided. One to two sentences per player, direct, no hedging filler.',
+        'You write short, factual fantasy football draft pick explanations. Use only the ADP numbers, positions, roster, and strategy given to you. Never invent stats, injuries, or team needs that were not provided. One to two sentences per player, direct, no hedging filler.',
       messages: [
         {
           role: 'user',
-          content: `It is round ${input.round}, pick ${input.pickNumber} of a live snake draft. The manager's roster so far: ${rosterList}. Here are the best available candidates for their next pick:\n${candidateList}\n\nFor each candidate, explain in 1-2 sentences why they might be the pick, based only on their ADP relative to the other candidates and how they fit the roster built so far.`,
+          content: `It is round ${input.round}, pick ${input.pickNumber} of a live snake draft. The manager's roster so far: ${rosterList}.${strategyContext ? ` ${strategyContext}.` : ''} Here are the best available candidates for their next pick:\n${candidateList}\n\nFor each candidate, explain in 1-2 sentences why they might be the pick, based on their ADP relative to the other candidates, how they fit the roster built so far${strategyContext ? ', and how they fit the stated draft strategy' : ''}.`,
         },
       ],
     })

@@ -127,6 +127,10 @@ export interface DraftPick {
   adpDelta: number | null
 }
 
+// A stated draft philosophy — see lib/draftBoard.ts for the round-by-round
+// position weighting each one applies to Draft Copilot's rankings.
+export type DraftStrategy = 'balanced' | 'zero_rb' | 'hero_rb' | 'hero_wr'
+
 export interface DraftSettings {
   platform: Platform
   leagueId: string | null
@@ -138,6 +142,7 @@ export interface DraftSettings {
   scoringSettings: ScoringSettings
   rosterSlots: string[]
   isSnakeDraft: boolean
+  strategy: DraftStrategy
 }
 
 export interface DraftGrade {

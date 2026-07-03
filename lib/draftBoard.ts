@@ -3,7 +3,64 @@
 // polled picks, draft settings), which is what makes the board "always
 // current" without a per-view API round trip. See PRD 6.3.1.
 
-import type { ADPPlayer, DraftPick, NFLPosition } from '@/types'
+import type { ADPPlayer, DraftPick, DraftStrategy, NFLPosition } from '@/types'
+
+// ─── Draft strategy ─────────────────────────────────────────────────────────────
+// A stated strategy changes what "need" means at a given point in the draft —
+// Zero-RB says RB isn't a real need until the mid-rounds; Hero-RB says draft
+// exactly one elite RB early then pivot hard to WR. This is a real override
+// on top of pure roster-slot need, not just a tiebreaker — see the scoring in
+// computeBestAvailable below for why the two have to be unified into one
+// signal rather than kept as separate sort passes.
+
+export const STRATEGY_LABELS: Record<DraftStrategy, string> = {
+  balanced: 'Balanced (BPA)',
+  zero_rb: 'Zero-RB',
+  hero_rb: 'Hero-RB',
+  hero_wr: 'Hero-WR',
+}
+
+export const STRATEGY_DESCRIPTIONS: Record<DraftStrategy, string> = {
+  balanced: 'Best player available, weighted by roster need only.',
+  zero_rb: 'Avoid RB early, stack WR depth, catch up on RB from the mid-rounds on.',
+  hero_rb: 'Take one elite RB early, then pivot hard to WR before circling back for RB depth.',
+  hero_wr: 'Take one elite WR early, then prioritize RB before circling back for WR depth.',
+}
+
+interface StrategyRule {
+  position: NFLPosition
+  roundStart: number
+  roundEnd: number
+  weight: number // negative = deprioritize, positive = prioritize; 0 = neutral
+}
+
+const STRATEGY_RULES: Record<DraftStrategy, StrategyRule[]> = {
+  balanced: [],
+  zero_rb: [
+    { position: 'RB', roundStart: 1, roundEnd: 4, weight: -2 },
+    { position: 'WR', roundStart: 1, roundEnd: 5, weight: 1 },
+    { position: 'RB', roundStart: 5, roundEnd: 8, weight: 1 },
+  ],
+  hero_rb: [
+    { position: 'RB', roundStart: 1, roundEnd: 1, weight: 2 },
+    { position: 'RB', roundStart: 2, roundEnd: 5, weight: -2 },
+    { position: 'WR', roundStart: 2, roundEnd: 5, weight: 1 },
+    { position: 'RB', roundStart: 6, roundEnd: 9, weight: 1 },
+  ],
+  hero_wr: [
+    { position: 'WR', roundStart: 1, roundEnd: 1, weight: 2 },
+    { position: 'WR', roundStart: 2, roundEnd: 4, weight: -1 },
+    { position: 'RB', roundStart: 2, roundEnd: 5, weight: 2 },
+  ],
+}
+
+// Raw weight (-2..+2, 0 = neutral) — exposed so the UI can show *why* a
+// player's rank shifted, not just present a reordered list silently.
+export function getStrategyWeight(strategy: DraftStrategy, position: NFLPosition, round: number): number {
+  const rules = STRATEGY_RULES[strategy]
+  const match = rules.find((r) => r.position === position && round >= r.roundStart && round <= r.roundEnd)
+  return match?.weight ?? 0
+}
 
 // ─── Turn prediction ───────────────────────────────────────────────────────────
 
@@ -69,25 +126,43 @@ export function findSnipedQueueTargets(queue: string[], draftedPlayerIds: Set<st
 
 // ─── Best available ────────────────────────────────────────────────────────────
 
-// Undrafted players, sorted so positions the roster still needs come first
-// (each group internally sorted by ADP — best value first within the group).
+export interface RankedPlayer {
+  player: ADPPlayer
+  isNeeded: boolean
+  strategyWeight: number // same scale as getStrategyWeight — 0 when strategy is 'balanced' or no rule applies
+}
+
+// A flat need-before-filled partition (the original design) can't let a
+// strategy override "need" — Zero-RB's whole point is to deprioritize RB
+// despite an empty RB slot, which a hard partition would never allow. So
+// need and strategy are combined into one adjusted-ADP score instead: each
+// shifts a player's effective ADP by a fixed amount, and the list sorts on
+// that. Constants below are tuned to feel like a strong nudge, not an
+// absolute override — a truly elite player one tier above the field can
+// still outrank a same-position "needed" scrub.
+const NEED_ADP_BONUS = 50
+const STRATEGY_ADP_UNIT = 20
+
 export function computeBestAvailable(
   pool: ADPPlayer[],
   draftedPlayerIds: Set<string>,
   rosterNeeds: Partial<Record<NFLPosition, number>>,
-  rosterCounts: Partial<Record<NFLPosition, number>>
-): ADPPlayer[] {
+  rosterCounts: Partial<Record<NFLPosition, number>>,
+  strategy: DraftStrategy = 'balanced',
+  round = 1
+): RankedPlayer[] {
   const available = pool.filter((p) => !draftedPlayerIds.has(p.playerId))
 
-  const needed: ADPPlayer[] = []
-  const filled: ADPPlayer[] = []
-  for (const p of available) {
-    const need = rosterNeeds[p.position] ?? 0
-    const have = rosterCounts[p.position] ?? 0
-    if (have < need) needed.push(p)
-    else filled.push(p)
-  }
+  const ranked: RankedPlayer[] = available.map((player) => {
+    const need = rosterNeeds[player.position] ?? 0
+    const have = rosterCounts[player.position] ?? 0
+    const isNeeded = have < need
+    const strategyWeight = getStrategyWeight(strategy, player.position, round)
+    return { player, isNeeded, strategyWeight }
+  })
 
-  const byAdp = (a: ADPPlayer, b: ADPPlayer) => a.adpConsensus - b.adpConsensus
-  return [...needed.sort(byAdp), ...filled.sort(byAdp)]
+  const adjustedAdp = (r: RankedPlayer) =>
+    r.player.adpConsensus - (r.isNeeded ? NEED_ADP_BONUS : 0) - r.strategyWeight * STRATEGY_ADP_UNIT
+
+  return ranked.sort((a, b) => adjustedAdp(a) - adjustedAdp(b))
 }

@@ -32,8 +32,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   return NextResponse.json({ session: { ...data, queue_json: queueRow?.queue_json ?? [] } })
 }
 
+// Both fields optional — the queue and the strategy are switched
+// independently from different parts of the live board UI.
 const PatchBody = z.object({
-  queue: z.array(z.string()),
+  queue: z.array(z.string()).optional(),
+  strategy: z.enum(['balanced', 'zero_rb', 'hero_rb', 'hero_wr']).optional(),
 })
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -41,15 +44,34 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const body = await request.json()
   const parsed = PatchBody.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'queue must be an array of player IDs' }, { status: 400 })
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
   const admin = createAdminClient()
-  const { error } = await admin
-    .from('draft_sessions')
-    .update({ queue_json: parsed.data.queue })
-    .eq('id', id)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (parsed.data.queue !== undefined) {
+    const { error } = await admin
+      .from('draft_sessions')
+      .update({ queue_json: parsed.data.queue })
+      .eq('id', id)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  // strategy lives inside settings_json, not its own column — read, merge, write back.
+  if (parsed.data.strategy !== undefined) {
+    const { data: current, error: readError } = await admin
+      .from('draft_sessions')
+      .select('settings_json')
+      .eq('id', id)
+      .single()
+    if (readError) return NextResponse.json({ error: readError.message }, { status: 500 })
+
+    const { error: writeError } = await admin
+      .from('draft_sessions')
+      .update({ settings_json: { ...current.settings_json, strategy: parsed.data.strategy } })
+      .eq('id', id)
+    if (writeError) return NextResponse.json({ error: writeError.message }, { status: 500 })
+  }
+
   return NextResponse.json({ ok: true })
 }

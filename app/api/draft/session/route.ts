@@ -19,18 +19,22 @@ import { normalizeSleeperLeague, normalizeYahooLeague, normalizeYahooDraftResult
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { YahooAPIError } from '@/types'
-import type { DraftSettings, ScoringSettings } from '@/types'
+import type { DraftSettings, DraftStrategy, ScoringSettings } from '@/types'
+
+const StrategyField = z.enum(['balanced', 'zero_rb', 'hero_rb', 'hero_wr']).default('balanced')
 
 const Body = z.discriminatedUnion('platform', [
   z.object({
     platform: z.literal('sleeper'),
     draftId: z.string().min(1),
     username: z.string().min(1),
+    strategy: StrategyField,
   }),
   z.object({
     platform: z.literal('yahoo'),
     yahooLeagueId: z.string().min(1),
     manualDraftPosition: z.number().int().positive().optional(),
+    strategy: StrategyField,
   }),
 ])
 
@@ -47,8 +51,8 @@ export async function POST(request: Request) {
   return joinYahooDraft(parsed.data)
 }
 
-async function joinSleeperDraft(data: { draftId: string; username: string }) {
-  const { draftId, username } = data
+async function joinSleeperDraft(data: { draftId: string; username: string; strategy: DraftStrategy }) {
+  const { draftId, username, strategy } = data
 
   try {
     const draft = await getSleeperDraft(draftId)
@@ -91,6 +95,7 @@ async function joinSleeperDraft(data: { draftId: string; username: string }) {
         scoringSettings: normalized.scoringSettings,
         rosterSlots: normalized.rosterSlots,
         isSnakeDraft: draft.type === 'snake',
+        strategy,
       }
     } else {
       // Mock draft — confirmed live (no league behind it): league_id is
@@ -117,6 +122,7 @@ async function joinSleeperDraft(data: { draftId: string; username: string }) {
         scoringSettings: scoringSettingsFromMockType(draft.metadata?.scoring_type),
         rosterSlots: rosterSlotsFromDraftSettings(draft.settings),
         isSnakeDraft: draft.type === 'snake',
+        strategy,
       }
     }
 
@@ -176,6 +182,7 @@ function scoringSettingsFromMockType(scoringType: 'std' | 'ppr' | 'half_ppr' | u
 async function joinYahooDraft(data: {
   yahooLeagueId: string
   manualDraftPosition?: number
+  strategy: DraftStrategy
 }) {
   const supabase = await createSSRClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -252,6 +259,7 @@ async function joinYahooDraft(data: {
       scoringSettings: normalized.scoringSettings,
       rosterSlots: normalized.rosterSlots,
       isSnakeDraft: true, // Yahoo doesn't expose draft type here; snake is the default for redraft leagues
+      strategy: data.strategy,
     }
 
     return insertSession({ userId: user.id, platform: 'yahoo', draftId: leagueKey, settings })

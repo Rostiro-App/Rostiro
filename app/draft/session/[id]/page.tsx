@@ -13,9 +13,10 @@ import {
   detectPositionRun,
   findSnipedQueueTargets,
   picksUntilMyTurn,
+  STRATEGY_LABELS,
   type PositionRun,
 } from '@/lib/draftBoard'
-import type { ADPPlayer, DraftPick, DraftSettings, NFLPosition, Platform } from '@/types'
+import type { ADPPlayer, DraftPick, DraftSettings, DraftStrategy, NFLPosition, Platform } from '@/types'
 import type { DraftPickRecommendation } from '@/lib/claude'
 
 const POLL_INTERVAL_MS = 5_000
@@ -108,13 +109,16 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
     return needs
   }, [settings])
 
+  const currentRound = settings ? Math.ceil(currentPickNumber / settings.teamCount) : 1
+  const strategy: DraftStrategy = settings?.strategy ?? 'balanced'
+
   const bestAvailable = useMemo(
-    () => computeBestAvailable(pool, draftedIds, rosterNeeds, rosterCounts),
-    [pool, draftedIds, rosterNeeds, rosterCounts]
+    () => computeBestAvailable(pool, draftedIds, rosterNeeds, rosterCounts, strategy, currentRound),
+    [pool, draftedIds, rosterNeeds, rosterCounts, strategy, currentRound]
   )
 
   const filteredBestAvailable = useMemo(
-    () => (positionFilter === 'ALL' ? bestAvailable : bestAvailable.filter((p) => p.position === positionFilter)),
+    () => (positionFilter === 'ALL' ? bestAvailable : bestAvailable.filter((r) => r.player.position === positionFilter)),
     [bestAvailable, positionFilter]
   )
 
@@ -123,7 +127,17 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
     [settings]
   )
   const picksLeft = picksUntilMyTurn(myPickNumbers, currentPickNumber)
-  const currentRound = settings ? Math.ceil(currentPickNumber / settings.teamCount) : 1
+
+  function changeStrategy(next: DraftStrategy) {
+    setSettings((prev) => (prev ? { ...prev, strategy: next } : prev))
+    fetch(`/api/draft/session/${sessionId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ strategy: next }),
+    }).catch(() => {
+      // Best-effort, same as queue persistence — the session still works locally either way
+    })
+  }
 
   const positionRun: PositionRun | null = useMemo(() => detectPositionRun(picks), [picks])
 
@@ -161,7 +175,7 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
     recommendedForPick.current = targetPick
 
     const candidates = bestAvailable.slice(0, 5)
-    recommendedPlayerIds.current = new Set(candidates.map((p) => p.playerId))
+    recommendedPlayerIds.current = new Set(candidates.map((r) => r.player.playerId))
 
     fetch(`/api/draft/session/${sessionId}/recommend`, {
       method: 'POST',
@@ -169,12 +183,13 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
       body: JSON.stringify({
         round: currentRound,
         pickNumber: targetPick,
+        strategy,
         rosterSoFar: myPicks.map((p) => ({ name: p.playerName, position: p.position })),
-        candidates: candidates.map((p) => ({
-          playerId: p.playerId,
-          name: p.name,
-          position: p.position,
-          adp: p.adpConsensus,
+        candidates: candidates.map((r) => ({
+          playerId: r.player.playerId,
+          name: r.player.name,
+          position: r.player.position,
+          adp: r.player.adpConsensus,
         })),
       }),
     })
@@ -269,47 +284,86 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
         </div>
       )}
 
-      <div className="flex gap-1.5 mb-3 overflow-x-auto pb-1">
-        {(['ALL', ...NEEDED_POSITIONS] as const).map((pos) => (
-          <button
-            key={pos}
-            onClick={() => setPositionFilter(pos)}
-            className="flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all"
-            style={{
-              backgroundColor: positionFilter === pos ? '#378ADD' : '#0A1520',
-              color: positionFilter === pos ? 'white' : '#5A7A9A',
-              border: `1px solid ${positionFilter === pos ? '#378ADD' : '#1A3048'}`,
-            }}
-          >
-            {pos}
-          </button>
-        ))}
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="flex gap-1.5 overflow-x-auto pb-1">
+          {(['ALL', ...NEEDED_POSITIONS] as const).map((pos) => (
+            <button
+              key={pos}
+              onClick={() => setPositionFilter(pos)}
+              className="flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all"
+              style={{
+                backgroundColor: positionFilter === pos ? '#378ADD' : '#0A1520',
+                color: positionFilter === pos ? 'white' : '#5A7A9A',
+                border: `1px solid ${positionFilter === pos ? '#378ADD' : '#1A3048'}`,
+              }}
+            >
+              {pos}
+            </button>
+          ))}
+        </div>
+        <select
+          value={strategy}
+          onChange={(e) => changeStrategy(e.target.value as DraftStrategy)}
+          className="flex-shrink-0 text-xs font-semibold px-2.5 py-1.5 rounded-lg outline-none"
+          style={{ backgroundColor: '#0A1520', border: '1px solid #1A3048', color: '#378ADD' }}
+        >
+          {Object.entries(STRATEGY_LABELS).map(([key, label]) => (
+            <option key={key} value={key}>{label}</option>
+          ))}
+        </select>
       </div>
 
       <div className="rounded-xl overflow-hidden mb-4" style={{ border: '1px solid #1A3048' }}>
-        {filteredBestAvailable.slice(0, 20).map((p, i) => (
-          <div
-            key={p.playerId}
-            className="flex items-center gap-3 px-4 py-2.5"
-            style={{ backgroundColor: '#0A1520', borderTop: i === 0 ? 'none' : '1px solid #1A3048' }}
-          >
-            <button
-              onClick={() => toggleQueue(p.playerId)}
-              className="flex-shrink-0 text-base"
-              style={{ color: queue.includes(p.playerId) ? '#F59E0B' : '#3A5A7A' }}
-              aria-label="Toggle target"
-            >
-              {queue.includes(p.playerId) ? '★' : '☆'}
-            </button>
-            <span className="text-xs font-semibold flex-shrink-0 w-9" style={{ color: '#3A5A7A' }}>
-              ADP {Math.round(p.adpConsensus)}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-white truncate">{p.name}</p>
-              <p className="text-xs truncate" style={{ color: '#3A5A7A' }}>{p.position} · {p.nflTeam || 'FA'}</p>
+        {filteredBestAvailable.slice(0, 20).map((r, i) => {
+          const p = r.player
+          const prevTier = i > 0 ? filteredBestAvailable[i - 1].player.tier : null
+          const showTierDivider = p.tier !== prevTier && i > 0
+
+          return (
+            <div key={p.playerId}>
+              {showTierDivider && (
+                <div
+                  className="px-4 py-1 text-[10px] font-semibold tracking-widest uppercase"
+                  style={{ backgroundColor: '#07111C', color: '#3A5A7A' }}
+                >
+                  Tier {p.tier}
+                </div>
+              )}
+              <div
+                className="flex items-center gap-3 px-4 py-2.5"
+                style={{ backgroundColor: '#0A1520', borderTop: i === 0 ? 'none' : '1px solid #1A3048' }}
+              >
+                <button
+                  onClick={() => toggleQueue(p.playerId)}
+                  className="flex-shrink-0 text-base"
+                  style={{ color: queue.includes(p.playerId) ? '#F59E0B' : '#3A5A7A' }}
+                  aria-label="Toggle target"
+                >
+                  {queue.includes(p.playerId) ? '★' : '☆'}
+                </button>
+                <span className="text-xs font-semibold flex-shrink-0 w-9" style={{ color: '#3A5A7A' }}>
+                  ADP {Math.round(p.adpConsensus)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-white truncate">{p.name}</p>
+                  <p className="text-xs truncate" style={{ color: '#3A5A7A' }}>{p.position} · {p.nflTeam || 'FA'}</p>
+                </div>
+                {r.strategyWeight !== 0 && (
+                  <span
+                    className="flex-shrink-0 text-xs font-semibold px-1.5 py-0.5 rounded"
+                    style={{
+                      backgroundColor: r.strategyWeight > 0 ? '#4CAF7218' : '#E8404018',
+                      color: r.strategyWeight > 0 ? '#4CAF72' : '#E84040',
+                    }}
+                    title={`${STRATEGY_LABELS[strategy]} is ${r.strategyWeight > 0 ? 'boosting' : 'suppressing'} this pick`}
+                  >
+                    {r.strategyWeight > 0 ? '↑' : '↓'}
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       <h2 className="text-sm font-semibold text-white mb-2">My roster ({myPicks.length})</h2>

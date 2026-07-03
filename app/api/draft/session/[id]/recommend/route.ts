@@ -11,6 +11,7 @@ import { z } from 'zod'
 const Body = z.object({
   round: z.number().int().positive(),
   pickNumber: z.number().int().positive(),
+  strategy: z.enum(['balanced', 'zero_rb', 'hero_rb', 'hero_wr']).default('balanced'),
   rosterSoFar: z.array(z.object({ name: z.string(), position: z.string() })),
   candidates: z
     .array(
