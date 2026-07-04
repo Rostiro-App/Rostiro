@@ -165,8 +165,26 @@ Unlike the changelog rows in `Rostiro_PRD_v5.md` (append-only, dated), this sect
 | Marketing copy acknowledging Founders | Marketing surfaces are untouched pending a designer pass (standing since the v5.0 changelog) — waits on that regardless of this item | T-111, PRD task table |
 | Tooltip/tutorial UX fork — mandatory walkthrough vs. the originally-spec'd skippable boot sequence | Real UX-philosophy decision (forced completion vs. skippable), not something to silently resolve either way | T-72 open question, PRD task table (6.8) |
 | T-101 — Live Fantasy Matchup Scoring | Standalone, multi-day build; needs its own design pass (data source, scoring engine, refresh cadence) | T-101, PRD task table |
-| Opportunity Surge, injury-during-play, trade-offer-received triggers | Each blocked on a data pipeline that doesn't exist (T-87 nflverse ingestion, a live injury feed, per-platform incoming-trade polling) | `lib/engagementTriggers.ts` header, PRD 6.12 |
+| Opportunity Surge, injury-during-play, trade-offer-received triggers | T-87's nflverse ingestion shipped July 4 2026 — Opportunity Surge (T-99) is now unblocked on data, the detection/trigger-wiring itself is still real, un-started work. Injury-during-play and trade-offer-received still block on their own separate pipelines (a live injury feed, per-platform incoming-trade polling). | `lib/engagementTriggers.ts` header, PRD 6.12, T-99 |
 | Player Intelligence Card (T-89) | Doesn't exist at all yet — building state-aware tabs for it is premature | PRD task table |
 | ESPN league lifecycle/activity messaging (e.g. "league not open for 2026 yet") | Real gap (found via user testing), but deliberately scoped down to the honest static explanation already shipped (T-109) rather than building live ESPN draft/season-activity detection | `Rostiro_UX_Behavior_Spec.md` Leagues surface section |
 | ESPN/Yahoo Film Room matchup parsing | Fetcher functions exist (`getEspnMatchup`, `getYahooMatchup`) but return untyped `unknown` — their raw response shapes are complex enough that parsing without a real completed matchup to verify against risks a silent bug, same category as two real bugs already caught today | T-108, `lib/espn.ts` / `lib/yahoo.ts` |
 | Waiver Day resumable session framing ("League 1 of 3, ~12 min left") | T-98's full description beyond FAAB/health-delta, which is the concretely-computable half already shipped | T-108, PRD task table |
+
+### Event-trigger animations — prioritized, deferred (added July 4 2026)
+
+Founder brainstorm on "dopamine trigger" micro-animations for events (new league added, touchdowns, over-performing players), plus a boot-up animation. Grounded in PRD §7's existing Emotional Event Taxonomy and Motion Philosophy — anti-patterns already written down there (no slot-machine celebration on every score, no sound beyond one chime reserved for P0/P1) apply to all of these; not reinventing that framework, building inside it. Ranked by UX impact vs. build/maintenance cost, none of these started except the boot sequence (T-72, shipped):
+
+| # | Event | Impact | Effort | Note |
+|---|---|---|---|---|
+| 1 | Boot sequence, every login | High | Low | ✓ **Done** (T-72, July 4 2026) |
+| 2 | "All Clear" — Pulse fully cleared for the day | High | Very low | PRD's own Motion Philosophy already names this "rewarding"; flourish on existing `AllClearState`, no new data |
+| 3 | Your-player TD / lead-change card | High | Low | Trigger already exists (T-93/InterruptStack) — this is a sharper entrance for that specific card, not new detection |
+| 4 | "New league added" confirmation | Medium | Very low | Client-side only, no new data |
+| 5 | Draft pick confirmed (your own pick) | Medium-high | Low | Flourish on an existing submit action during live draft sessions |
+| 6 | Health Score resolving (monitor/action → healthy) | Medium | Low | Reinforces trust in Rostiro's own advice loop |
+| 7 | Waiver outcome / FAAB result | High | Medium-high | Needs a live claim-result detector first (T-98) — animation is the easy part once that exists |
+| 8 | Opportunity Surge (over-performing bench player) | High | Medium | T-99's real scope — detection + trigger wiring, not just an animation, now unblocked on data by T-87 |
+| 9 | "Welcome to Pro/Founder" | High (one-time) | Low, blocked | Can't build until Stripe (T-85) exists to redirect from |
+
+Sound/jingle explicitly deferred to "down the road, maybe added during the season" per the founder — not part of any of the above yet.
