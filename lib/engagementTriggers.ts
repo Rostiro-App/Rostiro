@@ -93,9 +93,15 @@ async function insertPulseItem(
     headline: string
     reasoning: string
     affectedLeagues: { leagueId: string; leagueName: string; platform: 'sleeper' }[]
-    fingerprint: string
   }
 ) {
+  // Deliberately no fingerprint. lib/pulse.ts's syncPulseItems (the daily
+  // Pulse rebuild) treats ANY open row with a non-null fingerprint that
+  // isn't in that day's freshly-built injury/lineup/waiver set as stale and
+  // deletes it — these rows come from a completely different code path
+  // (engagement_log's unique constraint is the real dedup here, not a
+  // fingerprint), so a fingerprint here would get them silently wiped out
+  // by the next daily cron run rather than surviving until dismissed.
   await admin.from('pulse_items').insert({
     user_id: userId,
     type: item.type,
@@ -104,7 +110,6 @@ async function insertPulseItem(
     reasoning: item.reasoning,
     affected_leagues_json: item.affectedLeagues,
     platform: 'sleeper',
-    fingerprint: item.fingerprint,
     status: 'open',
   })
 }
@@ -182,7 +187,6 @@ export async function detectTouchdownSwings(admin: AdminClient, deltas: ScoreDel
         headline,
         reasoning,
         affectedLeagues: info.leagues.map((l) => ({ leagueId: l.id, leagueName: l.league_name, platform: 'sleeper' })),
-        fingerprint: `touchdown:${dedupeKey}:${userId}`,
       })
       await pushToUser(admin, userId, 'Touchdown!', headline)
     }
@@ -257,7 +261,6 @@ export async function detectLineupLockUrgency(admin: AdminClient, todayEt: strin
       headline,
       reasoning,
       affectedLeagues: [{ leagueId: league.id, leagueName: league.league_name, platform: 'sleeper' }],
-      fingerprint: `lineup_lock:${dedupeKey}`,
     })
     await pushToUser(admin, league.user_id, headline, reasoning)
   }
@@ -316,7 +319,6 @@ export async function detectMissionComplete(admin: AdminClient, todayEt: string)
       headline,
       reasoning,
       affectedLeagues: userLeagues.map((l) => ({ leagueId: l.id, leagueName: l.league_name, platform: 'sleeper' })),
-      fingerprint: `mission_complete:${userId}:${dedupeKey}`,
     })
     await pushToUser(admin, userId, headline, reasoning)
   }
