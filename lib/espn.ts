@@ -4,6 +4,7 @@
 // All calls go through EspnAPIError — never crash the app on ESPN failure.
 
 import { EspnAPIError } from '@/types'
+import { checkCircuitBreaker, recordApiCall } from '@/lib/observability'
 
 const ESPN_API_BASE = 'https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl'
 const SEASON = 2026
@@ -15,11 +16,19 @@ interface EspnCredentials {
 
 // ─── Core fetcher ──────────────────────────────────────────────────────────────
 
+// T-84: circuit-checked and latency-logged. 401/403/404 deliberately count
+// as "success" toward the breaker — those mean one user's credentials are
+// bad or one resource doesn't exist, not that ESPN itself is down, and
+// tripping the breaker over a single user's expired cookies would wrongly
+// block every other ESPN user's real, healthy calls. Only a network
+// error, a 429, or an unexpected server error signals an actual outage.
 async function espnFetch<T>(
   path: string,
   credentials: EspnCredentials,
   params?: Record<string, string>
 ): Promise<T> {
+  await checkCircuitBreaker('espn')
+  const start = Date.now()
   const url = new URL(`${ESPN_API_BASE}${path}`)
   if (params) {
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
@@ -35,10 +44,12 @@ async function espnFetch<T>(
       next: { revalidate: 0 },
     })
   } catch (err) {
+    await recordApiCall('espn', path, Date.now() - start, false)
     throw new EspnAPIError(`Network error fetching ${path}: ${String(err)}`, 'ESPN_NETWORK_ERROR')
   }
 
   if (res.status === 401 || res.status === 403) {
+    await recordApiCall('espn', path, Date.now() - start, true, res.status)
     throw new EspnAPIError(
       'ESPN credentials are invalid or expired. Please re-enter your espn_s2 and SWID cookies.',
       'ESPN_AUTH_ERROR',
@@ -47,6 +58,7 @@ async function espnFetch<T>(
   }
 
   if (res.status === 404) {
+    await recordApiCall('espn', path, Date.now() - start, true, 404)
     throw new EspnAPIError(
       `ESPN league or resource not found: ${path}`,
       'ESPN_NOT_FOUND',
@@ -55,10 +67,12 @@ async function espnFetch<T>(
   }
 
   if (res.status === 429) {
+    await recordApiCall('espn', path, Date.now() - start, false, 429)
     throw new EspnAPIError('ESPN API rate limit exceeded', 'ESPN_RATE_LIMIT', 429)
   }
 
   if (!res.ok) {
+    await recordApiCall('espn', path, Date.now() - start, false, res.status)
     throw new EspnAPIError(
       `ESPN API error ${res.status} on ${path}`,
       'ESPN_HTTP_ERROR',
@@ -66,6 +80,7 @@ async function espnFetch<T>(
     )
   }
 
+  await recordApiCall('espn', path, Date.now() - start, true, res.status)
   return res.json() as Promise<T>
 }
 

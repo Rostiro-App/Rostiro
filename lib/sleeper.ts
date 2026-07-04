@@ -3,26 +3,37 @@
 // Rate limit: stay under 1,000 req/min. 10-second polling = 6 req/min.
 
 import { SleeperAPIError } from '@/types'
+import { checkCircuitBreaker, recordApiCall } from '@/lib/observability'
 
 const BASE_URL = 'https://api.sleeper.app/v1'
 export const SEASON = 2026
 const SPORT = 'nfl'
 
+// T-84: circuit-checked and latency-logged — every Sleeper call in the app
+// funnels through this one function, so instrumenting here covers all of
+// them. A tripped breaker throws immediately, before ever touching the
+// network, so callers fall back to their own cached data instead of
+// piling more requests onto an already-erroring Sleeper.
 async function sleeperFetch<T>(path: string): Promise<T> {
+  await checkCircuitBreaker('sleeper')
+  const start = Date.now()
   const url = `${BASE_URL}${path}`
   let res: Response
 
   try {
     res = await fetch(url, { next: { revalidate: 0 } })
   } catch (err) {
+    await recordApiCall('sleeper', path, Date.now() - start, false)
     throw new SleeperAPIError(`Network error fetching ${path}: ${String(err)}`, 'SLEEPER_NETWORK_ERROR')
   }
 
   if (res.status === 404) {
+    await recordApiCall('sleeper', path, Date.now() - start, false, 404)
     throw new SleeperAPIError(`Sleeper resource not found: ${path}`, 'SLEEPER_NOT_FOUND', 404)
   }
 
   if (!res.ok) {
+    await recordApiCall('sleeper', path, Date.now() - start, false, res.status)
     throw new SleeperAPIError(
       `Sleeper API error ${res.status} on ${path}`,
       'SLEEPER_HTTP_ERROR',
@@ -30,6 +41,7 @@ async function sleeperFetch<T>(path: string): Promise<T> {
     )
   }
 
+  await recordApiCall('sleeper', path, Date.now() - start, true, res.status)
   return res.json() as Promise<T>
 }
 

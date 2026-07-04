@@ -6,6 +6,7 @@
 import { YahooAPIError } from '@/types'
 import { createAdminClient } from '@/lib/supabase'
 import { encrypt, decrypt } from '@/lib/encrypt'
+import { checkCircuitBreaker, recordApiCall } from '@/lib/observability'
 
 const YAHOO_API_BASE = 'https://fantasysports.yahooapis.com/fantasy/v2'
 const YAHOO_AUTH_URL = 'https://api.login.yahoo.com/oauth2/request_auth'
@@ -186,11 +187,18 @@ export async function getValidYahooAccessToken(userId: string): Promise<string> 
 // Always call this with a fresh access token. Token refresh is the caller's
 // responsibility — see /api/auth/yahoo/refresh route.
 
+// T-84: circuit-checked and latency-logged. 401 deliberately counts as
+// "success" toward the breaker — an expired token is one user's problem
+// (refreshed by the caller elsewhere), not a Yahoo outage; tripping the
+// breaker over it would wrongly block every other Yahoo user's calls.
+// A network error, 429, or unexpected server error is the real signal.
 async function yahooFetch<T>(
   path: string,
   accessToken: string,
   options?: RequestInit
 ): Promise<T> {
+  await checkCircuitBreaker('yahoo')
+  const start = Date.now()
   const url = `${YAHOO_API_BASE}${path}?format=json`
 
   let res: Response
@@ -204,18 +212,22 @@ async function yahooFetch<T>(
       },
     })
   } catch (err) {
+    await recordApiCall('yahoo', path, Date.now() - start, false)
     throw new YahooAPIError(`Network error on ${path}: ${String(err)}`, 'YAHOO_NETWORK_ERROR')
   }
 
   if (res.status === 401) {
+    await recordApiCall('yahoo', path, Date.now() - start, true, 401)
     throw new YahooAPIError('Yahoo access token expired or invalid', 'YAHOO_TOKEN_EXPIRED', 401)
   }
 
   if (res.status === 429) {
+    await recordApiCall('yahoo', path, Date.now() - start, false, 429)
     throw new YahooAPIError('Yahoo API rate limit exceeded', 'YAHOO_RATE_LIMIT', 429)
   }
 
   if (!res.ok) {
+    await recordApiCall('yahoo', path, Date.now() - start, false, res.status)
     throw new YahooAPIError(
       `Yahoo API error ${res.status} on ${path}`,
       'YAHOO_HTTP_ERROR',
@@ -223,6 +235,7 @@ async function yahooFetch<T>(
     )
   }
 
+  await recordApiCall('yahoo', path, Date.now() - start, true, res.status)
   return res.json() as Promise<T>
 }
 
