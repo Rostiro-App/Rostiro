@@ -13,6 +13,7 @@ import type { Confidence, TradeAnalysis } from '@/types'
 const Body = z.object({
   give: z.array(z.string()).min(1),
   receive: z.array(z.string()).min(1),
+  mode: z.enum(['focused', 'balanced', 'savant']).default('balanced'),
 })
 
 interface CachedPlayer {
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: 'give and receive must each be non-empty arrays of player IDs' }, { status: 400 })
   }
-  const { give, receive } = parsed.data
+  const { give, receive, mode } = parsed.data
 
   const allIds = [...give, ...receive]
   const { data: cached, error } = await supabase
@@ -85,6 +86,7 @@ export async function POST(request: Request) {
       receive: receivePlayers.map((p) => ({ name: p.name, position: p.position ?? '', adp: p.adp_sleeper! })),
       verdict,
       netValue: Math.round(netValue),
+      mode,
     })
   } catch {
     reasoning = `Based on ADP-implied value, this trade is a ${verdict === 'win' ? 'net win' : verdict === 'lose' ? 'net loss' : 'roughly even'} (${Math.round(netValue)} point swing).`

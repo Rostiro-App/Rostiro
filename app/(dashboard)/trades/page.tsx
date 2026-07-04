@@ -5,6 +5,7 @@
 // then POST to /api/trades/analyze for a verdict + reasoning.
 
 import { useEffect, useMemo, useState } from 'react'
+import { useMode } from '@/components/nav/AppShell'
 import type { ADPPlayer, TradeAnalysis } from '@/types'
 
 const VERDICT_LABEL: Record<TradeAnalysis['verdict'], string> = {
@@ -20,6 +21,7 @@ const VERDICT_COLOR: Record<TradeAnalysis['verdict'], string> = {
 }
 
 export default function TradesPage() {
+  const mode = useMode()
   const [players, setPlayers] = useState<ADPPlayer[]>([])
   const [give, setGive] = useState<ADPPlayer[]>([])
   const [receive, setReceive] = useState<ADPPlayer[]>([])
@@ -45,6 +47,7 @@ export default function TradesPage() {
         body: JSON.stringify({
           give: give.map((p) => p.playerId),
           receive: receive.map((p) => p.playerId),
+          mode,
         }),
       })
       const data = await res.json()

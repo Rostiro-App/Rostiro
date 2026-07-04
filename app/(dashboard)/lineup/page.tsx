@@ -40,7 +40,7 @@ export default function LineupPage() {
   useEffect(() => {
     let cancelled = false
 
-    fetch('/api/lineup/sleeper')
+    fetch(`/api/lineup/sleeper?mode=${mode}`)
       .then((res) => {
         if (!res.ok) throw new Error('Failed to load lineup recommendations')
         return res.json()
@@ -60,7 +60,9 @@ export default function LineupPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+    // T-102: re-fetch when mode changes so reasoning tone matches the
+    // newly selected persona rather than staying stale until next load.
+  }, [mode])
 
   return (
     <div className="max-w-2xl mx-auto px-4 pt-6 pb-8 md:px-6 md:pt-8">

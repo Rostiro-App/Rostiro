@@ -13,8 +13,11 @@
 import { createSSRClient } from '@/lib/supabase'
 import { getSleeperRosters } from '@/lib/sleeper'
 import { generateStartSitReasoning } from '@/lib/claude'
-import { NextResponse } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
+import type { Mode } from '@/components/nav/AppShell'
 import type { Confidence, NFLPosition, Platform, Player, StartSitRecommendation } from '@/types'
+
+const VALID_MODES: readonly Mode[] = ['focused', 'balanced', 'savant']
 
 interface CachedPlayer {
   player_id: string
@@ -28,10 +31,15 @@ interface CachedPlayer {
 const MAX_PER_LEAGUE = 2
 const PLATFORM: Platform = 'sleeper'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const supabase = await createSSRClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // T-102: GET has no body, so mode travels as a query param — client
+  // already knows it via useMode(), this just carries it server-side.
+  const modeParam = request.nextUrl.searchParams.get('mode')
+  const mode: Mode = VALID_MODES.includes(modeParam as Mode) ? (modeParam as Mode) : 'balanced'
 
   const { data: leagues, error: leaguesError } = await supabase
     .from('connected_leagues')
@@ -51,7 +59,7 @@ export async function GET() {
 
   for (const league of leagues) {
     try {
-      const leagueRecs = await buildLeagueRecommendations(supabase, league)
+      const leagueRecs = await buildLeagueRecommendations(supabase, league, mode)
       recommendations.push(...leagueRecs)
     } catch {
       continue
@@ -89,7 +97,8 @@ function verdictForDelta(delta: number): { verdict: StartSitRecommendation['verd
 
 async function buildLeagueRecommendations(
   supabase: Awaited<ReturnType<typeof createSSRClient>>,
-  league: { id: string; league_id: string; league_name: string; team_id: string | null }
+  league: { id: string; league_id: string; league_name: string; team_id: string | null },
+  mode: Mode
 ): Promise<StartSitRecommendation[]> {
   const rosters = await getSleeperRosters(league.league_id)
   const myRoster = rosters.find((r) => String(r.roster_id) === league.team_id)
@@ -155,6 +164,7 @@ async function buildLeagueRecommendations(
         benchName: c.bench.name,
         benchPosition: c.bench.position ?? '',
         benchAdp: c.bench.adp_sleeper!,
+        mode,
       })
     } catch {
       reasoning = `${c.bench.name} has a stronger ADP (${Math.round(c.bench.adp_sleeper!)}) than ${c.starter.name} (${Math.round(c.starter.adp_sleeper!)}).`

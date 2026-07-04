@@ -7,6 +7,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { ClaudeAPIError, type DraftStrategy } from '@/types'
 import { STRATEGY_DESCRIPTIONS } from '@/lib/draftBoard'
+import type { Mode } from '@/components/nav/AppShell'
 
 const MODEL = 'claude-sonnet-5'
 
@@ -21,6 +22,24 @@ function getClient(): Anthropic {
   return client
 }
 
+// T-102 / PRD 3: the three personas aren't just card density — "Focused:
+// tell me what to do" vs "Savant: AI advisory not directive" is a real
+// difference in what Claude is asked to write, not just how much of it a
+// component shows. Appended to every system prompt below rather than
+// replacing the existing deterministic-numbers-only instruction — the tone
+// changes, the "never invent stats" rule doesn't.
+function toneInstruction(mode: Mode): string {
+  switch (mode) {
+    case 'focused':
+      return 'State the verdict in the first sentence. One additional sentence of why, at most. No hedging, no "on the other hand," no caveats.'
+    case 'savant':
+      return 'Write as an advisory, never as an instruction — present the data and let the manager reach their own call. Never phrase it as what they should do.'
+    case 'balanced':
+    default:
+      return 'Direct, no hedging filler.'
+  }
+}
+
 interface StartSitReasoningInput {
   starterName: string
   starterPosition: string
@@ -28,6 +47,7 @@ interface StartSitReasoningInput {
   benchName: string
   benchPosition: string
   benchAdp: number
+  mode: Mode
 }
 
 // Claude only writes the prose here — the verdict and confidence are computed
@@ -45,7 +65,7 @@ export async function generateStartSitReasoning(input: StartSitReasoningInput): 
       thinking: { type: 'disabled' },
       output_config: { effort: 'low' },
       system:
-        'You write short, factual fantasy football lineup explanations. Use only the numbers given to you. Never invent stats, matchups, or injury information that was not provided. Two to three sentences, direct, no hedging filler.',
+        `You write short, factual fantasy football lineup explanations. Use only the numbers given to you. Never invent stats, matchups, or injury information that was not provided. Two to three sentences. ${toneInstruction(input.mode)}`,
       messages: [
         {
           role: 'user',
@@ -70,6 +90,7 @@ interface TradeReasoningInput {
   receive: Array<{ name: string; position: string; adp: number }>
   verdict: 'win' | 'lose' | 'even'
   netValue: number
+  mode: Mode
 }
 
 // Same split as generateStartSitReasoning: verdict and value are computed
@@ -90,7 +111,7 @@ export async function generateTradeReasoning(input: TradeReasoningInput): Promis
       thinking: { type: 'disabled' },
       output_config: { effort: 'low' },
       system:
-        'You write short, factual fantasy football trade evaluations. Use only the numbers given to you. Never invent stats, injuries, team needs, or league context that was not provided. Three to five sentences, direct, no hedging filler.',
+        `You write short, factual fantasy football trade evaluations. Use only the numbers given to you. Never invent stats, injuries, team needs, or league context that was not provided. Three to five sentences. ${toneInstruction(input.mode)}`,
       messages: [
         {
           role: 'user',
@@ -128,6 +149,7 @@ interface DraftRecommendationsInput {
   pickNumber: number
   strategy: DraftStrategy
   rosterSoFar: Array<{ name: string; position: string }>
+  mode: Mode
 }
 
 const RECOMMENDATION_SCHEMA = {
@@ -181,7 +203,7 @@ export async function generateDraftPickRecommendations(
         format: { type: 'json_schema', schema: RECOMMENDATION_SCHEMA },
       },
       system:
-        'You write short, factual fantasy football draft pick explanations. Use only the ADP numbers, positions, roster, and strategy given to you. Never invent stats, injuries, or team needs that were not provided. One to two sentences per player, direct, no hedging filler.',
+        `You write short, factual fantasy football draft pick explanations. Use only the ADP numbers, positions, roster, and strategy given to you. Never invent stats, injuries, or team needs that were not provided. One to two sentences per player. ${toneInstruction(input.mode)}`,
       messages: [
         {
           role: 'user',

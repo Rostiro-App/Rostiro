@@ -16,6 +16,7 @@ import {
   STRATEGY_LABELS,
   type PositionRun,
 } from '@/lib/draftBoard'
+import { useMode } from '@/components/nav/AppShell'
 import type { ADPPlayer, DraftPick, DraftSettings, DraftStrategy, NFLPosition, Platform } from '@/types'
 import type { DraftPickRecommendation } from '@/lib/claude'
 
@@ -25,6 +26,7 @@ const NEEDED_POSITIONS: NFLPosition[] = ['QB', 'RB', 'WR', 'TE', 'K']
 
 export default function DraftSessionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: sessionId } = use(params)
+  const mode = useMode()
 
   const [settings, setSettings] = useState<DraftSettings | null>(null)
   const [queue, setQueue] = useState<string[]>([])
@@ -191,6 +193,7 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
           position: r.player.position,
           adp: r.player.adpConsensus,
         })),
+        mode,
       }),
     })
       .then((res) => res.json())

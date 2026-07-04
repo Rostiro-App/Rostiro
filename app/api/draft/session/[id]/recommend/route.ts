@@ -24,6 +24,7 @@ const Body = z.object({
     )
     .min(1)
     .max(8),
+  mode: z.enum(['focused', 'balanced', 'savant']).default('balanced'),
 })
 
 export async function POST(request: Request) {
