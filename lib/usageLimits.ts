@@ -11,7 +11,7 @@
 
 type AdminClient = { from: (table: string) => any }
 
-function currentWeekStart(): string {
+export function currentWeekStart(): string {
   const now = new Date()
   const day = now.getUTCDay() // 0 = Sunday .. 6 = Saturday
   const diffToMonday = (day + 6) % 7 // days since the most recent Monday

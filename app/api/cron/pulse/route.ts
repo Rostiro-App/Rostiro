@@ -6,6 +6,7 @@
 
 import { createAdminClient } from '@/lib/supabase'
 import { buildPulseItemsForUser, syncPulseItems } from '@/lib/pulse'
+import { computeUserPortfolioSnapshot, currentWeekStart } from '@/lib/portfolio'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function GET(request: NextRequest) {
@@ -28,6 +29,8 @@ export async function GET(request: NextRequest) {
   let usersSynced = 0
   let itemsBuilt = 0
   let persistenceMissing = false
+  let portfolioSnapshotted = 0
+  const weekStart = currentWeekStart()
 
   for (const userId of userIds) {
     try {
@@ -45,6 +48,43 @@ export async function GET(request: NextRequest) {
       // One user's league failing shouldn't stop the run for everyone else.
       continue
     }
+
+    // T-86: Portfolio data plumbing — piggybacks on this same per-user loop
+    // (already fetching rosters for Pulse generation) rather than a
+    // separate cron. Best-effort like the other snapshot steps in this
+    // codebase: a missing migration or one user's Sleeper call failing
+    // never breaks Pulse generation for anyone.
+    try {
+      const snapshot = await computeUserPortfolioSnapshot(admin, userId)
+      if (snapshot.health.length > 0) {
+        const { error: healthError } = await admin.from('portfolio_health_snapshots').upsert(
+          snapshot.health.map((h) => ({
+            week_start: weekStart,
+            user_id: userId,
+            league_id: h.leagueId,
+            health_score: h.healthScore,
+            health_status: h.healthStatus,
+            created_at: new Date().toISOString(),
+          })),
+          { onConflict: 'week_start,user_id,league_id' }
+        )
+        if (!healthError) portfolioSnapshotted += 1
+      }
+      if (snapshot.exposure.length > 0) {
+        await admin.from('portfolio_exposure_snapshots').upsert(
+          snapshot.exposure.map((e) => ({
+            week_start: weekStart,
+            user_id: userId,
+            player_id: e.playerId,
+            league_count: e.leagueCount,
+            created_at: new Date().toISOString(),
+          })),
+          { onConflict: 'week_start,user_id,player_id' }
+        )
+      }
+    } catch {
+      // Missing migration or a transient failure — never break Pulse over it.
+    }
   }
 
   if (persistenceMissing) {
@@ -54,5 +94,5 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  return NextResponse.json({ users: userIds.length, usersSynced, itemsBuilt })
+  return NextResponse.json({ users: userIds.length, usersSynced, itemsBuilt, portfolioSnapshotted })
 }
