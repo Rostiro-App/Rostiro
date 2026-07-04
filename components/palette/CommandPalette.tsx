@@ -40,7 +40,10 @@ const MODE_LABELS: Record<Mode, string> = {
 // Pulse items are re-fetched at most this often across palette opens —
 // each fetch triggers a full build+sync server-side, so don't hammer it.
 const PULSE_CACHE_MS = 60_000
-const MAX_PLAYER_RESULTS = 6
+
+// T-105 / PRD 3: Focused gets a shorter, faster-to-scan result list;
+// Savant gets more options up front instead of needing a narrower query.
+const MAX_PLAYER_RESULTS: Record<Mode, number> = { focused: 4, balanced: 6, savant: 9 }
 
 export default function CommandPalette({
   mode,
@@ -172,7 +175,7 @@ export default function CommandPalette({
   if (q.length >= 2) {
     const matches = players
       .filter((p) => p.name.toLowerCase().includes(q))
-      .slice(0, MAX_PLAYER_RESULTS)
+      .slice(0, MAX_PLAYER_RESULTS[mode])
     for (const p of matches) {
       commands.push({
         id: `player:${p.playerId}`,

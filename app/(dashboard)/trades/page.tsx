@@ -103,7 +103,7 @@ export default function TradesPage() {
         </div>
       )}
 
-      {analysis && <AnalysisCard analysis={analysis} />}
+      {analysis && <AnalysisCard analysis={analysis} mode={mode} />}
     </div>
   )
 }
@@ -184,8 +184,13 @@ function PlayerPicker({
   )
 }
 
-function AnalysisCard({ analysis }: { analysis: TradeAnalysis }) {
+// T-105 / PRD 3: Focused gets the verdict + reasoning only — "stats hidden
+// by default, tap 'why' to expand" — the value-comparison/roster-impact
+// detail rows are exactly the kind of supporting stat Balanced/Savant show
+// inline and Focused doesn't.
+function AnalysisCard({ analysis, mode }: { analysis: TradeAnalysis; mode: string }) {
   const color = VERDICT_COLOR[analysis.verdict]
+  const showDetail = mode !== 'focused'
 
   return (
     <div
@@ -199,10 +204,12 @@ function AnalysisCard({ analysis }: { analysis: TradeAnalysis }) {
         {VERDICT_LABEL[analysis.verdict]}
       </span>
       <p className="text-sm mb-3" style={{ color: 'var(--t2)' }}>{analysis.reasoning}</p>
-      <div className="space-y-1">
-        <p className="text-xs" style={{ color: 'var(--t3)' }}>{analysis.rosValueComparison}</p>
-        <p className="text-xs" style={{ color: 'var(--t3)' }}>{analysis.rosterImpact}</p>
-      </div>
+      {showDetail && (
+        <div className="space-y-1">
+          <p className="text-xs" style={{ color: 'var(--t3)' }}>{analysis.rosValueComparison}</p>
+          <p className="text-xs" style={{ color: 'var(--t3)' }}>{analysis.rosterImpact}</p>
+        </div>
+      )}
     </div>
   )
 }

@@ -320,8 +320,12 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
         </select>
       </div>
 
+      {/* T-105 / PRD 3: Focused gets a shorter, quieter list — 5 rows, no
+          strategy-weight indicators (a Balanced/Savant supporting stat).
+          Savant adds decimal ADP precision, matching the same distinction
+          already drawn on the Draft Kit rankings table. */}
       <div className="rounded-xl overflow-hidden mb-4" style={{ border: '1px solid var(--hairline)' }}>
-        {filteredBestAvailable.slice(0, 20).map((r, i) => {
+        {filteredBestAvailable.slice(0, mode === 'focused' ? 5 : 20).map((r, i) => {
           const p = r.player
           const prevTier = i > 0 ? filteredBestAvailable[i - 1].player.tier : null
           const showTierDivider = p.tier !== prevTier && i > 0
@@ -349,13 +353,13 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
                   {queue.includes(p.playerId) ? '★' : '☆'}
                 </button>
                 <span className="text-xs font-semibold flex-shrink-0 w-9" style={{ color: 'var(--t3)' }}>
-                  ADP {Math.round(p.adpConsensus)}
+                  ADP {mode === 'savant' ? p.adpConsensus.toFixed(1) : Math.round(p.adpConsensus)}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-white truncate">{p.name}</p>
                   <p className="text-xs truncate" style={{ color: 'var(--t3)' }}>{p.position} · {p.nflTeam || 'FA'}</p>
                 </div>
-                {r.strategyWeight !== 0 && (
+                {mode !== 'focused' && r.strategyWeight !== 0 && (
                   <span
                     className="flex-shrink-0 text-xs font-semibold px-1.5 py-0.5 rounded"
                     style={{

@@ -14,6 +14,7 @@
 // deliberately stays untagged everywhere else).
 
 import { useEffect, useState } from 'react'
+import { useMode } from '@/components/nav/AppShell'
 import type { LeagueHealthFactor, LeagueHealthStatus, RostiroState, SystemStatus, SystemStatusLeague } from '@/types'
 
 function sortFactorsByUrgency(factors: LeagueHealthFactor[]): LeagueHealthFactor[] {
@@ -53,6 +54,7 @@ const PLATFORM_LABEL: Record<string, string> = {
 }
 
 export default function LeaguesPage() {
+  const mode = useMode()
   const [status, setStatus] = useState<SystemStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -99,7 +101,7 @@ export default function LeaguesPage() {
       {!loading && !error && leagues.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {leagues.map((league) => (
-            <LeagueCard key={league.id} league={league} rostiroState={status?.rostiroState ?? 'standard'} />
+            <LeagueCard key={league.id} league={league} rostiroState={status?.rostiroState ?? 'standard'} mode={mode} />
           ))}
         </div>
       )}
@@ -107,10 +109,23 @@ export default function LeaguesPage() {
   )
 }
 
-function LeagueCard({ league, rostiroState }: { league: SystemStatusLeague; rostiroState: RostiroState }) {
+function LeagueCard({
+  league,
+  rostiroState,
+  mode,
+}: {
+  league: SystemStatusLeague
+  rostiroState: RostiroState
+  mode: string
+}) {
   const { health } = league
   const color = STATUS_COLOR[health.status]
   const factors = rostiroState === 'standard' ? sortFactorsByUrgency(health.factors) : health.factors
+  // T-105 / PRD 3: Focused hides the factor breakdown — "5 max actions,
+  // stats hidden by default" — the ring + one-line topFlag is the verdict;
+  // Balanced/Savant keep the full breakdown (identical today, since there's
+  // no deeper data layer to add for Savant here yet).
+  const showFactors = mode !== 'focused'
 
   return (
     <div className="glass card-hover rounded-[14px] p-4">
@@ -130,7 +145,7 @@ function LeagueCard({ league, rostiroState }: { league: SystemStatusLeague; rost
         </div>
       </div>
 
-      {factors.length > 0 && (
+      {showFactors && factors.length > 0 && (
         <div className="mt-4 space-y-[7px]">
           {factors.map((factor) => (
             <FactorRow key={factor.key} factor={factor} />
