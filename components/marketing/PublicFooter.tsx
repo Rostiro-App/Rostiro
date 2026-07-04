@@ -19,6 +19,7 @@ export default function PublicFooter() {
           <Link href="/draft" className="transition-colors hover:opacity-80">Draft Kit</Link>
           <Link href="/login" className="transition-colors hover:opacity-80">Sign in</Link>
           <Link href="/signup" className="transition-colors hover:opacity-80">Get started</Link>
+          <Link href="/privacy" className="transition-colors hover:opacity-80">Privacy</Link>
         </div>
       </div>
       <p className="max-w-5xl mx-auto mt-8 text-xs" style={{ color: 'var(--t4)' }}>

@@ -6,6 +6,7 @@
 // Disconnect uses a two-step inline confirm instead of a browser dialog.
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { setGlobalMode, useMode, type Mode } from '@/components/nav/AppShell'
 
 interface SettingsData {
@@ -47,11 +48,15 @@ const MODES: Array<{ id: Mode; label: string; tagline: string }> = [
 ]
 
 export default function SettingsPage() {
+  const router = useRouter()
   const mode = useMode()
   const [data, setData] = useState<SettingsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteInput, setDeleteInput] = useState('')
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -120,6 +125,24 @@ export default function SettingsPage() {
       setData((d) => (d ? { ...d, leagues: prev } : d))
       setError('Could not update waiver cutoff — try again.')
       setTimeout(() => setError(null), 4000)
+    }
+  }
+
+  async function deleteAccount() {
+    setDeleting(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/settings/delete-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: 'DELETE' }),
+      })
+      if (!res.ok) throw new Error()
+      await fetch('/api/auth/signout', { method: 'POST' })
+      router.push('/')
+    } catch {
+      setError('Could not delete your account — try again, or contact support.')
+      setDeleting(false)
     }
   }
 
@@ -334,6 +357,92 @@ export default function SettingsPage() {
                 />
               </button>
             </div>
+          </Section>
+
+          {/* ─── Data & Privacy (T-78) ──────────────────────────────────── */}
+          <Section title="Data & privacy">
+            <div className="flex items-center justify-between py-1">
+              <div>
+                <p className="text-sm text-white">Export your data</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--t3)' }}>
+                  Download everything Rostiro has on your account as a JSON file.
+                </p>
+              </div>
+              <a
+                href="/api/settings/export"
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0 transition-all"
+                style={{ color: 'var(--t1)', border: '1px solid var(--hairline)' }}
+              >
+                Export
+              </a>
+            </div>
+            <div className="flex items-center justify-between py-1 mt-2">
+              <p className="text-sm" style={{ color: 'var(--t2)' }}>
+                Read the{' '}
+                <a href="/privacy" className="underline" style={{ color: 'var(--signal)' }}>
+                  privacy policy
+                </a>
+              </p>
+            </div>
+          </Section>
+
+          {/* ─── Danger zone ─────────────────────────────────────────────── */}
+          <Section title="Danger zone">
+            {!showDeleteConfirm ? (
+              <div className="flex items-center justify-between py-1">
+                <div>
+                  <p className="text-sm text-white">Delete account</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--t3)' }}>
+                    Permanently deletes your account and all connected league data. Cannot be undone.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="text-xs px-3 py-1.5 rounded-lg flex-shrink-0 transition-all"
+                  style={{ color: 'var(--crit)', border: '1px solid rgba(232,80,74,.35)' }}
+                >
+                  Delete account
+                </button>
+              </div>
+            ) : (
+              <div className="py-1 space-y-3">
+                <p className="text-sm" style={{ color: 'var(--crit)' }}>
+                  This permanently deletes your account, connected leagues, and all Pulse history. There is no undo.
+                </p>
+                <p className="text-xs" style={{ color: 'var(--t2)' }}>
+                  Type <span className="mono-data font-bold" style={{ color: 'var(--t1)' }}>DELETE</span> to confirm.
+                </p>
+                <input
+                  value={deleteInput}
+                  onChange={(e) => setDeleteInput(e.target.value)}
+                  disabled={deleting}
+                  className="mono-data text-sm w-full rounded-lg px-3 py-2 outline-none"
+                  style={{ backgroundColor: 'rgba(6,11,19,0.55)', border: '1px solid var(--hairline)', color: 'var(--t1)' }}
+                  placeholder="DELETE"
+                />
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={deleteAccount}
+                    disabled={deleteInput !== 'DELETE' || deleting}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all disabled:opacity-40"
+                    style={{ backgroundColor: 'rgba(232,80,74,.16)', color: 'var(--crit)' }}
+                  >
+                    {deleting ? 'Deleting…' : 'Permanently delete my account'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowDeleteConfirm(false)
+                      setDeleteInput('')
+                    }}
+                    disabled={deleting}
+                    className="text-xs px-3 py-1.5 rounded-lg"
+                    style={{ color: 'var(--t2)' }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </Section>
         </div>
       )}
