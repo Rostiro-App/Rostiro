@@ -1,9 +1,17 @@
-# ROSTIRO — Product Requirements Document v5.5
+# ROSTIRO — Product Requirements Document v5.6
 **Run Every League.**
 The operating system for fantasy sports.
 rostiro.com | July 2026 | Pass directly to Claude Code
 
 ---
+
+## Changelog from v5.5 → v5.6
+
+| Change | Rationale |
+|---|---|
+| New companion doc: `Rostiro_UX_Behavior_Spec.md` | T-90/T-92/T-93 shipping real Game Day surfaces this session turned "what does the ticker show if I own a player in that game" from an obvious question into one that took real code-reading to answer precisely. Rather than let that knowledge stay tribal, it's now a living scenario-by-scenario reference (surface × state × condition → what actually renders, checked against code, not intent), started from three specific gaps a founder's simple question surfaced today: ambient surfaces (System Bar badge, Pulse Live Now) don't name players/leagues the way the event-driven touchdown card does; there's no live fantasy matchup scoring anywhere; and T-81's score matching doesn't verify event date. Grows by adding a row per newly-discovered scenario, not via periodic documentation passes. |
+| T-101 added — Live Fantasy Matchup Scoring | Confirmed as a real roadmap commitment, not a deferred maybe: every live-score surface today shows real NFL scores, never fantasy point totals or who's winning your actual matchup. Honestly scoped in the new companion doc as a standalone build (new per-player live stat feed + scoring engine against the existing `ScoringSettings` type + matchup pairing + live aggregation) — comparable in size to T-81's original backend, not a small addition to it. Deserves its own design pass before implementation. |
+| T-90/T-92/T-93 shipped this session | Game Day live-score UI wiring (Pulse/System Bar/ticker, roster-relevant filtering, free/Pro gating), the kickoff-triggered transition animation, and the Engagement System's 3 buildable triggers (touchdown_swing at team level, lineup_lock, mission_complete) — all verified against real 2026 schedule data. See `Rostiro_UX_Behavior_Spec.md` for exactly what each surface renders. |
 
 ## Changelog from v5.4 → v5.5
 
@@ -1049,6 +1057,12 @@ Additional tasks from v5.5 (Emotional Priority Model, Pregame Ramp, Waiver Sessi
 | T-98 | Waiver Day session-mode — resumable multi-league progress framing ("League 1 of 3, ~12 min left"), real FAAB budget math and projected roster-health delta per candidate, replacing today's framing-and-reordering-only slice. Upgrades T-80. |
 | T-99 | Opportunity Surge trigger (6.12) — usage/projection-spike detection over the existing nflverse cache (T-87), celebratory copy tone, added to the existing fan-out/rate-limit machinery from T-93. No new polling or data source. |
 | T-100 | Console/Pulse engagement telemetry — instrument Game Day session opens, time-in-Game-Day-state, P0 alert action rate, and notification mute/dismiss rate, per 7.1's priority model. Feeds retention measurement without new UI. |
+
+Additional task from v5.6 (UX Behavior Spec, Live Fantasy Matchup Scoring — see `Rostiro_UX_Behavior_Spec.md`):
+
+| Task | Description |
+|---|---|
+| T-101 | Live Fantasy Matchup Scoring — a real per-player live stat feed (new data source, beyond T-81's team-level scoreboard), a scoring engine against each league's existing `ScoringSettings`, Sleeper matchup-by-week pairing, and live aggregation of active starters into a team total for both sides of the matchup. Standalone build, comparable in size to T-81's original backend — needs its own design pass before implementation. |
 
 ---
 
