@@ -220,17 +220,30 @@ export default function SystemBar({
         )}
 
         {/* Plan badge — visible on both breakpoints, unlike the wordmark's
-            "OS" chip which is desktop-only. */}
+            "OS" chip which is desktop-only. Founder gets a visibly distinct
+            treatment (filled, star-marked), not just Pro's label swapped —
+            Section 9 promises Founders a real "founder badge," not a
+            re-skinned Pro chip. Full founder recognition (priority feedback
+            access, early feature previews) is real scope beyond this and is
+            logged separately, not attempted here. */}
         {status && PLAN_LABEL[status.plan] && (
           <span
             className="text-[8.5px] font-bold tracking-[0.14em] px-1.5 py-0.5 rounded flex-shrink-0"
-            style={{
-              color: '#F5C842',
-              border: '1px solid rgba(245,200,66,0.5)',
-              textShadow: '0 0 10px rgba(245,200,66,0.5)',
-            }}
+            style={
+              status.plan === 'commissioner'
+                ? {
+                    color: '#0D0800',
+                    backgroundColor: '#F5C842',
+                    boxShadow: '0 0 12px rgba(245,200,66,0.7)',
+                  }
+                : {
+                    color: '#F5C842',
+                    border: '1px solid rgba(245,200,66,0.5)',
+                    textShadow: '0 0 10px rgba(245,200,66,0.5)',
+                  }
+            }
           >
-            {PLAN_LABEL[status.plan]}
+            {status.plan === 'commissioner' ? `★ ${PLAN_LABEL[status.plan]}` : PLAN_LABEL[status.plan]}
           </span>
         )}
 
