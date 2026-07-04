@@ -9,6 +9,7 @@
 // with rollback, persistent: false hides actions until the migration runs.
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useMode, type Mode } from '@/components/nav/AppShell'
 import { STATE_CONFIG } from '@/lib/brandTokens'
 import { useGameDayKickoffTransition } from '@/lib/gameDayTransition'
@@ -653,7 +654,15 @@ function DetailDrawer({
   const drawerRef = useRef<HTMLElement>(null)
   useFocusTrap(true, drawerRef)
 
-  return (
+  // Portaled to document.body — this component renders deep inside
+  // AppShell's `.relative.z-10` main-content wrapper, which establishes its
+  // own CSS stacking context. `fixed` positioning escapes normal layout
+  // flow but NOT a stacking context, so this drawer's z-40 was being
+  // evaluated inside that z-10 context instead of against the real root —
+  // capping it below the System Bar's z-20 and causing the two to overlap
+  // visually (found via a screenshot: system bar text bleeding through the
+  // drawer's own header). Portaling escapes the ancestor context entirely.
+  return createPortal(
     <div
       className="fixed inset-0 z-40 flex justify-end"
       style={{
@@ -750,7 +759,8 @@ function DetailDrawer({
           )}
         </div>
       </aside>
-    </div>
+    </div>,
+    document.body
   )
 }
 
