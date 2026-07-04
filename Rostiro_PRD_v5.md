@@ -19,6 +19,9 @@ rostiro.com | July 2026 | Pass directly to Claude Code
 | T-102–T-106 shipped this session | Mode-aware AI voice (`lib/claude.ts`), Free/Pro usage quota enforcement (3/week + 1-league cap, `lib/usageLimits.ts`), Draft/Standard State surface wiring, Mode threaded into remaining surfaces, and the Interrupt Stack (`components/InterruptStack.tsx`, the real implementation of 7.1's "one persistent interrupt slot" rule). Two real bugs found and fixed along the way: `syncPulseItems`' daily rebuild was silently deleting open touchdown/lineup-lock cards (a fingerprint collision across two independent code paths), and push notifications were reaching every plan despite Section 9 already gating them to Pro. |
 | T-109 added and shipped — league integration gap | Found by direct user testing, not a report: `/onboarding` was the only path to connect a league anywhere in the app, with no way back to it once already onboarded — Pulse, Lineup, Leagues, and Settings each only offered a connect CTA in the fully-empty state. New `/leagues/add` (reuses the existing platform connectors, returns to `/leagues` instead of restarting onboarding) plus persistent "Add league" affordances on Leagues/Settings regardless of current count. Also fixed a related honesty gap: Pulse/Lineup's `leagueCount` is Sleeper-only, so an ESPN/Yahoo-only account saw "no leagues connected" despite having one — both now distinguish "zero leagues" from "leagues, just not Sleeper." Same pass fixed a false "Connected" state after a plan-blocked add, and gave ESPN/Yahoo leagues an honest "unknown status" explanation instead of a bare "NO DATA YET." |
 | T-110 shipped, T-111 added, T-72 refined | System Bar now shows a real plan badge (T-110) — gold PRO/STARTER/FOUNDER, Founder visibly distinct (filled + star), Free gets none on purpose. Full Founder recognition (Section 9's "priority feedback access, early feature previews") logged separately as T-111 — those aren't mechanically defined yet, a product decision, not an engineering default. T-72 (boot sequence/coach marks) gets an open question flagged: the founder now wants a *mandatory* tooltip tour, a real UX-philosophy fork from the originally-spec'd skippable version — not silently resolved either way, needs a decision before it's built. |
+| §12 restructured into a phased build order | Every remaining task (T-73 onward) now sits in exactly one of Phase 1–4 or the deferred list, sequenced by what MVP functionality genuinely needs early vs. what has runway — this replaces ad-hoc "what's next" discussion as the standing deferral/prioritization mechanism going forward. |
+| T-112 added — marketing landing page overhaul | Founder review: the post-auth product (OS design tokens — void/glass/signal, mono tabular-nums) has visibly outpaced `app/page.tsx`'s generic navy SaaS look, last touched at T-66/T-74. Also caught a real 3-way pricing mismatch: shipped code (`free/starter/pro/commissioner`), the landing page's displayed plans (Scout/Starter/Pro/Commissioner), and the PRD's own §9 target model were all different. Confirmed with the founder: **Free / Rostiro Pro ($9.99/mo) / Founder Season Pass ($59) / Founding 500 ($149 lifetime, capped at 500)** is the real target — this is what T-85 and T-112 both build toward. |
+| T-85 Stripe status confirmed | No Stripe account exists yet (confirmed with founder, July 4, 2026) — real billing is blocked on that account existing, same category of external blocker as Yahoo OAuth. Schema, plan-gating logic, and webhook-handler shape can be built against Stripe's documented API now; live checkout can't be verified until real test-mode keys exist. |
 
 ## Changelog from v5.4 → v5.5
 
@@ -957,18 +960,48 @@ As of July 3, 2026, build is ahead of the original Week 3–7 plan. That room is
 
 **Since v5.2 (this session, July 3, 2026 evening):** the Rostiro States engine (T-79) and the Game Day live-score backend (T-81's backend half, 10.2) both shipped and were verified against real data — the states engine computes correctly against synthetic boundary timestamps, and the live-score cron matched all 16 real Week 1 2026 games against ESPN's live scoreboard, catching a team-code mismatch (Rams, Washington) that would otherwise have silently broken the join. Remaining Game Day scope is now entirely frontend and was scoped, not built, this session: UI surfacing (T-90), `PulseMark.tsx` (T-91), the kickoff transition animation (T-92), the engagement/notification trigger system (T-93, new — 6.12), and Waiver Day / Film Room State UI (T-94, T-95).
 
-### Remaining build order
+### Remaining build order (historical, T-14–T-50)
 
 Week 3: Dashboard + AI layer (T-14–T-23)
 Week 4-5: Draft Kit (T-24–T-37)
 Week 6: Pulse + Pulse empty state + League Health Score (T-38–T-46)
 Week 7: Mobile audit + landing page + launch (T-47–T-50)
 
-**8/1–8/10: Launch.** Draft State + Standard State live. Free / Pro / Founder Season Pass / Founding 500 pricing live.
-
-**Through end of August (pre-Week-1, using live preseason games as a test bed):** Waiver Day, Game Day, and Film Room States (T-79–T-83) built and validated against real preseason kickoffs (~Aug 6 onward) before Week 1 traffic (~Sept 4, 2026) arrives. Scalability baseline (feature flags, caching audit, observability, circuit breakers — T-84) also lands in this window, ahead of the first real Sunday.
-
 **GO / NO-GO GATE:** Yahoo OAuth returning live roster data AND ESPN cookie auth returning league data. Both must pass before dashboard UI is finalized.
+
+### Phased build order (established July 4, 2026 — this is the ongoing sequencing mechanism)
+
+Every remaining task (T-73 onward) sits in exactly one of these phases or the deferred list below. When new scope is discovered mid-build, it gets slotted into a phase or the deferred list in the same pass it's added to the task table — nothing floats untracked. Re-sequence phases here as priorities shift; don't leave the old order stale next to a new one.
+
+**Phase 1 — Launch blockers (must ship before 8/1–8/10).** Real money and real user data start flowing at launch; these aren't optional by then.
+- T-85 Pricing rebuild (Stripe) — Free / Rostiro Pro ($9.99/mo) / Founder Season Pass ($59) / Founding 500 ($149 lifetime, capped at 500). **Blocked on a real Stripe account existing** (confirmed none exists yet, July 4, 2026) — schema, gating logic, and webhook-handler shape can be built against Stripe's documented API now; live checkout can't be verified until real test-mode keys exist.
+- T-112 Marketing landing page overhaul (new, added July 4, 2026) — the post-auth product (glass/void/signal OS design tokens, `app/globals.css`) has visibly outpaced the marketing site's generic navy SaaS look (`app/page.tsx`, last touched at T-66/T-74). Pricing section currently shows a stale four-tier model (Scout/Starter/Pro/Commissioner) that matches neither the current code (`free/starter/pro/commissioner`) nor the T-85 target model above — copy across the whole page needs a pass to reflect what Rostiro actually does today (Rostiro States, Modes, Pulse, Health Score, Command Palette, System Bar), not what it did at T-66.
+- T-78 Privacy policy + data controls — also the Yahoo OAuth review prerequisite, on the GO/NO-GO gate's critical path.
+- T-76 Security hardening — real payments + real user data live; do this before go-live, not after.
+- T-75 Accessibility baseline — lower effort, bundle into the same pre-launch pass as T-76.
+
+**Phase 2 — Finish the core State story.** Rostiro States is the product's central pitch; Waiver Day and Film Room currently only have their data layer shipped (T-108), not their presentation layer.
+- T-87 nflverse ingestion — sequenced first; T-95 and T-88 both depend on this cache existing.
+- T-94 Waiver Day State UI — layout reprioritization, opportunity-green accent, reflow motion (content already shipped).
+- T-95 Film Room State UI — AI recap, usage/snap-count deltas, buy-low/sell-high signals (unblocked by T-87).
+- T-97 Pregame-ramp Pulse content — trigger already fires (July 4, 2026); the card content for that window doesn't exist yet.
+- T-73 Ticker seasonal sources — resolve the pending game-day gating decision and close this out.
+
+**Phase 3 — Harden before real Week 1 traffic.** Preseason (~Aug 6 onward) is the test bed before Week 1 (~Sept 4, 2026) per the plan above — this is the window to do it in, not launch week.
+- T-84 Scalability baseline — feature flags exist; caching/observability/circuit breakers don't yet.
+- T-86 Portfolio data plumbing — cheap, background-only; start now so weekly history isn't cold when the deferred Portfolio product ships.
+
+**Phase 4 — Engagement depth (retention, not core-loop).** The 3 buildable triggers already work; these are additive.
+- T-99 Opportunity Surge trigger
+- T-96 Seasonal/intensity variation
+- T-100 Engagement telemetry instrumentation
+
+**Deferred — bigger, standalone, real runway before they're needed:**
+- T-101 Live Fantasy Matchup Scoring — already flagged as needing its own design pass; comparable in size to T-81's original backend, not a slot-in.
+- T-89 Player Intelligence Card — a whole new UI surface, not required for states/pricing/launch to function.
+- T-88 ESPN native projections wiring — nice-to-have parity feature, no user-facing gap without it yet.
+- T-83 Playoffs/Championship theming — irrelevant until weeks 15–17, no reason to touch before December.
+- (Carried forward from earlier sessions, unchanged: T-72's mandatory-vs-skippable tour decision, T-74 pending the marketing-design pass, T-77 post-launch by design, T-98 and T-111 per their own entries.)
 
 ---
 
@@ -1085,6 +1118,7 @@ Additional tasks from `Rostiro_Behavior_Wiring_Plan.md` — recommended build se
 | T-109 | ✓ **Done.** League integration gap — new `/leagues/add` (reuses existing platform connectors, returns to `/leagues` instead of restarting onboarding) plus persistent "Add league" affordances on Leagues/Settings regardless of current count. Also fixed Pulse/Lineup's Sleeper-only `leagueCount` falsely reporting "no leagues" for ESPN/Yahoo-only accounts. Found and fixed via direct user testing. Same pass also fixed a false "Connected" state after a plan-blocked league add, and added an honest explanation for unknown-status (ESPN/Yahoo) leagues on the Leagues page. |
 | T-110 | ✓ **Done** (badge only). Visible plan badge — `/api/system/status` now returns `plan`; System Bar shows a gold PRO/STARTER/FOUNDER badge next to the Mode chip (both breakpoints), Founder visually distinct (filled + star, not just Pro's label swapped). Free gets no badge on purpose. Found via direct user testing — nothing in the UI showed plan at all before this. |
 | T-111 | Full Founder recognition — Section 9 promises "founder badge, priority feedback access, early feature previews" for Founding 500; T-110 ships only the badge. "Priority feedback access" and "early feature previews" aren't mechanically defined anywhere yet (a different support channel? a beta-flag gate?) — needs a product decision before it's buildable, not an engineering default. Also includes: marketing copy explicitly acknowledging Founders (site/marketing surfaces are untouched pending designs per the v5.0 changelog, so this waits on that pass regardless). Not started. |
+| T-112 | Marketing landing page overhaul (added July 4, 2026, Phase 1) — `app/page.tsx` still reads as a generic navy-blue SaaS template (last touched at T-66/T-74) while the post-auth product has moved to the "Rostiro OS" design language (`app/globals.css`: void ground, glass surfaces, signal-blue glow, mono tabular-nums data, ambient drift). Pricing section shows a stale Scout/Starter/Pro/Commissioner four-tier model matching neither current code (`free/starter/pro/commissioner`) nor the confirmed T-85 target (Free / Rostiro Pro $9.99mo / Founder Season Pass $59 / Founding 500 $149 lifetime). Full visual + copy pass: real OS design tokens, current feature set (Rostiro States, Modes, Pulse, Health Score, Command Palette, System Bar), correct pricing. |
 
 ---
 
