@@ -5,9 +5,25 @@
 // note ("Loads Week 1") instead of a bar — honest preseason degradation,
 // never a fake number. Same /api/system/status payload the system bar
 // polls: one computation, two surfaces.
+//
+// T-104: Standard State's emotion is preparation — factors within each
+// card sort by urgency (worst score first) rather than a fixed order, so
+// what actually needs attention this week leads. Every other State keeps
+// the original weight-order; this is the one page where Standard actively
+// changes something, not just an ambient accent (6.10's "resting state"
+// deliberately stays untagged everywhere else).
 
 import { useEffect, useState } from 'react'
-import type { LeagueHealthFactor, LeagueHealthStatus, SystemStatus, SystemStatusLeague } from '@/types'
+import type { LeagueHealthFactor, LeagueHealthStatus, RostiroState, SystemStatus, SystemStatusLeague } from '@/types'
+
+function sortFactorsByUrgency(factors: LeagueHealthFactor[]): LeagueHealthFactor[] {
+  return [...factors].sort((a, b) => {
+    if (a.score === null && b.score === null) return 0
+    if (a.score === null) return 1
+    if (b.score === null) return -1
+    return a.score - b.score
+  })
+}
 
 const STATUS_COLOR: Record<LeagueHealthStatus, string> = {
   healthy: 'var(--live)',
@@ -83,7 +99,7 @@ export default function LeaguesPage() {
       {!loading && !error && leagues.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {leagues.map((league) => (
-            <LeagueCard key={league.id} league={league} />
+            <LeagueCard key={league.id} league={league} rostiroState={status?.rostiroState ?? 'standard'} />
           ))}
         </div>
       )}
@@ -91,9 +107,10 @@ export default function LeaguesPage() {
   )
 }
 
-function LeagueCard({ league }: { league: SystemStatusLeague }) {
+function LeagueCard({ league, rostiroState }: { league: SystemStatusLeague; rostiroState: RostiroState }) {
   const { health } = league
   const color = STATUS_COLOR[health.status]
+  const factors = rostiroState === 'standard' ? sortFactorsByUrgency(health.factors) : health.factors
 
   return (
     <div className="glass card-hover rounded-[14px] p-4">
@@ -113,9 +130,9 @@ function LeagueCard({ league }: { league: SystemStatusLeague }) {
         </div>
       </div>
 
-      {health.factors.length > 0 && (
+      {factors.length > 0 && (
         <div className="mt-4 space-y-[7px]">
-          {health.factors.map((factor) => (
+          {factors.map((factor) => (
             <FactorRow key={factor.key} factor={factor} />
           ))}
         </div>

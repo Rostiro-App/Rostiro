@@ -257,11 +257,15 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
       )}
 
       {showPanicPanel && (
+        // T-104 / 6.13: Draft State's accent — matches the already-shipped
+        // STATE_CONFIG.draft amber (PulseMark/System Bar), not the PRD 6.13
+        // text's "opportunity green," which was never reconciled with the
+        // real STATE_CONFIG values.
         <div
           className="rounded-xl p-4 mb-4"
-          style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', border: '1px solid var(--signal)', borderLeft: '3px solid var(--signal)' }}
+          style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', border: '1px solid #EF9F27', borderLeft: '3px solid #EF9F27' }}
         >
-          <p className="text-xs font-semibold tracking-widest uppercase mb-3" style={{ color: 'var(--signal)' }}>
+          <p className="text-xs font-semibold tracking-widest uppercase mb-3" style={{ color: '#EF9F27' }}>
             {picksLeft === 0 ? "You're on the clock" : `Your turn in ${picksLeft} pick${picksLeft === 1 ? '' : 's'}`}
           </p>
           {recommendations.length === 0 ? (
@@ -276,7 +280,7 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
                 const p = poolByPlayerId.get(rec.playerId)
                 if (!p || draftedIds.has(rec.playerId)) return null
                 return (
-                  <div key={rec.playerId}>
+                  <div key={rec.playerId} className="draft-queue-slide-in">
                     <p className="text-sm font-semibold text-white">{p.name} <span className="text-xs font-normal" style={{ color: 'var(--t3)' }}>{p.position} · ADP {Math.round(p.adpConsensus)}</span></p>
                     <p className="text-sm mt-0.5" style={{ color: 'var(--t2)' }}>{rec.reasoning}</p>
                   </div>

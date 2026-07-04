@@ -170,6 +170,14 @@ body {
 }
 .ticker-pause:hover .ticker-crawl { animation-play-state: paused; }
 
+/* T-104 / 6.13: Draft State — Draft Copilot recommendations slide in from
+   the right rather than popping in, on each pre-fetch refresh. */
+@keyframes draft-queue-slide-in {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: none; }
+}
+.draft-queue-slide-in { animation: draft-queue-slide-in 0.4s var(--ease-os); }
+
 /* T-92: kickoff-triggered transition (6.13) — plays once, the first moment
    a client notices Game Day actually start. System Bar accent sweeps to
    the Game Day tone and settles, rather than an instant repaint. */
@@ -202,7 +210,8 @@ body {
   .breathe,
   .ticker-crawl,
   .kickoff-sweep,
-  .ticker-slide-in {
+  .ticker-slide-in,
+  .draft-queue-slide-in {
     animation: none;
   }
   .panel-enter { animation-duration: 0.01ms; }

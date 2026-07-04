@@ -4,7 +4,12 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useMode } from '@/components/nav/AppShell'
-import type { ADPPlayer, NFLPosition } from '@/types'
+import type { ADPPlayer, NFLPosition, RostiroState } from '@/types'
+
+// T-104 / 6.13: matches the already-shipped STATE_CONFIG.draft amber
+// (PulseMark/System Bar) — not 6.13's text, which says "opportunity green"
+// and was never reconciled with the real STATE_CONFIG values.
+const DRAFT_STATE_COLOR = '#EF9F27'
 
 // DEF omitted — Sleeper never assigns search_rank to team defenses, so there's
 // no ranking signal for them yet. Add back once consensus ADP covers DEF.
@@ -38,6 +43,23 @@ function DraftPageInner() {
   const [position, setPosition] = useState<NFLPosition | 'ALL'>('ALL')
   // T-70: the command palette deep-links players here as /draft?q=Name.
   const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
+  const [rostiroState, setRostiroState] = useState<RostiroState>('standard')
+
+  // T-104: one-shot fetch, same pattern Pulse already uses for its own
+  // state-driven framing — this page doesn't need the 60s freshness
+  // System Bar polls for, just the state at load.
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/system/status')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { rostiroState?: RostiroState } | null) => {
+        if (!cancelled && data?.rostiroState) setRostiroState(data.rostiroState)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -77,6 +99,18 @@ function DraftPageInner() {
     <div className="max-w-3xl mx-auto px-4 pt-6 pb-8 md:px-6 md:pt-8">
       {/* Header */}
       <div className="mb-5">
+        {rostiroState === 'draft' && (
+          <span
+            className="mono-data inline-block text-[9.5px] tracking-[0.16em] px-2 py-0.5 rounded-full mb-2"
+            style={{
+              color: DRAFT_STATE_COLOR,
+              border: `1px solid ${DRAFT_STATE_COLOR}`,
+              backgroundColor: 'color-mix(in srgb, currentColor 12%, transparent)',
+            }}
+          >
+            DRAFT SEASON
+          </span>
+        )}
         <div className="flex items-baseline justify-between">
           <h1 className="text-[22px] font-semibold tracking-tight" style={{ color: 'var(--t1)' }}>Draft Kit</h1>
           {lastUpdated && (
@@ -112,20 +146,22 @@ function DraftPageInner() {
         style={{ color: 'var(--t1)' }}
       />
 
-      {/* Position filter tabs */}
+      {/* Position filter tabs — accent switches to Draft State's amber when
+          it's active, matching STATE_CONFIG rather than the default blue. */}
       <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
         {POSITION_FILTERS.map((pos) => {
           const isActive = position === pos
+          const accent = rostiroState === 'draft' ? DRAFT_STATE_COLOR : '#4BA3F5'
           return (
             <button
               key={pos}
               onClick={() => setPosition(pos)}
               className="mono-data flex-shrink-0 text-[11px] tracking-[0.06em] px-3 py-1.5 rounded-lg transition-all"
               style={{
-                backgroundColor: isActive ? 'var(--signal-dim)' : 'rgba(8, 15, 26, 0.6)',
-                color: isActive ? 'var(--signal)' : 'var(--t3)',
-                border: `1px solid ${isActive ? 'rgba(75,163,245,.45)' : 'var(--hairline)'}`,
-                boxShadow: isActive ? '0 0 14px rgba(75,163,245,.18)' : 'none',
+                backgroundColor: isActive ? `color-mix(in srgb, ${accent} 14%, transparent)` : 'rgba(8, 15, 26, 0.6)',
+                color: isActive ? accent : 'var(--t3)',
+                border: `1px solid ${isActive ? accent : 'var(--hairline)'}`,
+                boxShadow: isActive ? `0 0 14px color-mix(in srgb, ${accent} 20%, transparent)` : 'none',
               }}
             >
               {pos}
