@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { browserClient } from '@/lib/supabase-browser'
 import Link from 'next/link'
 
@@ -10,6 +10,14 @@ export default function LoginPage() {
   const [authMode, setAuthMode] = useState<'password' | 'magic'>('password')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null)
+
+  // T-72: clears the boot-sequence's "already played this tab session"
+  // flag whenever the login page is reached — including a sign-out that
+  // lands back here — so a real repeat login in the same tab still plays
+  // the boot animation, not just a brand-new tab.
+  useEffect(() => {
+    window.sessionStorage.removeItem('rostiro:booted')
+  }, [])
 
   async function handlePasswordLogin(e: React.FormEvent) {
     e.preventDefault()

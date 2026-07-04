@@ -6,9 +6,15 @@ import type { NextConfig } from "next";
 // style-src keep 'unsafe-inline' for now rather than quietly breaking
 // hydration or every inline `style={{...}}` in the app. Everything else
 // (frame-ancestors, object-src, connect-src) is locked down for real.
+//
+// 'unsafe-eval' is dev-only: Next/React's dev-mode tooling (Turbopack fast
+// refresh, reconstructing call stacks) uses eval(), confirmed via a real
+// console error locally — "React will never use eval() in production
+// mode" per React's own message, so this never weakens the real, deployed
+// CSP a user's browser actually enforces.
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' https://cdn.onesignal.com",
+  `script-src 'self' 'unsafe-inline' https://cdn.onesignal.com${process.env.NODE_ENV !== 'production' ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https:",
   "font-src 'self'",

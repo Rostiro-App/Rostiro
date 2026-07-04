@@ -180,6 +180,20 @@ body {
 }
 .ticker-pause:hover .ticker-crawl { animation-play-state: paused; }
 
+/* T-72 (revised): boot sequence — mark + wordmark settle in with a slight
+   scale-up rather than popping in, then the whole overlay fades to reveal
+   the app beneath. Brief and confident, not a loading spinner. */
+@keyframes boot-mark-in {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: none; }
+}
+.boot-mark-in { animation: boot-mark-in 0.5s var(--ease-os); }
+
+@keyframes boot-fade-out {
+  to { opacity: 0; }
+}
+.boot-fade-out { animation: boot-fade-out 0.4s ease-out forwards; }
+
 /* T-104 / 6.13: Draft State — Draft Copilot recommendations slide in from
    the right rather than popping in, on each pre-fetch refresh. */
 @keyframes draft-queue-slide-in {
@@ -234,8 +248,12 @@ body {
   .kickoff-sweep,
   .ticker-slide-in,
   .draft-queue-slide-in,
-  .waiver-reflow-in {
+  .waiver-reflow-in,
+  .boot-mark-in {
     animation: none;
   }
-  .panel-enter { animation-duration: 0.01ms; }
+  .panel-enter,
+  .boot-fade-out {
+    animation-duration: 0.01ms;
+  }
 }

@@ -7,6 +7,7 @@ import SystemBar from './SystemBar'
 import TickerBar from './TickerBar'
 import CommandPalette from '@/components/palette/CommandPalette'
 import InterruptStack from '@/components/InterruptStack'
+import BootSequence from '@/components/BootSequence'
 
 export type Mode = 'focused' | 'balanced' | 'savant'
 
@@ -80,6 +81,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <ModeContext.Provider value={mode}>
       <div className="flex flex-col h-screen overflow-hidden relative" style={{ backgroundColor: 'var(--void)' }}>
+        {/* T-72: plays once per tab session, above everything else. */}
+        <BootSequence />
+
         {/* OS redesign: ambient drifting glows under everything — the ground
             itself signals the system is alive. */}
         <div className="ambient-ground" aria-hidden="true" />
