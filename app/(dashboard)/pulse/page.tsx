@@ -8,10 +8,11 @@
 // Live behavior unchanged from T-69: persistent items, optimistic PATCH
 // with rollback, persistent: false hides actions until the migration runs.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMode, type Mode } from '@/components/nav/AppShell'
 import { STATE_CONFIG } from '@/lib/brandTokens'
 import { useGameDayKickoffTransition } from '@/lib/gameDayTransition'
+import { useFocusTrap } from '@/lib/useFocusTrap'
 import type { LiveGameScore, PulseItem, PulseItemType, PulsePriority, RostiroState } from '@/types'
 
 // ─── Priority + type config ────────────────────────────────────────────────────
@@ -577,6 +578,8 @@ function DetailDrawer({
   onAction: ActionHandler
 }) {
   const typeConf = TYPE_CONFIG[item.type]
+  const drawerRef = useRef<HTMLElement>(null)
+  useFocusTrap(true, drawerRef)
 
   return (
     <div
@@ -589,10 +592,14 @@ function DetailDrawer({
       onClick={onClose}
     >
       <aside
+        ref={drawerRef}
         className="glass-heavy panel-enter w-full max-w-[380px] h-full overflow-y-auto p-6 relative"
         style={{ boxShadow: '-30px 0 70px rgba(0,0,0,.45)' }}
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
         aria-label="Item detail"
+        tabIndex={-1}
       >
         <button
           onClick={onClose}

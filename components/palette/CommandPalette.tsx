@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Mode } from '@/components/nav/AppShell'
+import { useFocusTrap } from '@/lib/useFocusTrap'
 import type { ADPPlayer, PulseItem } from '@/types'
 
 interface Command {
@@ -60,8 +61,15 @@ export default function CommandPalette({
   const [players, setPlayers] = useState<ADPPlayer[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const paletteRef = useRef<HTMLDivElement>(null)
   const playersRequested = useRef(false)
   const pulseFetchedAt = useRef(0)
+
+  // T-75: Tab-traps within the palette and restores focus to whatever
+  // triggered it (⌘K, the mobile FAB, the system bar chip) on close. The
+  // existing inputRef.current?.focus() below still owns "what's focused
+  // first" — this only adds the wrap-around and restore behavior.
+  useFocusTrap(open, paletteRef)
 
   const openPalette = useCallback(() => {
     setOpen(true)
@@ -251,12 +259,16 @@ export default function CommandPalette({
           onClick={close}
         >
           <div
+            ref={paletteRef}
             className="glass-heavy panel-enter w-full max-w-[560px] rounded-[15px] overflow-hidden flex flex-col"
             style={{
               maxHeight: '60vh',
               boxShadow: '0 30px 90px rgba(0,0,0,.6), 0 0 50px rgba(75,163,245,.10)',
             }}
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Command palette"
           >
             {/* Input */}
             <div className="flex items-center gap-3 px-[18px] py-3.5" style={{ borderBottom: '1px solid var(--hairline)' }}>

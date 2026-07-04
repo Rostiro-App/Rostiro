@@ -19,8 +19,18 @@
   --crit: #E8504A;
   --t1: #E8F0F8;
   --t2: #8FA9C0;
-  --t3: #45607A;
-  --t4: #2E4258;
+  /* T-75: --t3 was #45607A (2.7-3.0:1 against void/glass-solid) — fails
+     WCAG AA's 4.5:1 for normal text, and it's used across ~24 files for
+     real body content (timestamps, metadata, descriptions), not large
+     text or decoration, so the large-text 3:1 carve-out doesn't apply
+     either. Lightened to clear 4.5:1 on both real backgrounds with a
+     margin, same hue, still clearly dimmer than --t2. */
+  --t3: #798D9F;
+  /* T-75: --t4 was #2E4258 (1.7-1.9:1) — fails even the 3:1 floor for
+     large text/UI components. Lightened to clear 3:1; still reserve this
+     tier for de-emphasized/decorative use (dividers, faint labels), not
+     primary body text — use --t3 or --t2 for anything meaningful. */
+  --t4: #5C6C7D;
   --ease-os: cubic-bezier(0.32, 0.72, 0.22, 1);
 
   --background: var(--void);

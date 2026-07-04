@@ -111,6 +111,34 @@ export default function TickerBar() {
   // the live segments below slide into the strip rather than just appearing.
   const kickoffSweeping = useGameDayKickoffTransition(rostiroState)
 
+  // T-75: the visual crawl is decorative/duplicated (rendered twice for a
+  // seamless loop) and can't be paused, so it's hidden from assistive tech
+  // entirely — this is the one-pass, readable-at-your-own-pace equivalent,
+  // built from the same underlying data rather than extracted from the
+  // JSX segments below.
+  const srSegments: string[] = []
+  if (gameDayActive) {
+    liveGames.forEach((g) => {
+      if (!scoresGated) srSegments.push(gameLabel(g))
+    })
+    if (scoresGated) srSegments.push('Live scores available on Pro')
+  } else if (data) {
+    if (data.movers.length > 0) {
+      data.movers.forEach((m) => {
+        srSegments.push(`${m.name} ${m.delta > 0 ? 'up' : 'down'} ${Math.abs(m.delta)}`)
+      })
+      srSegments.push(`${data.historyDays}-day ADP window, board refreshes 09:00 UTC`)
+    } else if (data.top.length > 0) {
+      data.top.forEach((p) => {
+        srSegments.push(`${p.name}${p.position ? `, ${p.position}` : ''}, ADP ${p.adp}`)
+      })
+      srSegments.push(`ADP history day ${data.historyDays} of 7 — movers unlock with a week of data`)
+    }
+  }
+  if (srSegments.length === 0) {
+    srSegments.push('ADP board refreshes 09:00 UTC, Pulse rebuilds 10:00 UTC')
+  }
+
   const segments: React.ReactNode[] = []
   if (gameDayActive) {
     liveGames.forEach((g) => {
@@ -212,11 +240,12 @@ export default function TickerBar() {
         LIVE
       </span>
       <div className="ticker-pause flex-1 overflow-hidden relative h-full">
-        <div className="ticker-crawl absolute flex items-center gap-[34px] h-full whitespace-nowrap pl-5">
+        <div className="ticker-crawl absolute flex items-center gap-[34px] h-full whitespace-nowrap pl-5" aria-hidden="true">
           {crawl}
           {crawl}
         </div>
       </div>
+      <span className="sr-only">{srSegments.join('. ')}.</span>
     </footer>
   )
 }
