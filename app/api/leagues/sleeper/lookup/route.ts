@@ -1,7 +1,22 @@
 import { getSleeperUser, getSleeperLeagues } from '@/lib/sleeper'
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
+import { createAdminClient } from '@/lib/supabase'
 import { NextResponse, type NextRequest } from 'next/server'
 
+// T-76: unauthenticated (onboarding hasn't created a session yet) and
+// proxies straight to Sleeper's API by username — rate-limited so it can't
+// be scripted into a username-enumeration or Sleeper-API-hammering tool.
+const RATE_LIMIT = 20
+const RATE_WINDOW_SECONDS = 60
+
 export async function GET(request: NextRequest) {
+  const admin = createAdminClient()
+  const ip = getClientIp(request)
+  const { allowed } = await checkRateLimit(admin, `sleeper-lookup:${ip}`, RATE_LIMIT, RATE_WINDOW_SECONDS)
+  if (!allowed) {
+    return NextResponse.json({ error: 'Too many requests — slow down and try again shortly.' }, { status: 429 })
+  }
+
   const username = request.nextUrl.searchParams.get('username')
   if (!username) {
     return NextResponse.json({ error: 'username is required' }, { status: 400 })
