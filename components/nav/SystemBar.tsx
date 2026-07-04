@@ -249,20 +249,28 @@ function LiveScoreBadge({ games, gated }: { games: LiveGameScore[]; gated: boole
   const live = games.filter((g) => g.rosterRelevant && g.statusState !== 'pre')
   if (live.length === 0) return null
 
-  const label = live.length === 1 ? gameLabel(live[0]) : `${live.length} LIVE`
-
   return (
     <span className="hidden sm:flex items-center gap-1.5 flex-shrink-0 relative group">
       <span
         className="breathe w-[5px] h-[5px] rounded-full flex-shrink-0"
         style={{ backgroundColor: 'var(--live)', boxShadow: '0 0 6px var(--live)' }}
       />
-      <span
-        className="value-tick"
-        style={{ color: 'var(--t1)', filter: gated ? 'blur(4px)' : 'none', userSelect: gated ? 'none' : 'auto' }}
-      >
-        {label}
-      </span>
+      {live.length === 1 ? (
+        <span className="value-tick flex items-baseline gap-1.5 min-w-0">
+          <span style={{ color: 'var(--t1)', filter: gated ? 'blur(4px)' : 'none', userSelect: gated ? 'none' : 'auto' }}>
+            {gameLabel(live[0])}
+          </span>
+          {/* UX Behavior Spec Gap #1: never blurred — this is "why this
+              game is yours," not the score itself, so it isn't Pro-gated. */}
+          {playerSummary(live[0].relevantPlayers) && (
+            <span className="hidden md:inline truncate max-w-40" style={{ color: 'var(--t3)' }}>
+              · {playerSummary(live[0].relevantPlayers)}
+            </span>
+          )}
+        </span>
+      ) : (
+        <span className="value-tick" style={{ color: 'var(--t1)' }}>{live.length} LIVE</span>
+      )}
       {gated && (
         <span
           className="text-[8.5px] font-bold tracking-[0.12em] px-1 rounded flex-shrink-0"
@@ -274,10 +282,15 @@ function LiveScoreBadge({ games, gated }: { games: LiveGameScore[]; gated: boole
       {live.length > 1 && (
         <span
           className="glass-heavy hidden group-hover:flex flex-col gap-1 absolute top-5 left-0 whitespace-nowrap text-[10.5px] px-2.5 py-1.5 rounded-lg z-50"
-          style={{ color: 'var(--t1)', filter: gated ? 'blur(4px)' : 'none' }}
+          style={{ color: 'var(--t1)' }}
         >
           {live.map((g) => (
-            <span key={g.gameId}>{gameLabel(g)}</span>
+            <span key={g.gameId} className="flex items-baseline gap-1.5">
+              <span style={{ filter: gated ? 'blur(4px)' : 'none' }}>{gameLabel(g)}</span>
+              {playerSummary(g.relevantPlayers) && (
+                <span style={{ color: 'var(--t3)' }}>· {playerSummary(g.relevantPlayers)}</span>
+              )}
+            </span>
           ))}
         </span>
       )}
@@ -288,6 +301,17 @@ function LiveScoreBadge({ games, gated }: { games: LiveGameScore[]; gated: boole
 function gameLabel(g: LiveGameScore): string {
   const clock = g.statusState === 'post' ? 'FINAL' : `Q${g.period} ${g.displayClock}`
   return `${g.awayTeam} ${g.awayScore} – ${g.homeTeam} ${g.homeScore} · ${clock}`
+}
+
+// UX Behavior Spec Gap #1: "Hurts, Barkley (2 leagues)" — names every
+// rostered player that made this game relevant, and how many distinct
+// leagues they span. Empty string (never rendered) when there's nothing
+// to attribute, e.g. the DEMO_MODE team-only override with no players.
+function playerSummary(players: LiveGameScore['relevantPlayers']): string {
+  if (!players || players.length === 0) return ''
+  const names = players.map((p) => p.name).join(', ')
+  const leagueCount = new Set(players.flatMap((p) => p.leagueNames)).size
+  return leagueCount > 0 ? `${names} (${leagueCount} ${leagueCount === 1 ? 'league' : 'leagues'})` : names
 }
 
 // T-93/6.12: calm -> warm -> urgent as a lineup-lock deadline nears. Plain

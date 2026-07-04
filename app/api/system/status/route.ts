@@ -18,7 +18,7 @@ import { getRostiroState } from '@/lib/rostiroState'
 import { toNflverseTeamCode } from '@/lib/liveScores'
 import { isFeatureEnabled } from '@/lib/featureFlags'
 import { NextResponse } from 'next/server'
-import type { LeagueHealth, LiveGameScore, SystemDeadline, SystemStatus, SystemStatusLeague } from '@/types'
+import type { LeagueHealth, LiveGameScore, RelevantPlayer, SystemDeadline, SystemStatus, SystemStatusLeague } from '@/types'
 
 interface LeagueRow {
   id: string
@@ -93,6 +93,10 @@ export async function GET() {
   // live-score roster-relevance can be computed after this loop without a
   // second round of roster fetches.
   const myRosteredPlayerIds: string[] = []
+  // UX Behavior Spec Gap #1: which league(s) each rostered player belongs
+  // to, so the live-score surfaces can name "Hurts, Barkley (2 leagues)"
+  // instead of collapsing relevance down to a bare boolean.
+  const playerLeagueNames = new Map<string, Set<string>>()
 
   // T-93 (6.12 lineup-lock countdown): today's kickoff time per team,
   // computed once up front rather than per-league, so the System Bar can
@@ -147,6 +151,11 @@ export async function GET() {
       const allRosteredIds = new Set(rosters.flatMap((r) => r.players ?? []))
       const myIds = myRoster.players ?? []
       myRosteredPlayerIds.push(...myIds)
+      for (const id of myIds) {
+        const leagueNames = playerLeagueNames.get(id) ?? new Set<string>()
+        leagueNames.add(league.league_name)
+        playerLeagueNames.set(id, leagueNames)
+      }
 
       // Enrich my roster from the cache in one query.
       const { data: myRows } = await supabase
@@ -241,26 +250,46 @@ export async function GET() {
       const { data: myPlayerRows } = uniquePlayerIds.length > 0
         ? await supabase
             .from('players_cache')
-            .select('nfl_team')
+            .select('player_id, name, nfl_team')
             .eq('platform', 'sleeper')
             .in('player_id', uniquePlayerIds)
-        : { data: [] as { nfl_team: string | null }[] }
-      const relevantTeams = new Set(
-        (myPlayerRows ?? [])
-          .map((r) => r.nfl_team)
-          .filter((t): t is string => !!t)
-          .map(toNflverseTeamCode)
-      )
+        : { data: [] as { player_id: string; name: string; nfl_team: string | null }[] }
+
+      const relevantTeams = new Set<string>()
+      // UX Behavior Spec Gap #1: team -> the specific players (and their
+      // leagues) that made it relevant, not just a yes/no.
+      const playersByTeam = new Map<string, RelevantPlayer[]>()
+      for (const row of myPlayerRows ?? []) {
+        if (!row.nfl_team) continue
+        const team = toNflverseTeamCode(row.nfl_team)
+        relevantTeams.add(team)
+        const list = playersByTeam.get(team) ?? []
+        list.push({ name: row.name, leagueNames: [...(playerLeagueNames.get(row.player_id) ?? [])] })
+        playersByTeam.set(team, list)
+      }
 
       // DEMO MODE — local testing only (DEMO_MODE is set in .env.local,
       // which is git-ignored and never deployed). Real roster relevance
       // above only covers Sleeper leagues; this account's real league is
-      // ESPN, which isn't wired up yet. This purely *adds* teams so the
-      // Game Day demo slate shows up in Pulse/System Bar without touching
-      // the real computation or affecting any account without the flag.
+      // ESPN, which isn't wired up yet. This purely *adds* teams (and
+      // illustrative players) so the Game Day demo slate shows up in
+      // Pulse/System Bar without touching the real computation or
+      // affecting any account without the flag.
       if (process.env.DEMO_MODE === 'true') {
+        const DEMO_PLAYERS: Record<string, RelevantPlayer[]> = {
+          TEN: [{ name: 'Derrick Henry', leagueNames: ['Demo League'] }],
+          PHI: [
+            { name: 'Jalen Hurts', leagueNames: ['Demo League'] },
+            { name: 'Saquon Barkley', leagueNames: ['Demo League 2'] },
+          ],
+          DAL: [{ name: 'Cowboys D/ST', leagueNames: ['Demo League'] }],
+        }
         for (const team of (process.env.DEMO_ROSTER_TEAMS ?? 'TEN,PHI,DAL').split(',')) {
-          relevantTeams.add(team.trim())
+          const trimmed = team.trim()
+          relevantTeams.add(trimmed)
+          if (!playersByTeam.has(trimmed) && DEMO_PLAYERS[trimmed]) {
+            playersByTeam.set(trimmed, DEMO_PLAYERS[trimmed])
+          }
         }
       }
 
@@ -277,6 +306,7 @@ export async function GET() {
           statusState: score?.status_state ?? 'pre',
           kickoffAt: g.kickoff_at,
           rosterRelevant: relevantTeams.has(g.home_team) || relevantTeams.has(g.away_team),
+          relevantPlayers: [...(playersByTeam.get(g.home_team) ?? []), ...(playersByTeam.get(g.away_team) ?? [])],
         }
       })
 

@@ -287,18 +287,27 @@ export default function PulsePage() {
           >
             LIVE NOW
           </span>
-          <div className="mt-1.5 space-y-1">
+          <div className="mt-1.5 space-y-1.5">
             {liveGames.map((g) => (
-              <div key={g.gameId} className="flex items-center gap-2">
-                <span
-                  className="mono-data text-[12px]"
-                  style={{ color: 'var(--t1)', filter: scoresGated ? 'blur(4px)' : 'none', userSelect: scoresGated ? 'none' : 'auto' }}
-                >
-                  {g.awayTeam} {g.awayScore} – {g.homeTeam} {g.homeScore}
-                </span>
-                <span className="mono-data text-[10px]" style={{ color: 'var(--t3)' }}>
-                  {g.statusState === 'post' ? 'FINAL' : `Q${g.period} ${g.displayClock}`}
-                </span>
+              <div key={g.gameId}>
+                <div className="flex items-center gap-2">
+                  <span
+                    className="mono-data text-[12px]"
+                    style={{ color: 'var(--t1)', filter: scoresGated ? 'blur(4px)' : 'none', userSelect: scoresGated ? 'none' : 'auto' }}
+                  >
+                    {g.awayTeam} {g.awayScore} – {g.homeTeam} {g.homeScore}
+                  </span>
+                  <span className="mono-data text-[10px]" style={{ color: 'var(--t3)' }}>
+                    {g.statusState === 'post' ? 'FINAL' : `Q${g.period} ${g.displayClock}`}
+                  </span>
+                </div>
+                {/* UX Behavior Spec Gap #1: never blurred — why this game
+                    is yours, not the score itself, so it isn't Pro-gated. */}
+                {playerSummary(g.relevantPlayers) && (
+                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--t2)' }}>
+                    {playerSummary(g.relevantPlayers)}
+                  </p>
+                )}
               </div>
             ))}
           </div>
@@ -352,6 +361,16 @@ export default function PulsePage() {
       )}
     </div>
   )
+}
+
+// UX Behavior Spec Gap #1: "Hurts, Barkley (2 leagues)" — names every
+// rostered player that made this game relevant, and how many distinct
+// leagues they span.
+function playerSummary(players: LiveGameScore['relevantPlayers']): string {
+  if (!players || players.length === 0) return ''
+  const names = players.map((p) => p.name).join(', ')
+  const leagueCount = new Set(players.flatMap((p) => p.leagueNames)).size
+  return leagueCount > 0 ? `${names} (${leagueCount} ${leagueCount === 1 ? 'league' : 'leagues'})` : names
 }
 
 function greeting(): string {

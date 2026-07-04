@@ -346,6 +346,11 @@ export interface SystemDeadline {
 // is true when a player on one of the user's rosters is on either team, per 6.1's
 // cross-league-relevance rule; Pulse/System Bar show only those, the bottom
 // ticker shows all of them (its existing unfiltered, public-market character).
+export interface RelevantPlayer {
+  name: string
+  leagueNames: string[]
+}
+
 export interface LiveGameScore {
   gameId: string
   homeTeam: string
@@ -357,6 +362,11 @@ export interface LiveGameScore {
   statusState: 'pre' | 'in' | 'post'
   kickoffAt: string
   rosterRelevant: boolean
+  // UX Behavior Spec Gap #1: which of your players (and which leagues) made
+  // this game roster-relevant — not gated behind Pro, since it's
+  // personalization context, not the score itself (9's "depth is the
+  // paywall" applies to the numbers, not to knowing why you should care).
+  relevantPlayers: RelevantPlayer[]
 }
 
 export interface SystemStatus {

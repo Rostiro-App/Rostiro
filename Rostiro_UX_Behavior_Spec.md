@@ -23,7 +23,7 @@ Started July 4, 2026, after a run of simple questions ("does the ticker show the
 | Game Day, exactly one roster-relevant game live | Badge shows `AWAY score – HOME score · Qn clock`, e.g. `NYJ 20 – TEN 27 · Q3 6:12` | `LiveScoreBadge` → `gameLabel()` | Built |
 | Game Day, 2+ roster-relevant games live | Badge collapses to `N LIVE`; hover reveals each game's score line | `LiveScoreBadge` (`live.length > 1` branch) | Built |
 | Free plan | Score text rendered with `filter: blur(4px)`, plus a small `PRO` tag | `scoresGated` from `/api/system/status` | Built |
-| **Which players/leagues are behind that score** | **Not shown, at any tier.** The badge only ever shows team codes and the raw score — never "Hurts, Barkley (2 leagues)" | `gameLabel()` has no player/league params | **Gap — see Known Gaps #1** |
+| Which players/leagues are behind that score | Subtext next to the score (desktop only): "Hurts, Barkley (2 leagues)" — never blurred, even on free plan | `LiveScoreBadge`, `playerSummary()` | **Built 2026-07-04 (Gap #1 fix)** |
 | Kickoff-transition sweep (first Game Day moment of the day) | ~1.8s inset glow sweep on the bar, once per ET calendar day | `useGameDayKickoffTransition`, `.kickoff-sweep` | Built |
 | Lineup-lock deadline, >15 min out | Deadline chip in calm signal-blue | `lineupLockRampColor()` | Built |
 | Lineup-lock deadline, 5–15 min out | Chip ramps to warm amber | `lineupLockRampColor()` | Built |
@@ -40,7 +40,7 @@ Started July 4, 2026, after a run of simple questions ("does the ticker show the
 | Game Day, no games have actually kicked off yet | Falls back to ADP-mode content (no fake pregame scores) | `gameDayActive = ...liveGames.length > 0` | Built |
 | Free plan, Game Day | Each score segment blurred, plus a trailing "UNLOCK LIVE SCORES WITH PRO" segment | `scoresGated` | Built |
 | First live segment appearance each day | Slides in from the right (`.ticker-slide-in`) once, then crawls normally | `useGameDayKickoffTransition` | Built |
-| **Player/league attribution** | **Not shown** — same gap character as System Bar, but arguably not a gap here (see Known Gaps #1's ticker note) | — | Deliberate (ticker) / relates to Gap #1 (ambient surfaces generally) |
+| Player/league attribution | Not shown, and not planned — the ticker is a public, unfiltered crawl by design, unlike System Bar/Pulse (see Gap #1's resolution note) | — | Deliberate |
 
 ## Surface: Pulse — ambient "Live Now" card (`app/(dashboard)/pulse/page.tsx`)
 
@@ -50,7 +50,7 @@ Started July 4, 2026, after a run of simple questions ("does the ticker show the
 | Game Day, 1+ roster-relevant live games | One row per game: `AWAY score – HOME score`, `Qn clock` underneath a "LIVE NOW" label | Live Now card JSX | Built |
 | Free plan | Score row blurred + "Unlock live scores with Pro" caption | `scoresGated` | Built |
 | Persistent "Mission Control" header badge | Shows whenever `rostiroState === 'game_day'`; flickers in via `.value-tick` only the first time that day | `isMissionControl`, `kickoffSweeping` | Built |
-| **Which of your players are in that game, which leagues** | **Not shown** on the ambient card itself | Live Now card JSX has no player/league fields | **Gap — see Known Gaps #1** |
+| Which of your players are in that game, which leagues | A line under the score/clock: "Hurts, Barkley (2 leagues)" — never blurred | Live Now card JSX, `playerSummary()` | **Built 2026-07-04 (Gap #1 fix)** |
 
 ## Surface: Pulse — event-driven trigger cards (`lib/engagementTriggers.ts`)
 
@@ -69,12 +69,10 @@ These are real `pulse_items` rows, not ambient state — they only exist because
 
 ## Known Gaps (surfaced via product questions — log the date, keep this growing)
 
-### Gap #1 — Ambient displays don't carry player/league attribution (2026-07-04)
-System Bar's live badge, the ticker's live segments, and Pulse's "Live Now" card all show a bare team score. Only the event-driven `touchdown_swing` card names players and leagues, and only at the instant of a scoring play. Someone glancing at the System Bar mid-game with no new score change has no way to see *why* a game is marked relevant to them.
+### Gap #1 — Ambient displays don't carry player/league attribution (2026-07-04, fixed same day)
+System Bar's live badge and Pulse's "Live Now" card used to show a bare team score. Only the event-driven `touchdown_swing` card named players and leagues, and only at the instant of a scoring play — someone glancing at the System Bar mid-game with no new score change had no way to see *why* a game was marked relevant to them.
 
-**Recommendation: fix this.** The data already exists — `/api/system/status` already computes `rosterRelevant: boolean` per game; it would just need to also carry *which* players/leagues made it relevant, not collapse that down to a boolean. Cheap relative to its clarity payoff. Proposed shape: add `relevantPlayers: { name: string; leagueNames: string[] }[]` to `LiveGameScore`, surfaced as a small subtext line — e.g. `PHI 24 – NYG 17 · Q3 · Hurts, Barkley (2 leagues)` — on the System Bar badge and Pulse Live Now card. **Ticker excluded on purpose:** it's a public, unfiltered crawl by design (matches its existing ADP-movers character), so per-viewer personalization there would be a bigger, different change — the ticker doesn't currently know or care who's watching it beyond the blur gate.
-
-Status: not yet built, pending a go/no-go.
+**Fixed:** `LiveGameScore.relevantPlayers` (`{ name, leagueNames }[]`) is now computed in `/api/system/status` from data that was already being fetched (rosters, `players_cache`), so no new queries — just carrying player identity through instead of collapsing it to a boolean. Surfaced as `Hurts, Barkley (2 leagues)` under/next to the score on both the System Bar badge and Pulse's Live Now card. Deliberately **never blurred**, even on free plan — it's "why this game is yours," not the score value itself, so 9's depth-gating doesn't apply to it. **Ticker excluded on purpose, still:** it's a public, unfiltered crawl by design (matches its ADP-movers character) — personalizing it would be a bigger, different change, since it doesn't otherwise know or care who's watching beyond the blur gate.
 
 ### Gap #2 — No live fantasy matchup scoring anywhere (2026-07-04)
 Every live-score surface in the product shows real **NFL** game scores. Nothing computes or shows **fantasy** point totals — your team's live score, your opponent's live score, or who's winning your actual head-to-head matchup. This is the natural thing a user pictures when they hear "Game Day mode," and it doesn't exist. See **T-101** below — this is a real roadmap commitment now, not a deferred nice-to-have.
