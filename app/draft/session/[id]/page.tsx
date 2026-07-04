@@ -170,6 +170,19 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
   }, [draftedIds])
 
   // Pre-fetch recommendations once we're within range of the manager's turn.
+  //
+  // Found via a real live draft (July 4, 2026): picking 1st overall meant
+  // picksLeft was already 0 on the very first render, before the player
+  // pool (fetched async in a separate effect) had finished loading. This
+  // effect's guard reads bestAvailable.length, but its dependency array
+  // only listed [picksLeft, currentPickNumber] — neither of which change
+  // again once you're sitting at pick 1 with nobody else having picked
+  // yet, so the one invocation that bailed on an empty pool never got a
+  // second chance. Anyone picking later never hit this: by the time
+  // picksLeft naturally counted down to the threshold, other teams' picks
+  // had already given the pool plenty of time to load. Fixed by making
+  // bestAvailable itself a dependency, so pool finishing load re-triggers
+  // this even when picksLeft/currentPickNumber were already sitting still.
   useEffect(() => {
     if (picksLeft === null || picksLeft > PREFETCH_THRESHOLD || bestAvailable.length === 0) return
     const targetPick = currentPickNumber + picksLeft
@@ -204,7 +217,7 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
         // Silent — the deterministic best-available board still works without Claude's reasoning
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [picksLeft, currentPickNumber])
+  }, [picksLeft, currentPickNumber, bestAvailable])
 
   function toggleQueue(playerId: string) {
     const next = queue.includes(playerId) ? queue.filter((id) => id !== playerId) : [...queue, playerId]
