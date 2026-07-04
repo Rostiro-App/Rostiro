@@ -7,7 +7,7 @@
 // the picks route).
 
 import { createSSRClient, createAdminClient } from '@/lib/supabase'
-import { getSleeperDraft, getSleeperLeague, getSleeperRosters, getSleeperUser } from '@/lib/sleeper'
+import { getSleeperDraft, getSleeperDrafts, getSleeperLeague, getSleeperRosters, getSleeperUser } from '@/lib/sleeper'
 import {
   getValidYahooAccessToken,
   getYahooCurrentGameKey,
@@ -23,11 +23,26 @@ import type { DraftSettings, DraftStrategy, ScoringSettings } from '@/types'
 
 const StrategyField = z.enum(['balanced', 'zero_rb', 'hero_rb', 'hero_wr']).default('balanced')
 
-const Body = z.discriminatedUnion('platform', [
+// Not z.discriminatedUnion: Zod throws "Duplicate discriminator value" at
+// parse time if two branches share a discriminant value (verified directly
+// against the real Zod version in this project before relying on it) —
+// and two Sleeper join paths (manual draftId+username vs. an already-
+// connected league) both need platform: 'sleeper'. A plain z.union tries
+// each branch in order instead, which is exactly what's needed here.
+const Body = z.union([
   z.object({
     platform: z.literal('sleeper'),
     draftId: z.string().min(1),
     username: z.string().min(1),
+    strategy: StrategyField,
+  }),
+  // Found via a real live draft (July 4, 2026): a user who's already
+  // connected a Sleeper league to Rostiro shouldn't have to re-type a
+  // draft ID and username Rostiro already knows — both are resolvable
+  // directly from the connected league. Zero manual entry.
+  z.object({
+    platform: z.literal('sleeper'),
+    connectedLeagueId: z.string().min(1),
     strategy: StrategyField,
   }),
   z.object({
@@ -45,10 +60,96 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
+  if (parsed.data.platform === 'sleeper' && 'connectedLeagueId' in parsed.data) {
+    return joinSleeperDraftFromConnectedLeague(parsed.data)
+  }
   if (parsed.data.platform === 'sleeper') {
     return joinSleeperDraft(parsed.data)
   }
   return joinYahooDraft(parsed.data)
+}
+
+async function joinSleeperDraftFromConnectedLeague(data: { connectedLeagueId: string; strategy: DraftStrategy }) {
+  const supabase = await createSSRClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ error: 'sign_in_required' }, { status: 401 })
+  }
+
+  // RLS-scoped select — this can only ever return a league belonging to
+  // the authenticated caller, never someone else's.
+  const { data: connectedLeague, error: leagueError } = await supabase
+    .from('connected_leagues')
+    .select('league_id, team_id')
+    .eq('id', data.connectedLeagueId)
+    .eq('platform', 'sleeper')
+    .maybeSingle()
+
+  if (leagueError || !connectedLeague) {
+    return NextResponse.json({ error: 'Connected league not found' }, { status: 404 })
+  }
+  if (!connectedLeague.team_id) {
+    return NextResponse.json({ error: 'This league has no roster assigned yet' }, { status: 404 })
+  }
+
+  try {
+    const draftList = await getSleeperDrafts(connectedLeague.league_id)
+    // Prefer a draft actually in progress, then one not yet started, then
+    // whatever's most recent — a league can carry multiple drafts across
+    // seasons/re-drafts.
+    const draftSummary =
+      draftList.find((d) => d.status === 'drafting') ??
+      draftList.find((d) => d.status === 'pre_draft') ??
+      draftList[0]
+    if (!draftSummary) {
+      return NextResponse.json({ error: 'No draft found for this league' }, { status: 404 })
+    }
+
+    // Verified live (July 4, 2026): Sleeper's list endpoint
+    // (/league/{id}/drafts) never includes slot_to_roster_id, only the
+    // single-draft endpoint does — a real API inconsistency, not a
+    // pre-draft-vs-started difference. The list is only good for picking
+    // which draft_id is relevant; this second call gets the full object.
+    const draft = await getSleeperDraft(draftSummary.draft_id)
+
+    const [league, rosters] = await Promise.all([
+      getSleeperLeague(connectedLeague.league_id),
+      getSleeperRosters(connectedLeague.league_id),
+    ])
+
+    const myRoster = rosters.find((r) => String(r.roster_id) === connectedLeague.team_id)
+    if (!myRoster) {
+      return NextResponse.json({ error: 'Could not find your roster in this league' }, { status: 404 })
+    }
+
+    const mySlot = Object.entries(draft.slot_to_roster_id).find(
+      ([, rosterId]) => rosterId === myRoster.roster_id
+    )?.[0]
+    if (!mySlot) {
+      return NextResponse.json({ error: 'Could not resolve draft position for this roster' }, { status: 500 })
+    }
+
+    const normalized = normalizeSleeperLeague(league, myRoster.roster_id)
+
+    const settings: DraftSettings = {
+      platform: 'sleeper',
+      leagueId: draft.league_id,
+      draftId: draft.draft_id,
+      teamCount: draft.settings.teams,
+      myDraftPosition: Number(mySlot),
+      myRosterId: String(myRoster.roster_id),
+      totalRounds: draft.settings.rounds,
+      scoringSettings: normalized.scoringSettings,
+      rosterSlots: normalized.rosterSlots,
+      isSnakeDraft: draft.type === 'snake',
+      strategy: data.strategy,
+    }
+
+    return insertSession({ userId: user.id, platform: 'sleeper', draftId: draft.draft_id, settings })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
 }
 
 async function joinSleeperDraft(data: { draftId: string; username: string; strategy: DraftStrategy }) {

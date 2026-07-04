@@ -146,11 +146,18 @@ async function buildLeagueItems(
       headline: `${league.league_name} drafts ${when}`,
       reasoning:
         untilStart < DRAFT_CRITICAL_WINDOW_MS
-          ? 'Your draft starts in under 48 hours. Lock in your rankings and strategy in the Draft Kit now.'
+          ? 'Your draft starts in under 48 hours. Join Rostiro\'s Draft Copilot to track it live — always-current best available, a heads-up before your turn, an alert the moment a run starts.'
           : 'Your draft is on the calendar. Set your rankings and strategy in the Draft Kit before draft day.',
       affectedLeagues: [affectedLeague],
       deadline: startDate.toISOString(),
-      actionUrl: `https://sleeper.com/draft/nfl/${draft.draft_id}`,
+      // Found via a real live draft (July 4, 2026): this used to point
+      // straight to Sleeper's own site, bouncing the user away from the
+      // one surface built specifically to track a live draft. This item
+      // only ever exists for an already-connected league (this whole loop
+      // iterates connected_leagues), so /draft/join's one-click "join from
+      // a connected league" list picks it up with zero further input —
+      // no query params needed, unlike a cold link from outside the app.
+      actionUrl: '/draft/join',
     })
   }
 

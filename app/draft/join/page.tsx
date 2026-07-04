@@ -3,28 +3,70 @@
 // T-64.1/T-64.2: entry point for Draft Copilot — join a live/mock draft
 // (Sleeper or Yahoo), land on the live companion view.
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import type { DraftStrategy, Platform } from '@/types'
 import { STRATEGY_LABELS, STRATEGY_DESCRIPTIONS } from '@/lib/draftBoard'
 
 type SupportedPlatform = Extract<Platform, 'sleeper' | 'yahoo'>
 const STRATEGIES: DraftStrategy[] = ['balanced', 'zero_rb', 'hero_rb', 'hero_wr']
 
+interface ConnectedLeagueOption {
+  id: string
+  platform: string
+  league_name: string
+}
+
+// Found via a real live draft (July 4, 2026), two real gaps in a row:
+// 1. Pulse's own draft deadline reminder linked straight to Sleeper's
+//    site instead of into Rostiro's Draft Copilot — the one surface built
+//    specifically to track a live draft. Fixed by having that reminder
+//    deep-link here with the draft ID pre-filled (lib/pulse.ts).
+// 2. Founder's live reaction to the pre-fill: "why should I have to
+//    re-enter that information if I already connected sleeper as a
+//    league" — a fair question. A user's connected league already has
+//    everything needed (league_id -> draft, team_id -> roster) to resolve
+//    both the draft and their identity in it server-side, with zero
+//    typing. That's the section below the platform toggle; the manual
+//    form stays only for mock drafts and leagues not yet connected.
 export default function JoinDraftPage() {
   const router = useRouter()
-  const [platform, setPlatform] = useState<SupportedPlatform>('sleeper')
+  const searchParams = useSearchParams()
+  const prefillPlatform = searchParams.get('platform')
+  const [platform, setPlatform] = useState<SupportedPlatform>(
+    prefillPlatform === 'yahoo' ? 'yahoo' : 'sleeper'
+  )
   const [strategy, setStrategy] = useState<DraftStrategy>('balanced')
 
-  const [draftId, setDraftId] = useState('')
+  const [draftId, setDraftId] = useState(searchParams.get('draftId') ?? '')
   const [username, setUsername] = useState('')
-  const [yahooLeagueId, setYahooLeagueId] = useState('')
+  const [yahooLeagueId, setYahooLeagueId] = useState(searchParams.get('yahooLeagueId') ?? '')
   const [manualSlot, setManualSlot] = useState('')
   const [needsManualSlot, setNeedsManualSlot] = useState(false)
+
+  const [connectedLeagues, setConnectedLeagues] = useState<ConnectedLeagueOption[]>([])
+  const [joiningLeagueId, setJoiningLeagueId] = useState<string | null>(null)
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [errorLink, setErrorLink] = useState<{ href: string; label: string } | null>(null)
+
+  // Best-effort — an anonymous Draft Kit visitor (401) just sees the
+  // manual form only, same as before this existed.
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/settings')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { leagues?: ConnectedLeagueOption[] } | null) => {
+        if (!cancelled && data?.leagues) {
+          setConnectedLeagues(data.leagues.filter((l) => l.platform === 'sleeper'))
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   async function submitJoin(body: Record<string, unknown>) {
     setLoading(true)
@@ -75,6 +117,11 @@ export default function JoinDraftPage() {
       body.manualDraftPosition = Number(manualSlot.trim())
     }
     submitJoin(body)
+  }
+
+  function joinFromConnectedLeague(leagueId: string) {
+    setJoiningLeagueId(leagueId)
+    submitJoin({ platform: 'sleeper', connectedLeagueId: leagueId, strategy })
   }
 
   return (
@@ -140,6 +187,38 @@ export default function JoinDraftPage() {
           You can change this mid-draft as things develop.
         </p>
       </div>
+
+      {platform === 'sleeper' && connectedLeagues.length > 0 && (
+        <div className="mb-4">
+          <p className="text-xs font-medium mb-1.5 text-center" style={{ color: 'var(--t2)' }}>
+            Join from a connected league
+          </p>
+          <div className="space-y-1.5">
+            {connectedLeagues.map((league) => (
+              <button
+                key={league.id}
+                type="button"
+                onClick={() => joinFromConnectedLeague(league.id)}
+                disabled={loading}
+                className="w-full flex items-center justify-between text-left px-4 py-3 rounded-xl transition-all hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ backgroundColor: 'var(--signal-dim)', border: '1px solid rgba(75,163,245,.4)' }}
+              >
+                <span className="text-sm font-semibold text-white">{league.league_name}</span>
+                <span className="text-xs font-semibold" style={{ color: 'var(--signal)' }}>
+                  {loading && joiningLeagueId === league.id ? 'Joining...' : 'Join draft →'}
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 mt-4">
+            <div className="h-px flex-1" style={{ backgroundColor: 'var(--hairline)' }} />
+            <span className="mono-data text-[9px] tracking-[0.12em]" style={{ color: 'var(--t3)' }}>
+              OR ENTER MANUALLY
+            </span>
+            <div className="h-px flex-1" style={{ backgroundColor: 'var(--hairline)' }} />
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="rounded-xl p-5 space-y-4" style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', border: '1px solid var(--hairline)' }}>
         {platform === 'sleeper' ? (
