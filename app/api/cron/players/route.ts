@@ -65,7 +65,27 @@ export async function GET(request: NextRequest) {
       if (!snapError) snapshotted = snapshotRows.length
     }
 
-    return NextResponse.json({ synced, snapshotted, source: 'sleeper' })
+    // T-73: daily injury snapshot — every player carrying a tag today.
+    // Powers "designation changed" news in-season. Best-effort like ADP:
+    // a missing table (migration_experience.sql not run) never fails the
+    // player sync.
+    const injuryRows = rows
+      .filter((r) => r.injury_status !== null && r.injury_status !== '')
+      .map((r) => ({
+        snapshot_date: today,
+        player_id: r.player_id,
+        platform: 'sleeper' as const,
+        injury_status: r.injury_status as string,
+      }))
+    let injuriesSnapshotted = 0
+    if (injuryRows.length > 0) {
+      const { error: injError } = await admin
+        .from('injury_snapshots')
+        .upsert(injuryRows, { onConflict: 'snapshot_date,player_id,platform' })
+      if (!injError) injuriesSnapshotted = injuryRows.length
+    }
+
+    return NextResponse.json({ synced, snapshotted, injuriesSnapshotted, source: 'sleeper' })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })

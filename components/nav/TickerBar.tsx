@@ -12,6 +12,7 @@
 // endpoint keeps the same response shape so this component won't change.
 
 import { useEffect, useState } from 'react'
+import type { LiveGameScore, RostiroState } from '@/types'
 
 interface Mover {
   name: string
@@ -31,6 +32,9 @@ interface MoversResponse {
 }
 
 const REFRESH_MS = 10 * 60_000
+// T-90: faster than the ADP refresh — during Game Day, scores actually move
+// on this cadence. Matches SystemBar's poll interval for the same endpoint.
+const GAME_DAY_REFRESH_MS = 60_000
 
 function tickerName(name: string): string {
   const parts = name.split(' ')
@@ -38,8 +42,16 @@ function tickerName(name: string): string {
   return `${parts[0][0]}.${parts.slice(1).join(' ')}`.toUpperCase()
 }
 
+function gameLabel(g: LiveGameScore): string {
+  const clock = g.statusState === 'post' ? 'FINAL' : `Q${g.period} ${g.displayClock}`
+  return `${g.awayTeam} ${g.awayScore} — ${g.homeTeam} ${g.homeScore} · ${clock}`
+}
+
 export default function TickerBar() {
   const [data, setData] = useState<MoversResponse | null>(null)
+  const [rostiroState, setRostiroState] = useState<RostiroState | null>(null)
+  const [liveScores, setLiveScores] = useState<LiveGameScore[]>([])
+  const [scoresGated, setScoresGated] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -61,8 +73,60 @@ export default function TickerBar() {
     }
   }, [])
 
+  // T-90: same endpoint SystemBar polls — this is the ticker's own
+  // independent fetch, matching the "each consumer polls on its own" pattern
+  // already used by Pulse (see its comment on /api/system/status).
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        const res = await fetch('/api/system/status')
+        if (!res.ok) return
+        const body: { rostiroState: RostiroState; liveScores: LiveGameScore[]; scoresGated: boolean } = await res.json()
+        if (cancelled) return
+        setRostiroState(body.rostiroState)
+        setLiveScores(body.liveScores ?? [])
+        setScoresGated(body.scoresGated ?? false)
+      } catch {
+        // Same degrade-quietly posture — a failed poll just leaves the
+        // ticker on whatever it last knew (ADP content or stale scores).
+      }
+    }
+    load()
+    const t = setInterval(load, GAME_DAY_REFRESH_MS)
+    return () => {
+      cancelled = true
+      clearInterval(t)
+    }
+  }, [])
+
+  // Games that have actually kicked off — a scheduled-but-not-started game
+  // shows nothing here rather than a fake "0-0" (same rule as SystemBar's
+  // live badge). Unfiltered by roster relevance: the ticker crawls every
+  // live game today, same public-market character as its ADP content.
+  const liveGames = liveScores.filter((g) => g.statusState !== 'pre')
+  const gameDayActive = rostiroState === 'game_day' && liveGames.length > 0
+
   const segments: React.ReactNode[] = []
-  if (data) {
+  if (gameDayActive) {
+    liveGames.forEach((g) => {
+      segments.push(
+        <span
+          key={g.gameId}
+          style={{ color: 'var(--t1)', filter: scoresGated ? 'blur(4px)' : 'none' }}
+        >
+          {gameLabel(g)}
+        </span>
+      )
+    })
+    if (scoresGated) {
+      segments.push(
+        <span key="gated-tail" style={{ color: 'var(--signal)' }}>
+          UNLOCK LIVE SCORES WITH PRO
+        </span>
+      )
+    }
+  } else if (data) {
     if (data.movers.length > 0) {
       data.movers.forEach((m, i) => {
         segments.push(

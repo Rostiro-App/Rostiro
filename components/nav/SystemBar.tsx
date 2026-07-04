@@ -9,7 +9,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { type Mode, ModeButton, ModeSwitcher } from './AppShell'
-import type { LeagueHealthStatus, SystemStatus } from '@/types'
+import PulseMark from '@/components/PulseMark'
+import type { LeagueHealthStatus, LiveGameScore, SystemStatus } from '@/types'
 
 const POLL_INTERVAL_MS = 60_000
 
@@ -91,20 +92,32 @@ export default function SystemBar({
         className="glass-bar mono-data flex items-center gap-3 md:gap-5 px-3 md:px-4 flex-shrink-0 relative z-20"
         style={{ borderBottom: '1px solid var(--hairline)', height: '42px', fontSize: '11px' }}
       >
+        {/* Pulse mark — the one element that visibly reflects the active
+            Rostiro State (PRD 6.10 / brand kit §2-5). Defaults to Standard's
+            resting color until the first status poll resolves. */}
+        <span className="flex md:hidden items-center gap-1 flex-shrink-0">
+          <span className="font-medium text-[13px]" style={{ color: 'var(--t1)' }}>R</span>
+          <PulseMark state={status?.rostiroState ?? 'standard'} />
+        </span>
+
         {/* Wordmark — desktop only (mobile keeps every pixel for state) */}
-        <span className="hidden md:flex items-baseline gap-1.5 flex-shrink-0">
-          <span className="font-bold tracking-[0.18em] text-[11.5px]" style={{ color: 'var(--t1)' }}>
-            ROSTIRO
-          </span>
-          <span
-            className="text-[8.5px] font-bold tracking-[0.14em] px-1 rounded"
-            style={{
-              color: 'var(--signal)',
-              border: '1px solid rgba(75,163,245,0.45)',
-              textShadow: '0 0 12px rgba(75,163,245,0.65)',
-            }}
-          >
-            OS
+        <span className="hidden md:flex items-center gap-2.5 flex-shrink-0">
+          <PulseMark state={status?.rostiroState ?? 'standard'} />
+          <span aria-hidden="true" style={{ width: 1, height: 14, backgroundColor: 'var(--hairline)' }} />
+          <span className="flex items-baseline gap-1.5">
+            <span className="font-bold tracking-[0.18em] text-[11.5px]" style={{ color: 'var(--t1)' }}>
+              ROSTIRO
+            </span>
+            <span
+              className="text-[8.5px] font-bold tracking-[0.14em] px-1 rounded"
+              style={{
+                color: 'var(--signal)',
+                border: '1px solid rgba(75,163,245,0.45)',
+                textShadow: '0 0 12px rgba(75,163,245,0.65)',
+              }}
+            >
+              OS
+            </span>
           </span>
         </span>
 
@@ -152,6 +165,15 @@ export default function SystemBar({
               </span>
             ))}
           </span>
+        )}
+
+        {/* T-90: live scores — Game Day only, and only for games where a
+            rostered player is on either team (6.1 cross-league relevance).
+            Games that haven't kicked off yet stay silent here rather than
+            showing a fake "0-0" — that's the pregame ramp's (T-97) job, not
+            this badge's. */}
+        {status?.rostiroState === 'game_day' && (
+          <LiveScoreBadge games={status.liveScores} gated={status.scoresGated} />
         )}
 
         <span className="flex-1" />
@@ -210,6 +232,51 @@ export default function SystemBar({
       )}
     </>
   )
+}
+
+function LiveScoreBadge({ games, gated }: { games: LiveGameScore[]; gated: boolean }) {
+  const live = games.filter((g) => g.rosterRelevant && g.statusState !== 'pre')
+  if (live.length === 0) return null
+
+  const label = live.length === 1 ? gameLabel(live[0]) : `${live.length} LIVE`
+
+  return (
+    <span className="hidden sm:flex items-center gap-1.5 flex-shrink-0 relative group">
+      <span
+        className="breathe w-[5px] h-[5px] rounded-full flex-shrink-0"
+        style={{ backgroundColor: 'var(--live)', boxShadow: '0 0 6px var(--live)' }}
+      />
+      <span
+        className="value-tick"
+        style={{ color: 'var(--t1)', filter: gated ? 'blur(4px)' : 'none', userSelect: gated ? 'none' : 'auto' }}
+      >
+        {label}
+      </span>
+      {gated && (
+        <span
+          className="text-[8.5px] font-bold tracking-[0.12em] px-1 rounded flex-shrink-0"
+          style={{ color: 'var(--signal)', border: '1px solid rgba(75,163,245,0.45)' }}
+        >
+          PRO
+        </span>
+      )}
+      {live.length > 1 && (
+        <span
+          className="glass-heavy hidden group-hover:flex flex-col gap-1 absolute top-5 left-0 whitespace-nowrap text-[10.5px] px-2.5 py-1.5 rounded-lg z-50"
+          style={{ color: 'var(--t1)', filter: gated ? 'blur(4px)' : 'none' }}
+        >
+          {live.map((g) => (
+            <span key={g.gameId}>{gameLabel(g)}</span>
+          ))}
+        </span>
+      )}
+    </span>
+  )
+}
+
+function gameLabel(g: LiveGameScore): string {
+  const clock = g.statusState === 'post' ? 'FINAL' : `Q${g.period} ${g.displayClock}`
+  return `${g.awayTeam} ${g.awayScore} – ${g.homeTeam} ${g.homeScore} · ${clock}`
 }
 
 function formatSyncAge(ms: number): string {

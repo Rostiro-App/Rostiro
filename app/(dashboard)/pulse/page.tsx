@@ -10,7 +10,8 @@
 
 import { useEffect, useState } from 'react'
 import { useMode, type Mode } from '@/components/nav/AppShell'
-import type { PulseItem, PulseItemType, PulsePriority } from '@/types'
+import { STATE_CONFIG } from '@/lib/brandTokens'
+import type { LiveGameScore, PulseItem, PulseItemType, PulsePriority, RostiroState } from '@/types'
 
 // ─── Priority + type config ────────────────────────────────────────────────────
 
@@ -61,6 +62,31 @@ export default function PulsePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [detail, setDetail] = useState<PulseItem | null>(null)
+  const [rostiroState, setRostiroState] = useState<RostiroState>('standard')
+  const [liveScores, setLiveScores] = useState<LiveGameScore[]>([])
+  const [scoresGated, setScoresGated] = useState(false)
+
+  // T-94/T-90: Waiver Day Mission Briefing framing + Game Day live scores
+  // (PRD 6.10/6.13). One-shot fetch — this page doesn't need the 60s
+  // freshness SystemBar polls /api/system/status for, just the state at
+  // load. Duplicates that poll for now; folding both into one shared
+  // context is the natural follow-up once a second consumer like this
+  // exists.
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/system/status')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { rostiroState?: RostiroState; liveScores?: LiveGameScore[]; scoresGated?: boolean } | null) => {
+        if (cancelled || !data) return
+        if (data.rostiroState) setRostiroState(data.rostiroState)
+        setLiveScores(data.liveScores ?? [])
+        setScoresGated(data.scoresGated ?? false)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -132,11 +158,42 @@ export default function PulsePage() {
 
   const totalToday = items.length + doneToday
 
+  // Waiver Day State (PRD 6.10): priority waiver targets lead the queue,
+  // ahead of same-priority-tier items — a stable reorder, not a re-sort,
+  // so nothing else in the ordering shifts.
+  const displayItems = rostiroState === 'waiver_day'
+    ? [...items].sort((a, b) => Number(b.type === 'waiver_alert') - Number(a.type === 'waiver_alert'))
+    : items
+  const waiverCount = items.filter((i) => i.type === 'waiver_alert').length
+  const isMissionBriefing = rostiroState === 'waiver_day' && waiverCount > 0
+
+  // T-90: games actually in progress or finished, involving a rostered
+  // player — a not-yet-kicked-off game stays silent here (never a fake
+  // "0-0"); that's the pregame ramp's (T-97) territory, not this card's.
+  const liveGames = rostiroState === 'game_day'
+    ? liveScores.filter((g) => g.rosterRelevant && g.statusState !== 'pre')
+    : []
+
   return (
     <div className="max-w-2xl mx-auto px-4 pt-6 pb-8 md:px-6 md:pt-8">
 
-      {/* Morning header — the day framed as a finite work queue */}
+      {/* Morning header — the day framed as a finite work queue.
+          Waiver Day State (6.10/6.13): reframes to "Mission Briefing" —
+          opportunity-green tag, waiver-target count leads the subtext —
+          only when there's actually a waiver item to brief on. */}
       <div className="mb-6">
+        {isMissionBriefing && (
+          <span
+            className="mono-data inline-block text-[9.5px] tracking-[0.16em] px-2 py-0.5 rounded-full mb-2"
+            style={{
+              color: STATE_CONFIG.waiver_day.color,
+              border: `1px solid ${STATE_CONFIG.waiver_day.color}`,
+              backgroundColor: 'color-mix(in srgb, currentColor 12%, transparent)',
+            }}
+          >
+            MISSION BRIEFING
+          </span>
+        )}
         <h1 className="text-[22px] font-semibold tracking-tight" style={{ color: 'var(--t1)' }}>
           {greeting()}{firstName ? `, ${firstName}` : ''}.
         </h1>
@@ -145,17 +202,26 @@ export default function PulsePage() {
             ? 'No leagues connected yet'
             : items.length === 0
               ? `All clear across ${leagueCount} ${leagueCount === 1 ? 'league' : 'leagues'}`
-              : (
-                <>
-                  <b style={{ color: 'var(--t1)', fontWeight: 600 }}>
-                    {items.length} {items.length === 1 ? 'decision' : 'decisions'}
-                  </b>
-                  {` across ${leagueCount} ${leagueCount === 1 ? 'league' : 'leagues'}`}
-                  {estMinutes > 0 && (
-                    <> · Est. <b style={{ color: 'var(--t1)', fontWeight: 600 }}>{estMinutes} min</b></>
-                  )}
-                </>
-              )}
+              : isMissionBriefing
+                ? (
+                  <>
+                    <b style={{ color: STATE_CONFIG.waiver_day.color, fontWeight: 600 }}>
+                      {waiverCount} priority waiver {waiverCount === 1 ? 'target' : 'targets'}
+                    </b>
+                    {` across ${leagueCount} ${leagueCount === 1 ? 'league' : 'leagues'}`}
+                  </>
+                )
+                : (
+                  <>
+                    <b style={{ color: 'var(--t1)', fontWeight: 600 }}>
+                      {items.length} {items.length === 1 ? 'decision' : 'decisions'}
+                    </b>
+                    {` across ${leagueCount} ${leagueCount === 1 ? 'league' : 'leagues'}`}
+                    {estMinutes > 0 && (
+                      <> · Est. <b style={{ color: 'var(--t1)', fontWeight: 600 }}>{estMinutes} min</b></>
+                    )}
+                  </>
+                )}
         </p>
 
         {persistent && totalToday > 0 && (
@@ -178,6 +244,44 @@ export default function PulsePage() {
         )}
       </div>
 
+      {/* T-90: Live Now — Game Day's live-score presence in Pulse (PRD 6.10/
+          6.13). Roster-relevant only, matching Pulse's existing North Star
+          rule; scores blur for free plan per 9's "unblurred live scores" as
+          a Pro depth-gate. */}
+      {liveGames.length > 0 && (
+        <div
+          className="glass rounded-xl px-4 py-3 mb-4"
+          style={{ borderLeft: `2.5px solid ${STATE_CONFIG.game_day.color}`, boxShadow: `0 0 10px ${STATE_CONFIG.game_day.color}33` }}
+        >
+          <span
+            className="mono-data text-[9.5px] tracking-[0.16em]"
+            style={{ color: STATE_CONFIG.game_day.color }}
+          >
+            LIVE NOW
+          </span>
+          <div className="mt-1.5 space-y-1">
+            {liveGames.map((g) => (
+              <div key={g.gameId} className="flex items-center gap-2">
+                <span
+                  className="mono-data text-[12px]"
+                  style={{ color: 'var(--t1)', filter: scoresGated ? 'blur(4px)' : 'none', userSelect: scoresGated ? 'none' : 'auto' }}
+                >
+                  {g.awayTeam} {g.awayScore} – {g.homeTeam} {g.homeScore}
+                </span>
+                <span className="mono-data text-[10px]" style={{ color: 'var(--t3)' }}>
+                  {g.statusState === 'post' ? 'FINAL' : `Q${g.period} ${g.displayClock}`}
+                </span>
+              </div>
+            ))}
+          </div>
+          {scoresGated && (
+            <p className="mono-data text-[10px] mt-2" style={{ color: 'var(--signal)' }}>
+              Unlock live scores with Pro
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Mode label — only show in Focused so user knows what they're seeing */}
       {mode === 'focused' && items.length > 0 && (
         <div className="mb-4 flex items-center gap-2">
@@ -198,7 +302,7 @@ export default function PulsePage() {
       )}
       {!loading && items.length > 0 && (
         <div className={mode === 'balanced' ? 'space-y-3' : 'space-y-2'}>
-          {items.map((item) => (
+          {displayItems.map((item) => (
             <PulseCard
               key={item.id}
               item={item}

@@ -1,9 +1,35 @@
-# ROSTIRO — Product Requirements Document v5.2
+# ROSTIRO — Product Requirements Document v5.5
 **Run Every League.**
 The operating system for fantasy sports.
 rostiro.com | July 2026 | Pass directly to Claude Code
 
 ---
+
+## Changelog from v5.4 → v5.5
+
+| Change | Rationale |
+|---|---|
+| Emotional Experience deepened into a real priority model (7, 7.1, 7.2 — new) | Closes the gap between Section 7's emotion labels and actual build behavior. Adds: a widened Game Day pregame ramp instead of an on/off switch at kickoff; Waiver Day session-mode (resumable, real FAAB/roster-health math, not just reordering); a P0–P3 priority + Ambient/Glance/Interrupt/Action hierarchy for every alert in the product; and a formal Pulse-vs-Game-Day interaction-model split (action queue vs. glanceable ambient), so Game Day's two intensities (single game vs. concurrent slate) are a behavior mode within the existing State, not a new top-level State. |
+| Externally validated (7 preamble) | An independently commissioned research pass ("Rostiro Emotional Calendar Report," July 4 2026 — platform product-language survey, fantasy-forum discourse, attention/notification research) converged on the same architecture already committed here without having seen it: a stateful calendar-aware OS, Pulse/Console as two interaction models rather than one, and a portfolio-relevance filter for what deserves interruption. Cited where it sharpens rather than repeats what's already here. |
+| Game Day Engagement System (6.12) gets a 7th trigger: Opportunity Surge | The positive mirror to the injury-panic trigger — a rostered bench/stash player's usage or projection spiking week-over-week (reuses the existing nflverse usage cache, T-87 — no new data source). Independently corroborated by the external research's "Breakout surprise / FOMO" event, named without prompting. |
+| Handpicked event taxonomy, not the full research list | The research names ~19 distinct emotional events across a season. Building all of them now is the overengineering risk already flagged this session — 7.1 names which ones actually earn a place in MVP and why, deferring the rest explicitly rather than silently. |
+| Tasks T-97–T-100 added (14) | Pregame ramp, Waiver Day session-mode, Opportunity Surge trigger, and Console/Pulse engagement telemetry. |
+
+## Changelog from v5.3 → v5.4
+
+| Change | Rationale |
+|---|---|
+| Seasonal & Intensity Variation added (6.14 — new) | Closes the gap between 6.12/6.13's Game Day triggers (specified once, in the abstract) and how the season actually feels week to week: concurrent-game intensity tiers (Thu/Mon full-detail vs. Sunday multi-game terse-and-rate-limited vs. bye-week quiet framing), trade-deadline-week amplification, and playoffs/championship amplification tied directly to the existing 6.10 theming layer instead of left generic. No new architecture — all read from data 10.2/6.10 already computes. |
+| New task T-96 added (14) | Seasonal/intensity variation copy and threshold work, layered onto T-93 (engagement triggers) once that ships. |
+
+## Changelog from v5.2 → v5.3
+
+| Change | Rationale |
+|---|---|
+| Game Day live-score backend built and verified (10.2, T-81) | `live_scores` table + `lib/liveScores.ts` + a per-minute cron (`app/api/cron/live-scores`) with a cheap early-exit — only calls ESPN's scoreboard when a game is actually inside its live window right now, everything else is one lightweight `nfl_schedule` check. Matched all 16 real Week 1 2026 games correctly against ESPN's live scoreboard, including catching and correctly normalizing the two team-code mismatches between nflverse and ESPN (Rams: `LA`→`LAR`, Washington: `WAS`→`WSH`) that would have silently broken the join if unchecked. This is the hard, novel part of 10.2's architecture — backend only, no UI yet (see below). |
+| Game Day Engagement System added (6.12 — new) | Scopes the retention/dopamine layer explicitly requested this session: touchdown/lead-change/trade-offer/injury/lineup-lock notification triggers, rate-limiting and mode-tied density so it never reads as spam, and the pulsing/glow visual language — all built on the fan-out pattern already specified in 10.3, not a new subsystem. |
+| Per-State Visual & Motion Language added (6.13 — new) | Closes the "needs a design pass" flag left in 6.10 — one concrete accent/motion/ticker-voice spec per State, plus the kickoff-triggered transition animation sequence. Identifies `PulseMark.tsx` (brand kit component, not yet built) as a shared prerequisite for both the kickoff transition and the existing boot sequence (6.8/T-72). |
+| Task list updated (14) | T-81 split into backend (done) and UI/animation (not started) pieces; T-79 marked done. New tasks T-90–T-95 added for the Game Day UI surfacing, PulseMark.tsx, kickoff animation, engagement/notification triggers, and Waiver Day / Film Room State UI — all scoped today, none built yet. Yahoo remains the only open external blocker (application still in review as of July 3, 2026; no new information since v5.2). |
 
 ## Changelog from v5.1 → v5.2
 
@@ -553,12 +579,15 @@ Genuine build targets with acceptance criteria — not launch-week afterthoughts
 **Five states:**
 
 1. **Draft State.** Preseason through the user's last draft completes. Emotion: "This is my year." Prioritizes: Draft Copilot, ADP, sleepers, queue. Ticker: ADP movement, position runs (E2 pre-draft source, unchanged). Motion: opportunity, forward momentum.
+   - **v5.5 note:** this State has a dormant early phase (deep offseason, Feb–Jul — low-frequency Pulse, no urgency) that ramps into an active phase at training camp (late Jul, beat reports/depth charts — already carried by the existing preseason Pulse empty-state, 6.1) before becoming the high-action board itself. These are depth differences within Draft State, not separate States (7).
 
 2. **Standard State.** Wednesday through Saturday. Emotion: preparation, planning. Close to the dashboard already built — the resting state. Prioritizes: trade discussion, roster optimization, upcoming matchup prep.
 
 3. **Waiver Day State.** The day each user's connected leagues actually process waivers — for most leagues that's Tuesday night into Wednesday morning; Rostiro detects the specific cutoff per league rather than assuming one universal day (see Multi-League Alignment below). Emotion: "Mission Briefing" — opportunity, preparation. Prioritizes: priority waiver targets, recommended drops, projected roster-health improvement, FAAB budget context.
 
 4. **Game Day State.** Any day with a live NFL game involving a roster the user owns a player on: Thursday night (lower intensity), Sunday (full intensity — the signature moment), Monday night (lower intensity). Emotion: Mission Control — anticipation shifting to suspense as kickoff nears. Prioritizes: Pulse, live matchups, injuries, weather, lineup-lock countdowns, live scores in the ticker. Visual language: cockpit, telemetry, mission status. This is the state the product is emotionally built around — see 10.2 Game Day Architecture for how it's served without a polling storm.
+   - **v5.5 — pregame ramp (T-97).** The state now activates on a window starting a few hours before the day's earliest kickoff, not only once a game has actually started — closing the gap where the real 11:45am-Sunday "did I set my lineup" scramble (7) fell inside Standard State by the letter of the original trigger.
+   - **v5.5 — two interaction intensities within one State, not two States (7.2).** Concurrency of live games (already computable from `todaysKickoffs`) selects how the live phase behaves: one live game (Thu/Mon/SNF) runs every 6.12 trigger at full, unhurried detail; several concurrent games (Sunday windows) leans on P0–P3 tiering and cross-league de-duplication (6.14) so it stays glanceable instead of becoming a wall of cards. No new top-level State, no gating UI — see 7.2 for why that split was deliberately not built as "GameDay Console"/"Primetime Mode" as separate States.
 
 5. **Film Room State.** Monday night through Tuesday morning, before Waiver Day takes over. Emotion: "What happened?" Prioritizes: injuries, usage/snap counts, waiver trends, buy-low/sell-high signals, AI weekly recap. Visual language: review, analysis.
 
@@ -597,30 +626,154 @@ Genuine build targets with acceptance criteria — not launch-week afterthoughts
 
 **Engineering note:** reuses the existing player search plumbing (`/api/draft/players`, 6.7 W4) for lookup; the card itself is new UI, and its data dependencies (nflverse ingestion, per-league availability check) are the same 5.7 pipeline Film Room needs — building one builds the other.
 
+### 6.12 Game Day Engagement System — Momentum Triggers & Notifications (v5.3 — new)
+
+> **THE PROBLEM THIS SOLVES:** Game Day State (6.10) says the OS becomes Mission Control at kickoff — but "becomes" has to mean something a user feels, not just a repainted dashboard. This is the retention core of the product: the moments that make someone check Rostiro instead of just refreshing their platform's own app. Every trigger below exists to serve the emotional arc already defined in Section 7, and every one passes the two-question filter (7) before it ships — none of this is urgency manufactured for its own sake.
+
+**Trigger taxonomy** (v5.5: priority tier column added — see 7.1 for the full P0–P3 model this maps to):
+
+| Trigger | Priority | Fires when | Delivery | Emotion served (Section 7) |
+|---|---|---|---|---|
+| Injury during live play | P0 | A rostered player is marked questionable/out mid-game | Inline card alert, persistent until seen; OS push always (actionable — surfaces the best bench alternative) | Concern → reassurance |
+| Lineup-lock countdown | P0 | Inside the last 30 minutes before the user's own kickoff, with a questionable/unset player in the lineup | System Bar pulsing urgency accent; one OS push, never repeating | Urgency without punishment |
+| Touchdown swing | P1 | A rostered player scores, in any connected league | In-app card flash + score tick, auto-dismiss; OS push if app is backgrounded | Excitement, ownership pride |
+| Lead change | P1 | A live head-to-head matchup the user is in flips who's winning | In-app matchup-card border glow shift, auto-dismiss; OS push only for the user's own matchup | Suspense |
+| Trade offer received | P1 | Any connected league surfaces a new trade proposal | Badge bounce on Leagues nav; OS push always (time-sensitive) | Anticipation |
+| **Opportunity Surge** *(v5.5 — new)* | P1 | A rostered bench/stash player's projected usage or snap share jumps past a threshold week-over-week (nflverse cache, T-87 — no new data source) | Celebratory Pulse card + push, leads with the acknowledgment before the numbers; auto-dismiss | Vindication, "I called it" — the positive mirror to injury shock; independently named by external research as "Breakout surprise/FOMO" |
+| Mission Complete | P2 | All of the user's live games for the day have ended | Pulse settles to a calm summary card, reusing the completion-bar animation (T-69) | Relief; celebration or support per the win/loss rule below |
+
+**Engineering constraint (v5.5 — from 7.1):** one persistent interrupt slot at a time — a second P1 event queues behind the first rather than stacking, regardless of how many leagues or games are concurrently live.
+
+**Rate limiting and fatigue control — what keeps this from reading as spam:**
+- Fan-out from one detection event to all affected users, the same pattern already specified in 10.3 (Notifications) — one touchdown is one server-side event, never N per-user checks.
+- Per-user de-duplication across leagues: a single scoring play affecting a user's player in three connected leagues is one push naming all three, not three pushes.
+- Mode-tied density (Section 3), so notification volume is a facet of the persona choice that already exists rather than a new setting to design: Focused gets touchdown/lead-change/lineup-lock/trade/injury only; Savant may additionally surface narrower swings (e.g., a late-game momentum shift under one minute left); Balanced sits between.
+- Hard ceiling regardless of mode: no more than one push per rostered-player-event per 2 minutes, collapsed into a single "multiple updates" push above that rate — this is what prevents a replay-review reversal or stat correction from double-firing.
+- Never fires for events in a connected league the user doesn't own a rostered player in — filtered by the same cross-league-relevance rule that already governs Pulse (6.1's North Star test).
+
+**Visual language — pulsing and glow, inside the existing token system (Section 3), not a new palette:**
+- Score-change flash: card border briefly saturates to the existing signal-accent token, then settles back to resting glass state over ~600ms — confident, not jarring, per Section 7's Motion Philosophy.
+- Win-probability lean: a live matchup card's accent hue leans toward the existing opportunity or alert token depending on whether the user is winning or losing, at low saturation — a lean, never a full color swap.
+- Lineup-lock urgency ramp: System Bar countdown shifts calm → warm → urgent as the deadline nears, extending the deadline-countdown pattern already built in T-67.
+- Mission Complete settle: reuses Pulse's existing completion-bar animation (T-69) rather than inventing a new one for end-of-slate.
+
+**Engineering note — this is 10.2 (Game Day Architecture) plus 10.3 (Notifications), not a new subsystem:** detection is a diff between the current live-scores poll and the previous one (T-81's cron, already writing to `live_scores`), evaluated once server-side and fanned out via OneSignal — already end-to-end as of this session — to affected users' devices. No new polling loop and no new external dependency; this is the payoff of the architecture already built, not a reason to build another one.
+
+**MVP phasing:** ships alongside Game Day State's end-of-August window (6.10), behind the same feature flag. An engagement system that fires for the entire user base near the same moment needs the same instant kill switch every Game Day component requires (10.1).
+
+### 6.13 Per-State Visual & Motion Language (v5.3 — supersedes the flagged design-pass note in 6.10)
+
+> Fleshes out 6.10's "needs a design pass" flag into one concrete accent/motion/ticker-voice spec per State, so implementation isn't guessing at what "shifts subtly per state" means.
+
+| State | Accent lean | Card treatment | Signature motion | Ticker voice |
+|---|---|---|---|---|
+| Draft | Opportunity green | Sharp, forward-leaning borders | Queue items slide in from the right on ADP movement | "X being drafted faster than ADP" |
+| Standard | Neutral existing palette | Resting glass, no glow | None beyond existing hover states | Calm, planning-oriented |
+| Waiver Day | Opportunity green (shared with Draft — same emotion, per Section 7) | Priority-target cards carry a subtle top-border glow, ranked | Ranked list reorders with a soft reflow, never a hard cut | "Priority target: X, Y% roster-health lift" |
+| Game Day | Cockpit/telemetry mono-value tokens (Section 3) | Live cards carry a persistent low-saturation border glow keyed to win/loss lean (6.12) | Score-change flash (6.12), kickoff transition (below) | Live scores, win-probability shifts |
+| Film Room | Desaturated, calmer blues/greys — deliberately the quietest palette in the product | Recap cards read as a report, not a dashboard — no glow, no pulse | Single settle-in animation on load, then static | "What happened," never "what you missed" (avoids FOMO framing, per Section 7's non-punitive rule) |
+
+**Kickoff-triggered transition animation** — the one named-but-unbuilt piece from today's session: at the first kickoff of a user's Game Day window, the System Bar and Pulse header transition over ~1.5–2s from Standard's resting palette to Game Day's cockpit accent, never an instant repaint. Sequence: (1) System Bar accent sweeps to the Game Day tone, (2) Pulse header re-labels to "Mission Control" with a brief mono-value flicker-in reusing the boot sequence's visual grammar (T-72) rather than inventing a new one, (3) live score ticker items slide into the ticker strip for the first time that day. Requires `PulseMark.tsx` — a brand kit component that doesn't exist yet — as the shared visual anchor for both this transition and the boot sequence; building it is the first concrete task in the Game Day UI workstream (T-91).
+
+### 6.14 Seasonal & Intensity Variation — Engagement Triggers Across the Year (v5.4 — new)
+
+> **THE PROBLEM THIS SOLVES:** 6.12 and 6.13 specify one Game Day intensity and one playoff theming layer (6.10) in the abstract. In practice a Thursday-night game with one league on the line doesn't feel like a four-game Sunday early window, and Week 16 shouldn't feel like Week 3. Without this, the engagement system is either always-maximum (fatigue) or flat all season (wasted opportunity on the moments that matter most). This section makes the variation concrete instead of leaving it implied.
+
+**Concurrent-game intensity tiers** — the same triggers from 6.12, dialed by how many of the user's games are live at once, not just whether one is:
+| Window | Typical concurrency | Trigger behavior |
+|---|---|---|
+| Thursday Night / Monday Night | One game | Every trigger fires at full detail — low volume means no fatigue risk, so this is the highest-signal, lowest-noise window in the week |
+| Sunday early/late windows | Up to the user's full multi-league slate at once | The 6.12 rate ceiling and cross-league de-duplication carry the real weight here; touchdown/lead-change copy stays terse ("3 leagues" not three separate cards) to avoid the window feeling like a wall of alerts |
+| Sunday Night Football | One marquee game, often after the user's other rosters have finished | Treated like Thu/Mon tier — full detail, since concurrency has dropped back to one |
+| Bye-week Sundays (user has no live game) | Zero | Game Day State still activates (6.10 is per-connected-league, not per-user-game), but the System Bar and Pulse settle to a quieter "watching the rest of the league" framing instead of Mission Control at full intensity — never a broken-looking empty state, never fake urgency for a game the user has no stake in |
+
+**Trade-deadline week amplification** (typically Week 9–10 of the NFL season — exact week is platform/league-configurable, not hardcoded): the Trade Offer trigger (6.12) gets elevated in-app placement (Pulse-pinned, not just a nav badge) and copy that names the deadline explicitly ("Trade deadline in 3 days — 2 open offers"), since this is the one week of the season where trade urgency is real and time-boxed rather than evergreen.
+
+**Playoffs / Championship amplification (Weeks 15–17)** — ties the existing theming layer (6.10) directly to 6.12's triggers instead of leaving it generic: touchdown-swing flashes and lead-change glows run at a more saturated version of the same tokens (no new colors, per 6.10's "no new components" rule), and a Mission Complete on a playoff win reuses the same completion animation but with "legacy" copy framing (e.g., "Championship week: 1 win from the title") instead of the regular-season "Mission Complete" label — matching Section 7's existing Championship-week emotion ("Focus, legacy"). A playoff-week loss still follows the non-punitive rule (Section 7) — elevated stakes in the copy, never in blame.
+
+**Preseason (~Aug 6 onward)** carries no user-facing intensity difference — it's the internal test bed already noted in 12 for validating Game Day State against real kickoffs, not a moment to design a distinct feel for.
+
+**Engineering note:** all of this is copy/token/threshold variation read from the already-existing NFL schedule data (`nfl_schedule`, week number, `computeState`'s existing week-15–17 playoff check) — no new data source, no new detection logic beyond what 6.12/10.2 already built. This is tuning, not new architecture.
+
 ---
 
-## 7. Emotional Experience & Product Philosophy (v5.0 — new)
+## 7. Emotional Experience & Product Philosophy (v5.0 — new, deepened v5.5)
 
 Rostiro is not fantasy football software. It is a companion through an NFL season, designed to enhance the emotional experience users already have — not to showcase AI. We are not replacing ESPN, Yahoo, or Sleeper; we are enhancing the journey that already exists on top of them.
 
 Every feature answers two questions before it ships (also stated in Section 1): **(1) does this improve the user's fantasy experience, and (2) does this enhance the emotion they are already feeling right now?** This sits alongside the North Star Pulse test (6.1) as the second filter every feature passes through.
 
-### The Weekly Emotional Arc
+> **v5.5 — externally validated.** An independently commissioned research pass ("Rostiro Emotional Calendar Report," external LLM research, July 4 2026 — survey of ESPN/Yahoo/Sleeper product language, fantasy-forum discourse, and attention/notification research) converged on the same architecture already committed here, without having seen it: a stateful, calendar-aware OS rather than a static dashboard; Pulse and Game Day as two different interaction models, not one product; and a single governing filter — **if it doesn't affect the user's portfolio, opponent, or the available-player market, it stays ambient, it doesn't interrupt.** Where the research sharpens rather than repeats what's already here, it's folded into 7.1/7.2 below. It also proposed nine season states (Offseason Watch, Camp Watch, Draft Mode, Pre-Kickoff Prep, Game Day Console, Prime-Time Lite, Waiver Window, Film Room, Playoff Pressure) — deliberately **not** adopted as nine top-level States. The existing five (6.10) already cover this ground; the difference is depth, not headcount (see the table below and 6.10's updated note).
 
-Maps directly onto the Rostiro States (6.10) that carry it:
+### The Weekly Emotional Arc (v5.5 — extended)
+
+Maps directly onto the Rostiro States (6.10) that carry it. Two rows are new since v5.0 — the pregame ramp and the Waiver Day session — both closing gaps identified this session rather than adding new States.
 
 | Day / period | Emotion | Carried by State | Rostiro's job |
 |---|---|---|---|
-| Draft season | Hope, excitement, optimism | Draft | Mission preparation — Draft Copilot, ADP movement, portfolio groundwork |
+| Deep offseason (Feb–Jul) | Distance, dynasty itch, curiosity | Draft (dormant phase) | Low-frequency Pulse only — no state architecture needed for a phase where nothing is urgent |
+| Training camp (late Jul–Aug) | Anticipation, uncertainty | Draft (ramping into) | Beat-report digest, depth-chart changes, ADP movement — the existing preseason Pulse empty-state (6.1) already carries this; no new surface required |
+| Draft season | Hope, excitement, optimism, clock pressure | Draft | Mission preparation — Draft Copilot, ADP movement, portfolio groundwork |
 | Post-draft | Pride, ownership | Standard (light beat, see 13) | Let users admire what they built — roster grade appears in Pulse even without a full Portfolio product at MVP |
-| Sunday morning | Anticipation, nervousness, confidence | Game Day (ramping) | Mission Control — calmly organize everything requiring attention before kickoff |
-| During games | Suspense, excitement, momentum | Game Day | Alive without overwhelming — subtle animation, context-aware alerts, no unnecessary interruptions |
+| Wed–Sat | Preparation, optimization | Standard | Trade discussion, planning, confidence-building |
+| **Tue afternoon–night** | Panic, opportunism, decision fatigue (an hour across 2–3 leagues, worst weeks 1–3) | **Waiver Day (session-mode, T-98)** | Resumable, session-framed Pulse — "League 1 of 3, ~12 min left" — with real FAAB math and roster-health delta per candidate, not just a reordered list |
+| **Sun morning, pregame** | Anticipation curdling into scramble-anxiety — "did I set my lineup, am I missing a matchup" | **Game Day (pregame ramp, T-97)** | One unmissable cross-league lineup check + "don't sleep on this matchup," ahead of everything else in the queue |
+| During games | Suspense, elation, dread, obsession, ritual | Game Day (live — see 7.2 for the two interaction sub-modes) | Alive without overwhelming — glanceable, portfolio-filtered, never a wall of alerts |
 | Monday (win) | Celebration | Film Room | "Mission Complete" framing — leagues won, portfolio health improved, best move of the week |
 | Monday (loss) | Support, not punishment | Film Room | Never punitive — "not your week, here's what we already found for Tuesday" |
-| Tuesday | Opportunity, preparation | Waiver Day | Mission Briefing — priority targets, recommended drops, projected improvement |
-| Wed–Sat | Preparation, optimization | Standard | Trade discussion, planning, confidence-building |
-| Playoffs (theming layer) | Pressure, urgency | Any state, themed | Communicate higher stakes while staying calm |
-| Championship week (theming layer) | Focus, legacy | Any state, themed | Special animations, historical comparisons |
+| Playoffs / Championship (theming layer) | Pressure, hope, grief, legacy | Any state, themed | Communicate higher stakes while staying calm; ceremony, not alarm, at the close |
+
+### 7.1 Emotional Event Taxonomy — Priority Model (v5.5 — new)
+
+The research's biggest concrete contribution: a priority tier and an attention-layer for every alert in the product, so "should this interrupt someone" stops being decided ad hoc per feature.
+
+**Attention layers** — every piece of information in Rostiro sits in exactly one of these:
+
+| Layer | Behavior | Example |
+|---|---|---|
+| Ambient | Always visible, never interrupts | Ticker, sync status, live game state |
+| Glance | Raises salience, no action demanded | Halftime recap, projection lean |
+| Interrupt | Personally consequential, time-sensitive | Your TD, opponent lead-change, in-game injury |
+| Action | Requires a decision | Waiver claim, lineup swap, trade response — routed to Pulse, never to the live/ambient surface |
+
+**Priority tiers** — this is a rigor upgrade to 6.12's existing trigger table, not a replacement:
+
+| Tier | Trigger examples | Default treatment |
+|---|---|---|
+| P0 — critical | Starter ruled OUT within 90 min of lock; in-game injury to a rostered starter | Push + persistent in-app card until seen |
+| P1 — high | Your player's TD; opponent lead-change; trade offer received; lineup-lock countdown | In-app card, optional sound, auto-dismiss (except lock countdown, which persists until resolved) |
+| P2 — medium | Halftime/final recap, waiver-relevant injury elsewhere in the league | Ambient/Console card only — no push by default |
+| P3 — low | General box-score movement, non-portfolio news | Ticker only |
+
+**Engineering constraint worth stating explicitly, not left implied:** one persistent toast/interrupt slot at a time — a second P1 event queues behind the first rather than stacking. This is what keeps Game Day glanceable instead of becoming a second task queue, and it's a one-line rule to enforce in whatever component renders interrupts.
+
+**Handpicked for MVP.** The research names roughly nineteen distinct emotional events across a full season. Building all nineteen now would be exactly the overengineering this session already pulled back from once. The ones worth building first, and why:
+
+| Event | Priority | Why it's in, now | Where it lives |
+|---|---|---|---|
+| Injury shock (off-day and in-game) | P0 | Already the product's core retention mechanic (6.6); most-trusted, least discretionary | Shipped (6.6) + 6.12 |
+| Late inactive / lineup-lock panic | P0 | Directly the "did I set my lineup" moment you described; highest trust payoff for lowest build cost | T-97, T-69 |
+| Your-player TD / lead-change | P1 | The habitual, many-times-a-week moment that makes Game Day feel alive | 6.12 (shipped in spec, not code — T-93) |
+| **Opportunity Surge (breakout/handcuff heating up)** | P1 | The positive mirror to injury shock — no existing trigger covers it; independently named by the research as "Breakout surprise/FOMO" | New — T-99 |
+| Waiver outcome / FAAB result | P1 | Closes the loop on the Tuesday session (7's Waiver Day row) — you don't just submit a claim, you find out if it worked | T-98 |
+| Bye-week / bubble-week scenario framing | P2 | Real, recurring anxiety (weeks 5–14 bye stress, weeks 15–17 bubble dread) but lower frequency — a good fast-follow, not launch-blocking | Deferred, not scoped this session |
+| Trade elation/anxiety detail, championship ceremony copy | P1/ceremony | Already named in 6.10/6.14's theming layer and 6.12's trade trigger — this session just confirms the copy tone (celebratory or dignified, never alarmist) rather than adding new mechanics | Existing (6.12, 6.14) |
+
+Everything else in the research's taxonomy (predraft nerves, draft-clock stress, post-draft "rosterbation," bust realization, etc.) is real and worth revisiting once the handpicked list above is shipped and the pattern is proven — not before.
+
+### 7.2 Interaction Model: Pulse vs. Game Day (v5.5 — new)
+
+The research's other real contribution: Pulse and Game Day aren't the same product wearing different colors — they're two different interaction models, and conflating them is what would have made the "status board vs. task queue" tension (flagged earlier this session) a real design bug instead of a design choice.
+
+| Dimension | Pulse (Standard, Waiver Day, Film Room) | Game Day (live) |
+|---|---|---|
+| Primary use case | Decision support | Situational awareness |
+| Interaction style | Action-heavy — Done/Snooze/Dismiss | Glance-heavy — mostly nothing to tap |
+| Attention mode | Center of attention | Periphery of attention |
+| Card behavior | Persists until resolved or snoozed | Auto-fades unless P0/P1 |
+| Success metric | Actions completed | Time spent open, low friction |
+
+**The single-game-vs-many-games distinction from last session's brainstorm still matters — it's just not a new State.** It's Game Day's existing live interaction model expressing two intensities from the same concurrency signal already available in `todaysKickoffs` (`rostiroState.ts`): one live game (Thu/Mon/SNF) keeps every 6.12 trigger at full, unhurried detail; several concurrent games (Sunday windows) leans harder on the P0–P3 tiering and cross-league de-duplication so it doesn't read as a wall of cards. This is exactly 6.14's existing "concurrent-game intensity tiers" — the correction from this session is that the tiering should shape the *layout*, not only notification tone, without requiring a second top-level State or a ceremony/gating UI to get there.
 
 ### Motion Philosophy
 
@@ -629,6 +782,8 @@ Animation reinforces the emotional moment, never fights it:
 - **Losing:** supportive, never negative or alarming.
 - **New recommendation:** confident, never alarming.
 - **Mission completed (Pulse fully cleared):** rewarding.
+
+**Anti-patterns, stated explicitly (v5.5 — new):** no slot-machine-style celebration on every score; no red badge spam; no stacked alerts; never interrupt for information already visible on screen; no generic NFL news blasts unfiltered by roster relevance; no sound/haptics beyond a single short chime reserved for P0/P1. These aren't stylistic preferences — the research ties over-notification and constant-checking directly to fantasy-specific anxiety; Rostiro's differentiation is calm competence, not a dopamine loop.
 
 This is the emotional rulebook that the boot sequence and coach marks (6.8) and state transitions (6.10) are built to follow.
 
@@ -781,9 +936,11 @@ See v3 Section 7–11. All unchanged except season defaults updated to 2026, and
 | Auth (login/signup) live on Vercel | ✓ |
 | Onboarding flow built | ✓ |
 
-### Status: ahead of schedule (v5.0)
+### Status: ahead of schedule (v5.0, updated v5.3)
 
 As of July 3, 2026, build is ahead of the original Week 3–7 plan. That room is what allowed Rostiro States (6.10) and the Scalability & Operational Architecture baseline (10) to move into MVP scope rather than being deferred past launch.
+
+**Since v5.2 (this session, July 3, 2026 evening):** the Rostiro States engine (T-79) and the Game Day live-score backend (T-81's backend half, 10.2) both shipped and were verified against real data — the states engine computes correctly against synthetic boundary timestamps, and the live-score cron matched all 16 real Week 1 2026 games against ESPN's live scoreboard, catching a team-code mismatch (Rams, Washington) that would otherwise have silently broken the join. Remaining Game Day scope is now entirely frontend and was scoped, not built, this session: UI surfacing (T-90), `PulseMark.tsx` (T-91), the kickoff transition animation (T-92), the engagement/notification trigger system (T-93, new — 6.12), and Waiver Day / Film Room State UI (T-94, T-95).
 
 ### Remaining build order
 
@@ -850,10 +1007,10 @@ Additional tasks from v5.0 (Rostiro States, Scalability baseline, Emotional laye
 
 | Task | Description |
 |---|---|
-| T-79 | Rostiro States engine — `lib/rostiroState.ts`, deterministic state computation from local time + NFL schedule + per-league waiver cutoffs. Feature-flagged. |
-| T-80 | Waiver Day State — layout reprioritization, Mission Briefing Pulse framing, ticker tie-in. |
-| T-81 | Game Day State — layout reprioritization, cockpit/telemetry visual pass, kickoff-triggered transition animation, staggered/jittered shared score refresh (10.2). |
-| T-82 | Film Room State — layout reprioritization, weekly AI recap, usage/snap-count surfacing. |
+| T-79 | ✓ **Done.** Rostiro States engine — `lib/rostiroState.ts`, deterministic state computation from local time + NFL schedule + per-league waiver cutoffs. Feature-flagged. |
+| T-80 | Waiver Day State — layout reprioritization, Mission Briefing Pulse framing, ticker tie-in. Not started (see T-94). |
+| T-81 | Game Day State backend — ✓ **Done, verified July 3, 2026.** `live_scores` table, `lib/liveScores.ts`, per-minute cron with cheap early-exit (10.2), matched against all 16 real Week 1 2026 games including ESPN/nflverse team-code normalization. UI/animation half — layout reprioritization, cockpit/telemetry visual pass, kickoff-triggered transition animation — **not started** (see T-90–T-92). |
+| T-82 | Film Room State — layout reprioritization, weekly AI recap, usage/snap-count surfacing. Not started (see T-95). |
 | T-83 | Playoffs/Championship theming layer — visual treatment applied across active States for weeks 15–17, no new components. |
 | T-84 | Scalability baseline — feature-flag framework, cache-hit/API-latency/queue-depth observability, circuit breakers per platform, staggered background jobs. |
 | T-85 | Pricing rebuild — Free / Pro / Founder Season Pass / Founding 500 in Stripe, update onboarding trial copy (Step 2, done in this PRD), update Start/Sit and Trade Analyzer tier gating from Starter→Pro (done in this PRD, 6.4/6.5). |
@@ -867,7 +1024,33 @@ Additional tasks from v5.2 (Stats/Projections/Commentary data sources, Player In
 | T-88 | ESPN native projections wiring — surface `statSourceId: 1` from already-fetched roster/player-pool responses (no new API call, data is already in hand from `getEspnRosters`/waiver-pool fetches once those are wired per 5.2's engineering note); verify Yahoo/Sleeper equivalents before assuming parity. |
 | T-89 | Player Intelligence Card — ⌘K result becomes a full card (availability/usage/snap/projection/trend/context), reprioritized by active Rostiro State, reusing `/api/draft/players` for lookup. |
 
+Additional tasks from v5.3 (Game Day Engagement System, Per-State Visual Language — see 6.12, 6.13):
+
+| Task | Description |
+|---|---|
+| T-90 | Game Day UI surfacing — live scores from the now-verified `live_scores` cache (T-81 backend) into Pulse, System Bar, and the bottom ticker. The backend has existed and been verified since July 3, 2026; this is purely the frontend wiring. |
+| T-91 | ✓ **Done.** `PulseMark.tsx` — brand kit component, shared visual anchor for both the kickoff transition (T-92) and the existing boot sequence (T-72). Blocks T-92. |
+| T-92 | Kickoff-triggered transition animation (6.13) — System Bar accent sweep, Pulse header re-label to "Mission Control" with mono-value flicker-in, ticker items sliding in for the day's first live scores. Depends on T-91 and T-90. |
+| T-93 | Game Day Engagement System (6.12) — touchdown/lead-change/trade-offer/injury/lineup-lock triggers, fanned out via the existing OneSignal integration, rate-limited per the mode-tied density and 2-minute hard ceiling in 6.12. Reuses the T-81 live-scores diff for detection — no new polling. |
+| T-94 | Waiver Day State UI (6.10, 6.13) — Mission Briefing Pulse card (priority targets, FAAB budget, projected roster-health delta), opportunity-green accent, ranked-list reflow motion. |
+| T-95 | Film Room State UI (6.10, 6.13) — weekly AI recap card, injuries/usage/snap-count deltas, buy-low/sell-high signals, desaturated review palette, non-punitive win/loss framing per Section 7. |
+
+Additional task from v5.4 (Seasonal & Intensity Variation — see 6.14):
+
+| Task | Description |
+|---|---|
+| T-96 | Seasonal/intensity variation (6.14) — concurrent-game intensity tiers, bye-week quiet framing, trade-deadline-week amplification, playoffs/championship trigger amplification. Layers onto T-93 once the base engagement system ships; not a standalone build. |
+
+Additional tasks from v5.5 (Emotional Priority Model, Pregame Ramp, Waiver Session-Mode, Opportunity Surge — see 7, 7.1, 7.2, 6.12):
+
+| Task | Description |
+|---|---|
+| T-97 | ◐ **Trigger done, July 4, 2026** (`lib/rostiroState.ts` — `PREGAME_RAMP_HOURS`, 3h before earliest kickoff); Pulse content half **not started** — widen `computeState`'s Game Day trigger to begin a few hours before the day's earliest kickoff rather than at it; surface the cross-league lineup check and "don't sleep on this matchup" as the top-priority Pulse content inside that window. Pulse-content half depends on T-90. |
+| T-98 | Waiver Day session-mode — resumable multi-league progress framing ("League 1 of 3, ~12 min left"), real FAAB budget math and projected roster-health delta per candidate, replacing today's framing-and-reordering-only slice. Upgrades T-80. |
+| T-99 | Opportunity Surge trigger (6.12) — usage/projection-spike detection over the existing nflverse cache (T-87), celebratory copy tone, added to the existing fan-out/rate-limit machinery from T-93. No new polling or data source. |
+| T-100 | Console/Pulse engagement telemetry — instrument Game Day session opens, time-in-Game-Day-state, P0 alert action rate, and notification mute/dismiss rate, per 7.1's priority model. Feeds retention measurement without new UI. |
+
 ---
 
-*Rostiro PRD v5.2 — July 2026*
+*Rostiro PRD v5.5 — July 2026*
 *Run Every League. — rostiro.com*

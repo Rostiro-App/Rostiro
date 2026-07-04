@@ -13,7 +13,10 @@
 // data once that ships — these constants are deliberately isolated so that's
 // a small change, not a rewrite.
 
-export type RostiroState = 'draft' | 'standard' | 'waiver_day' | 'game_day' | 'film_room'
+import { isFeatureEnabled } from '@/lib/featureFlags'
+import type { RostiroState } from '@/types'
+
+export type { RostiroState }
 
 const ET_TZ = 'America/New_York'
 
@@ -21,6 +24,12 @@ const ET_TZ = 'America/New_York'
 // A single game runs ~3.25-3.5h; this pads for late games / OT rather than
 // flipping out of Game Day while people are still mid-game.
 const GAME_DURATION_HOURS = 4
+
+// T-97: how long before the day's earliest kickoff Game Day (pregame ramp)
+// activates. Covers the real 11:45am-Sunday "did I set my lineup" scramble
+// (PRD 7, 6.10 v5.5 note) ahead of a 1pm ET slate, rather than requiring a
+// game to have actually started.
+const PREGAME_RAMP_HOURS = 3
 
 // Film Room: Monday evening through Tuesday early afternoon.
 // Waiver Day: Tuesday afternoon through Wednesday midday.
@@ -65,8 +74,9 @@ export function computeState({ now, todaysKickoffs, hasIncompleteDraft }: Comput
   if (todaysKickoffs.length > 0) {
     const earliest = Math.min(...todaysKickoffs.map((k) => k.getTime()))
     const latest = Math.max(...todaysKickoffs.map((k) => k.getTime()))
+    const windowStart = earliest - PREGAME_RAMP_HOURS * 60 * 60 * 1000
     const windowEnd = latest + GAME_DURATION_HOURS * 60 * 60 * 1000
-    if (now.getTime() >= earliest && now.getTime() <= windowEnd) {
+    if (now.getTime() >= windowStart && now.getTime() <= windowEnd) {
       return 'game_day'
     }
   }
@@ -92,6 +102,15 @@ export async function getRostiroState(
   supabaseAdmin: { from: (table: string) => any },
   leagueDraftStatuses: boolean[]
 ): Promise<RostiroState> {
+  // PRD 6.10's own requirement: this is "new logic activating automatically
+  // for 100% of users on the highest-traffic day of the week," so it needs
+  // an instant kill switch back to Standard State — checked here, at the
+  // one real entry point, so every caller gets it for free rather than
+  // having to remember to check it themselves.
+  if (!(await isFeatureEnabled('rostiro_states').catch(() => false))) {
+    return 'standard'
+  }
+
   const now = new Date()
   const { dateKey } = partsInEastern(now)
 

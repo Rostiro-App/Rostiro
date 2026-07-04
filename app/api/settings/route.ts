@@ -11,10 +11,19 @@ const Body = z
   .object({
     mode: z.enum(['focused', 'balanced', 'savant']).optional(),
     pushEnabled: z.boolean().optional(),
+    // T-72: hint ids to merge into users.seen_hints (never removed here —
+    // "replay tour" resets via its own explicit payload).
+    addSeenHints: z.array(z.string().max(64)).max(32).optional(),
+    resetSeenHints: z.boolean().optional(),
   })
-  .refine((b) => b.mode !== undefined || b.pushEnabled !== undefined, {
-    message: 'Nothing to update',
-  })
+  .refine(
+    (b) =>
+      b.mode !== undefined ||
+      b.pushEnabled !== undefined ||
+      b.addSeenHints !== undefined ||
+      b.resetSeenHints !== undefined,
+    { message: 'Nothing to update' }
+  )
 
 export async function GET() {
   const supabase = await createSSRClient()
@@ -24,7 +33,7 @@ export async function GET() {
   const [{ data: profile, error: profileError }, { data: leagues }] = await Promise.all([
     supabase
       .from('users')
-      .select('email, plan, push_enabled, mode, created_at')
+      .select('email, plan, push_enabled, mode, seen_hints, created_at')
       .eq('id', user.id)
       .maybeSingle(),
     supabase

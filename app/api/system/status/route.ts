@@ -14,8 +14,11 @@
 import { createSSRClient } from '@/lib/supabase'
 import { getSleeperDrafts, getSleeperRosters } from '@/lib/sleeper'
 import { computeLeagueHealth, type HealthPlayer } from '@/lib/healthScore'
+import { getRostiroState } from '@/lib/rostiroState'
+import { toNflverseTeamCode } from '@/lib/liveScores'
+import { isFeatureEnabled } from '@/lib/featureFlags'
 import { NextResponse } from 'next/server'
-import type { LeagueHealth, SystemDeadline, SystemStatus, SystemStatusLeague } from '@/types'
+import type { LeagueHealth, LiveGameScore, SystemDeadline, SystemStatus, SystemStatusLeague } from '@/types'
 
 interface LeagueRow {
   id: string
@@ -30,6 +33,22 @@ interface CacheRow {
   name: string
   adp_sleeper: number | null
   injury_status: string | null
+}
+
+interface ScheduleRow {
+  game_id: string
+  home_team: string
+  away_team: string
+  kickoff_at: string
+}
+
+interface LiveScoreRow {
+  game_id: string
+  home_score: number
+  away_score: number
+  period: number
+  display_clock: string
+  status_state: 'pre' | 'in' | 'post'
 }
 
 const UNKNOWN_HEALTH: LeagueHealth = {
@@ -65,6 +84,14 @@ export async function GET() {
   const topPool = (topPlayers ?? []) as CacheRow[]
 
   const deadlines: SystemDeadline[] = []
+  // Per T-79's docstring: only Sleeper's draft status is wired for now, so
+  // non-Sleeper leagues simply don't contribute a flag here (not "false" —
+  // just absent, same honest-degradation posture as UNKNOWN_HEALTH).
+  const draftIncompleteFlags: boolean[] = []
+  // T-90: every rostered player id across the user's Sleeper leagues, so
+  // live-score roster-relevance can be computed after this loop without a
+  // second round of roster fetches.
+  const myRosteredPlayerIds: string[] = []
 
   const results = await Promise.allSettled(
     rows.map(async (league): Promise<SystemStatusLeague> => {
@@ -91,6 +118,7 @@ export async function GET() {
           })
         }
       }
+      draftIncompleteFlags.push(drafts.some((d) => d.status !== 'complete'))
 
       const myRoster = rosters.find((r) => String(r.roster_id) === league.team_id)
       if (!myRoster) {
@@ -99,6 +127,7 @@ export async function GET() {
 
       const allRosteredIds = new Set(rosters.flatMap((r) => r.players ?? []))
       const myIds = myRoster.players ?? []
+      myRosteredPlayerIds.push(...myIds)
 
       // Enrich my roster from the cache in one query.
       const { data: myRows } = await supabase
@@ -135,10 +164,87 @@ export async function GET() {
 
   deadlines.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
 
+  // Degrades to 'standard' rather than failing the whole request if the
+  // nfl_schedule read errors — the System Bar should never blank out over a
+  // pulse-mark color, per 10.1's "serve last-cached/best-guess, never a
+  // blank screen" resilience rule.
+  const rostiroState = await getRostiroState(supabase, draftIncompleteFlags).catch(() => 'standard' as const)
+
+  // T-90: live scores, gated behind the same flag as the T-81 cron — an
+  // instant kill switch that also stops this route from doing the extra
+  // queries below when the feature is off (PRD 10.1).
+  let liveScores: LiveGameScore[] = []
+  let scoresGated = false
+  if (await isFeatureEnabled('live_scores').catch(() => false)) {
+    const todayEt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date())
+    const { data: todaysGames } = await supabase
+      .from('nfl_schedule')
+      .select('game_id, home_team, away_team, kickoff_at')
+      .eq('game_date', todayEt)
+    const schedule = (todaysGames ?? []) as ScheduleRow[]
+
+    if (schedule.length > 0) {
+      const { data: scoreRows } = await supabase
+        .from('live_scores')
+        .select('game_id, home_score, away_score, period, display_clock, status_state')
+        .in('game_id', schedule.map((g) => g.game_id))
+      const scoresByGameId = new Map(((scoreRows ?? []) as LiveScoreRow[]).map((r) => [r.game_id, r]))
+
+      const uniquePlayerIds = [...new Set(myRosteredPlayerIds)]
+      const { data: myPlayerRows } = uniquePlayerIds.length > 0
+        ? await supabase
+            .from('players_cache')
+            .select('nfl_team')
+            .eq('platform', 'sleeper')
+            .in('player_id', uniquePlayerIds)
+        : { data: [] as { nfl_team: string | null }[] }
+      const relevantTeams = new Set(
+        (myPlayerRows ?? [])
+          .map((r) => r.nfl_team)
+          .filter((t): t is string => !!t)
+          .map(toNflverseTeamCode)
+      )
+
+      // DEMO MODE — local testing only (DEMO_MODE is set in .env.local,
+      // which is git-ignored and never deployed). Real roster relevance
+      // above only covers Sleeper leagues; this account's real league is
+      // ESPN, which isn't wired up yet. This purely *adds* teams so the
+      // Game Day demo slate shows up in Pulse/System Bar without touching
+      // the real computation or affecting any account without the flag.
+      if (process.env.DEMO_MODE === 'true') {
+        for (const team of (process.env.DEMO_ROSTER_TEAMS ?? 'TEN,PHI,DAL').split(',')) {
+          relevantTeams.add(team.trim())
+        }
+      }
+
+      liveScores = schedule.map((g) => {
+        const score = scoresByGameId.get(g.game_id)
+        return {
+          gameId: g.game_id,
+          homeTeam: g.home_team,
+          awayTeam: g.away_team,
+          homeScore: score?.home_score ?? 0,
+          awayScore: score?.away_score ?? 0,
+          period: score?.period ?? 0,
+          displayClock: score?.display_clock ?? '',
+          statusState: score?.status_state ?? 'pre',
+          kickoffAt: g.kickoff_at,
+          rosterRelevant: relevantTeams.has(g.home_team) || relevantTeams.has(g.away_team),
+        }
+      })
+
+      const { data: profile } = await supabase.from('users').select('plan').eq('id', user.id).maybeSingle()
+      scoresGated = (profile?.plan ?? 'free') === 'free'
+    }
+  }
+
   const status: SystemStatus = {
     syncedAt: new Date().toISOString(),
     leagues: statusLeagues,
     nextDeadline: deadlines[0] ?? null,
+    rostiroState,
+    liveScores,
+    scoresGated,
   }
 
   return NextResponse.json(status)

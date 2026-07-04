@@ -25,6 +25,8 @@ create table public.users (
   -- pre-signup cache.
   mode                    text not null default 'balanced'
                             check (mode in ('focused', 'balanced', 'savant')),
+  -- T-72: dismissed coach-mark/boot ids; localStorage is the per-device cache.
+  seen_hints              jsonb not null default '[]',
   created_at              timestamptz not null default now(),
   updated_at              timestamptz not null default now()
 );
@@ -305,6 +307,29 @@ create policy "Service role can manage adp snapshots" on public.adp_snapshots
 
 grant select on public.adp_snapshots to authenticated;
 grant select, insert, update, delete on public.adp_snapshots to service_role;
+
+-- ─── Injury Snapshots ──────────────────────────────────────────────────────────
+-- One row per tagged player per day. Powers "designation changed" news.
+-- Only non-null statuses are stored; absence on a later date = cleared.
+
+create table public.injury_snapshots (
+  snapshot_date  date not null,
+  player_id      text not null,
+  platform       text not null check (platform in ('espn', 'yahoo', 'sleeper')),
+  injury_status  text not null,
+  primary key (snapshot_date, player_id, platform)
+);
+
+alter table public.injury_snapshots enable row level security;
+
+create policy "Authenticated users can read injury snapshots" on public.injury_snapshots
+  for select using (auth.role() = 'authenticated');
+
+create policy "Service role can manage injury snapshots" on public.injury_snapshots
+  for all using (auth.role() = 'service_role');
+
+grant select on public.injury_snapshots to authenticated;
+grant select, insert, update, delete on public.injury_snapshots to service_role;
 
 -- ─── AI Queries (Logging) ─────────────────────────────────────────────────────
 -- Tracks Claude usage for rate limiting free tier and debugging.

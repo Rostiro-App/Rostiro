@@ -5,6 +5,11 @@
 
 export type Platform = 'espn' | 'yahoo' | 'sleeper'
 
+// PRD 6.10 — computed by lib/rostiroState.ts, consumed by lib/brandTokens.ts
+// and the system status API. Defined here (not in lib/rostiroState.ts) so it
+// stays upstream of every lib file that needs it, per this file's own rule.
+export type RostiroState = 'draft' | 'standard' | 'waiver_day' | 'game_day' | 'film_room'
+
 export type UserPlan = 'free' | 'starter' | 'pro' | 'commissioner'
 
 export type PulsePriority = 'critical' | 'important' | 'info'
@@ -329,10 +334,34 @@ export interface SystemDeadline {
   at: string // ISO timestamp
 }
 
+// T-90 / PRD 10.2: today's NFL games, read from the live_scores cache (T-81)
+// joined against nfl_schedule — never fetched directly by a client. `rosterRelevant`
+// is true when a player on one of the user's rosters is on either team, per 6.1's
+// cross-league-relevance rule; Pulse/System Bar show only those, the bottom
+// ticker shows all of them (its existing unfiltered, public-market character).
+export interface LiveGameScore {
+  gameId: string
+  homeTeam: string
+  awayTeam: string
+  homeScore: number
+  awayScore: number
+  period: number
+  displayClock: string
+  statusState: 'pre' | 'in' | 'post'
+  kickoffAt: string
+  rosterRelevant: boolean
+}
+
 export interface SystemStatus {
   syncedAt: string
   leagues: SystemStatusLeague[]
   nextDeadline: SystemDeadline | null
+  rostiroState: RostiroState
+  liveScores: LiveGameScore[]
+  // PRD 6.1 / 9: free plan sees live scores blurred with an upgrade prompt;
+  // Pro (and up) sees them unblurred. Computed server-side from users.plan
+  // so the client never has to know the plan enum, just whether to blur.
+  scoresGated: boolean
 }
 
 // ─── Error Classes ─────────────────────────────────────────────────────────────
