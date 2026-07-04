@@ -154,7 +154,9 @@ Unlike the changelog rows in `Rostiro_PRD_v5.md` (append-only, dated), this sect
 | 4 | Mode threaded into remaining surfaces (T-105) | ✓ Done |
 | 5 | The Interrupt Stack (T-106) | ✓ Done |
 | 6 | Per-league waiver cutoff (T-107) | ✓ Done |
-| 7 | Waiver Day State UI + Film Room State UI + matchup data (T-108) | **Next up** |
+| 7 | Waiver Day FAAB/health-delta + Film Room recap (T-108, Sleeper-only) | ✓ Done |
+
+**Recommended build sequence fully cleared.** Everything queued at the start of this document (T-102 through T-108) is now shipped and verified. Remaining work is either explicitly deferred (see below) or new scope discovered along the way (T-109, T-110, T-111).
 
 ### Explicitly deferred — not forgotten, just not now
 | Item | Why deferred | Where it's tracked |
@@ -166,3 +168,5 @@ Unlike the changelog rows in `Rostiro_PRD_v5.md` (append-only, dated), this sect
 | Opportunity Surge, injury-during-play, trade-offer-received triggers | Each blocked on a data pipeline that doesn't exist (T-87 nflverse ingestion, a live injury feed, per-platform incoming-trade polling) | `lib/engagementTriggers.ts` header, PRD 6.12 |
 | Player Intelligence Card (T-89) | Doesn't exist at all yet — building state-aware tabs for it is premature | PRD task table |
 | ESPN league lifecycle/activity messaging (e.g. "league not open for 2026 yet") | Real gap (found via user testing), but deliberately scoped down to the honest static explanation already shipped (T-109) rather than building live ESPN draft/season-activity detection | `Rostiro_UX_Behavior_Spec.md` Leagues surface section |
+| ESPN/Yahoo Film Room matchup parsing | Fetcher functions exist (`getEspnMatchup`, `getYahooMatchup`) but return untyped `unknown` — their raw response shapes are complex enough that parsing without a real completed matchup to verify against risks a silent bug, same category as two real bugs already caught today | T-108, `lib/espn.ts` / `lib/yahoo.ts` |
+| Waiver Day resumable session framing ("League 1 of 3, ~12 min left") | T-98's full description beyond FAAB/health-delta, which is the concretely-computable half already shipped | T-108, PRD task table |
