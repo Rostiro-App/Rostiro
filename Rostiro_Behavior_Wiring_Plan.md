@@ -188,3 +188,7 @@ Founder brainstorm on "dopamine trigger" micro-animations for events (new league
 | 9 | "Welcome to Pro/Founder" | High (one-time) | Low, blocked | Can't build until Stripe (T-85) exists to redirect from |
 
 Sound/jingle explicitly deferred to "down the road, maybe added during the season" per the founder — not part of any of the above yet.
+
+### State simulator — proposed, not started (added July 4 2026)
+
+Founder wants to see/capture each of the 5 Rostiro States on demand — both to actually QA states we've mostly only verified via code + synthetic tests (Draft, Waiver Day), and as a controlled environment for marketing stills/video. Proposed scope: a dev-only toggle extending DEMO_MODE's existing pattern (already used for Film Room/Waiver Day) to force any of the 5 states with matching fake data across every surface, rather than waiting for the calendar. Sized at under a day. Founder chose to stay on the PRD's own Phase 3 order first — this is logged as a real, wanted follow-up, not dropped.
