@@ -142,8 +142,45 @@ export async function getSleeperRosters(leagueId: string): Promise<SleeperRoster
   return sleeperFetch<SleeperRoster[]>(`/league/${leagueId}/rosters`)
 }
 
-export async function getSleeperMatchups(leagueId: string, week: number): Promise<unknown[]> {
-  return sleeperFetch<unknown[]>(`/league/${leagueId}/matchups/${week}`)
+// T-108: two rosters sharing the same matchup_id are opponents that week.
+// matchup_id is null for a roster on a bye (no opponent) — confirmed shape
+// from Sleeper's own docs; verified live against a real 2026 league (empty
+// array pre-season, as expected — no games played yet).
+export interface SleeperMatchup {
+  roster_id: number
+  matchup_id: number | null
+  points: number
+}
+
+export async function getSleeperMatchups(leagueId: string, week: number): Promise<SleeperMatchup[]> {
+  return sleeperFetch<SleeperMatchup[]>(`/league/${leagueId}/matchups/${week}`)
+}
+
+export interface FilmRoomResult {
+  myScore: number
+  opponentScore: number
+  opponentRosterId: number
+  // 6.10/T-108 MVP scope: win/loss by userScore > opponentScore, nothing
+  // fancier — a tie (rare, only possible in some scoring formats) reports
+  // won: null rather than guessing a framing for it.
+  won: boolean | null
+}
+
+// Pure — takes the week's matchup rows, returns this roster's result or
+// null if it wasn't part of a matchup that week (bye, or week not played).
+export function computeFilmRoomResult(matchups: SleeperMatchup[], myRosterId: number): FilmRoomResult | null {
+  const mine = matchups.find((m) => m.roster_id === myRosterId)
+  if (!mine || mine.matchup_id === null) return null
+
+  const opponent = matchups.find((m) => m.roster_id !== myRosterId && m.matchup_id === mine.matchup_id)
+  if (!opponent) return null
+
+  return {
+    myScore: mine.points,
+    opponentScore: opponent.points,
+    opponentRosterId: opponent.roster_id,
+    won: mine.points === opponent.points ? null : mine.points > opponent.points,
+  }
 }
 
 export async function getSleeperDrafts(leagueId: string): Promise<SleeperDraft[]> {

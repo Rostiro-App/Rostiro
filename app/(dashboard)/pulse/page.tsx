@@ -55,6 +55,15 @@ interface PulseResponse {
   persistent: boolean
 }
 
+// T-108
+interface FilmRoomLeagueResult {
+  leagueId: string
+  leagueName: string
+  myScore: number
+  opponentScore: number
+  won: boolean | null
+}
+
 // ─── Pulse page ────────────────────────────────────────────────────────────────
 
 export default function PulsePage() {
@@ -77,6 +86,7 @@ export default function PulsePage() {
   // state can tell "truly no leagues" apart from "has leagues, none of
   // them Sleeper," which otherwise look identical and aren't.
   const [totalLeagueCount, setTotalLeagueCount] = useState(0)
+  const [filmRoomResults, setFilmRoomResults] = useState<FilmRoomLeagueResult[]>([])
 
   // T-94/T-90: Waiver Day Mission Briefing framing + Game Day live scores
   // (PRD 6.10/6.13). One-shot fetch — this page doesn't need the 60s
@@ -100,6 +110,24 @@ export default function PulsePage() {
       cancelled = true
     }
   }, [])
+
+  // T-108: only fetched during Film Room — real Sleeper matchup data for
+  // the most recently completed week, no snap-count/injury/Buy-Low-Sell-
+  // High content (blocked on T-87's nflverse pipeline, honest-empty rather
+  // than faked).
+  useEffect(() => {
+    if (rostiroState !== 'film_room') return
+    let cancelled = false
+    fetch('/api/film-room')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { results?: FilmRoomLeagueResult[] } | null) => {
+        if (!cancelled && data) setFilmRoomResults(data.results ?? [])
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [rostiroState])
 
   useEffect(() => {
     let cancelled = false
@@ -322,6 +350,36 @@ export default function PulsePage() {
               Unlock live scores with Pro
             </p>
           )}
+        </div>
+      )}
+
+      {/* T-108: Film Room recap — 6.13's deliberately quietest palette, no
+          glow/pulse, "what happened" never "what you missed" (non-punitive
+          per Section 7). Sleeper-only, real matchup data for the most
+          recently completed week. */}
+      {rostiroState === 'film_room' && filmRoomResults.length > 0 && (
+        <div
+          className="rounded-xl px-4 py-3 mb-4"
+          style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', border: '1px solid var(--hairline)', borderLeft: `2.5px solid ${STATE_CONFIG.film_room.color}` }}
+        >
+          <span
+            className="mono-data text-[9.5px] tracking-[0.16em]"
+            style={{ color: STATE_CONFIG.film_room.color }}
+          >
+            FILM ROOM
+          </span>
+          <div className="mt-1.5 space-y-2.5">
+            {filmRoomResults.map((r) => (
+              <div key={r.leagueId}>
+                <p className="text-[12.5px]" style={{ color: 'var(--t1)' }}>
+                  {r.won === true ? 'You won this week' : r.won === false ? 'Not your week' : 'Even split'} — {r.leagueName}
+                </p>
+                <p className="mono-data text-[11px] mt-0.5" style={{ color: 'var(--t2)' }}>
+                  {r.myScore.toFixed(1)} – {r.opponentScore.toFixed(1)}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
