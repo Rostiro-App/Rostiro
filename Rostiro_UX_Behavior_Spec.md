@@ -91,3 +91,47 @@ Every live-score surface in the product shows real **NFL** game scores. Nothing 
 4. **Live aggregation.** Sum a roster's *active starters'* live fantasy points into a team total, on the same cadence as `live_scores`, for both sides of the matchup.
 
 **Phasing recommendation:** this is a genuinely separate, substantial feature — closer in size to T-81's original backend build than to any single UI task. Don't fold it into the current Game Day MVP window; it deserves its own design pass (data source confirmation, scoring-engine architecture, refresh cadence/cost) before implementation starts. Logged here so it's a committed "yes, we're building this" rather than a maybe.
+
+---
+
+## Free/Pro Gating — Game Day (2026-07-04)
+
+**The principle (user's framing, worth keeping verbatim):** gate the features that convert people, not so much that they can't smell what the rock is cooking. Section 9's existing table already drew most of this line — the pass below is checking every Game Day surface against it, not re-deciding from scratch.
+
+| Feature | Existing decision (Section 9) | Actual behavior today | Status |
+|---|---|---|---|
+| Rostiro State itself (Mission Control framing, pulse mark accent, kickoff sweep) | "States are never paywalled, only depth within them is" (6.10) | Fully free, universal | Built, correct |
+| Ticker / System Bar badge / Pulse Live Now — *that* a game is relevant, team names, clock/period | Not explicit, but consistent with "states universal" | Fully free, unblurred | Built, correct |
+| Live score **numbers** (the actual score value) | "Full state depth (unblurred live scores)" = Pro | Blurred + PRO tag for free, everywhere | Built, correct |
+| Player/league naming ("Hurts, Barkley (2 leagues)") | Not explicit | Free, never blurred (today's Gap #1 fix) | Built, correct — this is the tease: a free user knows *why* to care, not *what the score is* |
+| touchdown_swing / lineup_lock / mission_complete — **in-app Pulse card** | Not explicit, closest analog is "Morning Pulse (basic)" = free | Created for every user regardless of plan | **Recommend: keep free.** This is the "smell it" layer — full headline and reasoning, no blur. Taking it away would gut the free ambient experience the whole States model is built to sell. |
+| touchdown_swing / lineup_lock / mission_complete — **OS push notification** | "Push notifications" listed explicitly under Pro only | **Sent to every subscribed user regardless of plan — `lib/engagementTriggers.ts`'s `pushToUser` never checks plan.** | **Gap — real bug, fixed same day.** This is the actual lever: free users still get the moment the next time they open the app (via the Pulse card), but only Pro gets pinged on their phone the instant it happens. That immediacy gap — finding out live vs finding out later — is a legitimately compelling, already-decided upgrade reason that just wasn't wired up. |
+
+**One structural note, not a gate:** Free is capped at 1 league (Section 9), so the "one push naming all 3 leagues" cross-league dedup magic in `touchdown_swing` is inherently something a free user can't fully see — not because it's blocked, but because they structurally can't have a 2-league event. That's a naturally-occurring upsell moment, not something to engineer further. (Whether the 1-league cap is actually *enforced* anywhere in code is a separate, unchecked question — flagged here, not investigated as part of this pass.)
+
+---
+
+## Multi-League Conflict Scenarios (2026-07-04)
+
+**The real precedence order, as `computeState()` actually implements it today** (not per-league — one global state per user, computed in this check order):
+
+1. **Any connected league has an incomplete draft → Draft State.** Wins over everything, unconditionally.
+2. **Any NFL game is happening today, anywhere, regardless of whether the user has a rostered player in it → Game Day State.** Deliberate per PRD 6.14 — Game Day is ambient/universal, not per-user-relevance. A user with zero relevant players playing still gets the State; personalized surfaces (Live Now card, System Bar badge) just stay empty rather than showing an explicit "quiet" message (see note below).
+3. **Otherwise, a fixed global day-of-week schedule** (Mon/Tue-AM = Film Room, Tue-PM/Wed-AM = Waiver Day, else Standard) — **the same schedule for every league**, regardless of that league's actual waiver-processing day.
+
+**Scoped by likelihood — build for the first tier now, table the rest:**
+
+**High likelihood, already built, just documenting the decision:**
+- Draft (League A) + mid-season Standard/Waiver/Game Day (League B) — common during August preseason when leagues draft on different dates. Draft wins. Correct, matches "this is my year doesn't pause for a Tuesday waiver window."
+- Game Day (any live game) + a user with no roster-relevant game that day — common on a normal Sunday if someone's roster happens to be all on bye-adjacent teams that week, or simply hasn't connected many leagues. Ambient State still activates; personalized surfaces stay quiet by omission.
+- Multiple leagues all roster-relevant on the same Sunday (the normal case) — already works: Live Now card lists every relevant game, `touchdown_swing` already cross-league-dedups into one card/push.
+
+**Medium likelihood, current behavior is probably fine, revisit if it ever actually bites:**
+- A schedule irregularity (the PRD's own example: Week 1's Wednesday-night Australia game) lands on a day that would otherwise be a league's Waiver Day. Game Day wins by check order — a league's "Mission Briefing" framing gets pre-empted by "Mission Control" that day. Rare (a handful of times a season at most), and arguably the *correct* call anyway (a live game is a bigger deal than a waiver reminder). Not building anything special for this.
+
+**Low likelihood / explicitly tabled — don't build yet:**
+- **True per-league waiver-cutoff divergence** (League A's real cutoff is Monday night, League B's is Wednesday morning) — **can't be correctly resolved today at all**, because there's no per-league waiver-cutoff configuration anywhere (onboarding Step 4, referenced in `lib/rostiroState.ts`'s own comments, doesn't exist yet). The current fixed Tue/Wed window is a known, deliberate placeholder, not a bug to fix in isolation — it's blocked on that onboarding step existing first. Tabled until that prerequisite ships.
+- **Fantasy playoff byes** (a league seed earning a first-round playoff bye, weeks 15+) — tabled per direct instruction; real scenario, but 15 weeks out and not urgent.
+- Draft State (a live rookie/dynasty draft) overlapping a *different* league's real Game Day Sunday — technically possible (in-season dynasty startup drafts exist) but rare enough not to warrant special handling beyond the existing "Draft always wins" rule.
+
+**Small gap worth a one-line note, not a build:** PRD 6.14 describes an explicit "watching the rest of the league" quiet framing for a user with no live game of their own during Game Day. Today that's implemented by *omission* (the badge/card just don't render) rather than an explicit message. Close enough in practice; worth a real copy/design pass only if it comes up as a real point of confusion.

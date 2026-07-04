@@ -67,6 +67,15 @@ async function claimTrigger(
 }
 
 async function pushToUser(admin: AdminClient, userId: string, title: string, message: string, url?: string) {
+  // PRD 9: push notifications are a Pro feature — the in-app Pulse card
+  // (inserted separately, unconditionally) is the free tier's "smell what's
+  // cooking" layer; getting proactively pinged the instant it happens,
+  // rather than finding out next time you open the app, is the upgrade
+  // lever. This was already decided in Section 9 but never actually
+  // enforced until now (UX Behavior Spec Gap, 2026-07-04).
+  const { data: profile } = await admin.from('users').select('plan').eq('id', userId).maybeSingle()
+  if ((profile?.plan ?? 'free') === 'free') return
+
   const { data } = await admin.from('push_subscriptions').select('onesignal_player_id').eq('user_id', userId)
   const ids = ((data ?? []) as { onesignal_player_id: string }[]).map((r) => r.onesignal_player_id)
   if (ids.length === 0) return
