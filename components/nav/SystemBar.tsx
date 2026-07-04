@@ -99,9 +99,12 @@ export default function SystemBar({
   const deadline = status?.nextDeadline ?? null
   const deadlineMs = deadline ? new Date(deadline.at).getTime() - now : null
 
-  // T-92: plays once, the first moment this client notices Game Day start —
-  // never on every 60s poll while already in it.
-  const kickoffSweeping = useGameDayKickoffTransition(status?.rostiroState ?? null)
+  // T-92/T-97: plays once, the first moment this client notices a game
+  // actually go live — never on every 60s poll while already in it, and
+  // not during the pregame ramp computeState now enters up to 3h before
+  // kickoff (rostiroState alone no longer means "live").
+  const hasLiveGames = (status?.liveScores ?? []).some((g) => g.statusState !== 'pre')
+  const kickoffSweeping = useGameDayKickoffTransition(status?.rostiroState ?? null, hasLiveGames)
 
   return (
     <>

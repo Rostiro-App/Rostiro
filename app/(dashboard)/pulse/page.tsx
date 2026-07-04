@@ -57,12 +57,21 @@ interface PulseResponse {
 }
 
 // T-108
+interface FilmRoomUsageSignal {
+  name: string
+  position: string | null
+  direction: 'buy_low' | 'sell_high'
+  deltaPct: number
+}
+
 interface FilmRoomLeagueResult {
   leagueId: string
   leagueName: string
   myScore: number
   opponentScore: number
   won: boolean | null
+  usageSignal: FilmRoomUsageSignal | null
+  recap: string | null
 }
 
 // ─── Pulse page ────────────────────────────────────────────────────────────────
@@ -112,14 +121,15 @@ export default function PulsePage() {
     }
   }, [])
 
-  // T-108: only fetched during Film Room — real Sleeper matchup data for
-  // the most recently completed week, no snap-count/injury/Buy-Low-Sell-
-  // High content (blocked on T-87's nflverse pipeline, honest-empty rather
-  // than faked).
+  // T-108/T-95: only fetched during Film Room — real Sleeper matchup data
+  // for the most recently completed week, plus a Claude-narrated recap and
+  // a buy-low/sell-high usage signal (T-87's nflverse pipeline). Both are
+  // additive — a preseason week with no snap data, or a Claude failure,
+  // still shows the score.
   useEffect(() => {
     if (rostiroState !== 'film_room') return
     let cancelled = false
-    fetch('/api/film-room')
+    fetch(`/api/film-room?mode=${mode}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { results?: FilmRoomLeagueResult[] } | null) => {
         if (!cancelled && data) setFilmRoomResults(data.results ?? [])
@@ -128,7 +138,7 @@ export default function PulsePage() {
     return () => {
       cancelled = true
     }
-  }, [rostiroState])
+  }, [rostiroState, mode])
 
   useEffect(() => {
     let cancelled = false
@@ -200,24 +210,34 @@ export default function PulsePage() {
 
   const totalToday = items.length + doneToday
 
-  // Waiver Day State (PRD 6.10): priority waiver targets lead the queue,
-  // ahead of same-priority-tier items — a stable reorder, not a re-sort,
-  // so nothing else in the ordering shifts.
-  const displayItems = rostiroState === 'waiver_day'
-    ? [...items].sort((a, b) => Number(b.type === 'waiver_alert') - Number(a.type === 'waiver_alert'))
-    : items
-  const waiverCount = items.filter((i) => i.type === 'waiver_alert').length
-  const isMissionBriefing = rostiroState === 'waiver_day' && waiverCount > 0
-
   // T-90: games actually in progress or finished, involving a rostered
   // player — a not-yet-kicked-off game stays silent here (never a fake
   // "0-0"); that's the pregame ramp's (T-97) territory, not this card's.
   const liveGames = rostiroState === 'game_day'
     ? liveScores.filter((g) => g.rosterRelevant && g.statusState !== 'pre')
     : []
-  const isMissionControl = rostiroState === 'game_day'
-  // T-92: plays once, the first moment this client notices Game Day start.
-  const kickoffSweeping = useGameDayKickoffTransition(rostiroState)
+  // T-97: computeState returns 'game_day' up to 3h before the earliest
+  // kickoff now — Mission Control (and the kickoff sweep below) only kick
+  // in once a game has actually started, not for the whole ramp window.
+  // Inside the ramp itself, it's the last realistic chance to fix a
+  // lineup before it locks — that's what the reorder below surfaces.
+  const isMissionControl = rostiroState === 'game_day' && liveGames.length > 0
+  const isPregameRamp = rostiroState === 'game_day' && liveGames.length === 0
+
+  // Waiver Day / pregame ramp: priority items lead the queue, ahead of
+  // same-priority-tier items — a stable reorder, not a re-sort, so nothing
+  // else in the ordering shifts.
+  const displayItems = rostiroState === 'waiver_day'
+    ? [...items].sort((a, b) => Number(b.type === 'waiver_alert') - Number(a.type === 'waiver_alert'))
+    : isPregameRamp
+      ? [...items].sort((a, b) => Number(b.type === 'lineup_decision') - Number(a.type === 'lineup_decision'))
+      : items
+  const waiverCount = items.filter((i) => i.type === 'waiver_alert').length
+  const isMissionBriefing = rostiroState === 'waiver_day' && waiverCount > 0
+  const pregameLineupCount = items.filter((i) => i.type === 'lineup_decision').length
+  const isPregameCheck = isPregameRamp && pregameLineupCount > 0
+  // T-92: plays once, the first moment this client notices a game go live.
+  const kickoffSweeping = useGameDayKickoffTransition(rostiroState, liveGames.length > 0)
 
   return (
     <div className="max-w-2xl mx-auto px-4 pt-6 pb-8 md:px-6 md:pt-8">
@@ -257,6 +277,22 @@ export default function PulsePage() {
             MISSION CONTROL
           </span>
         )}
+        {/* T-97: the pregame ramp (up to 3h before the day's earliest
+            kickoff) is the last realistic window to fix a lineup — framed
+            as its own moment, distinct from both Standard's calm queue and
+            Mission Control's already-live one. */}
+        {isPregameCheck && (
+          <span
+            className="mono-data inline-block text-[9.5px] tracking-[0.16em] px-2 py-0.5 rounded-full mb-2"
+            style={{
+              color: STATE_CONFIG.game_day.color,
+              border: `1px solid ${STATE_CONFIG.game_day.color}`,
+              backgroundColor: 'color-mix(in srgb, currentColor 12%, transparent)',
+            }}
+          >
+            LAST CALL BEFORE KICKOFF
+          </span>
+        )}
         <h1 className="text-[22px] font-semibold tracking-tight" style={{ color: 'var(--t1)' }}>
           {greeting()}{firstName ? `, ${firstName}` : ''}.
         </h1>
@@ -272,6 +308,15 @@ export default function PulsePage() {
                       {waiverCount} priority waiver {waiverCount === 1 ? 'target' : 'targets'}
                     </b>
                     {` across ${leagueCount} ${leagueCount === 1 ? 'league' : 'leagues'}`}
+                  </>
+                )
+                : isPregameCheck
+                ? (
+                  <>
+                    <b style={{ color: STATE_CONFIG.game_day.color, fontWeight: 600 }}>
+                      {pregameLineupCount} {pregameLineupCount === 1 ? 'lineup' : 'lineups'} to confirm
+                    </b>
+                    {' before kickoff — don’t sleep on this matchup'}
                   </>
                 )
                 : (
@@ -378,6 +423,24 @@ export default function PulsePage() {
                 <p className="mono-data text-[11px] mt-0.5" style={{ color: 'var(--t2)' }}>
                   {r.myScore.toFixed(1)} – {r.opponentScore.toFixed(1)}
                 </p>
+                {/* T-95: Claude-narrated recap — the result and usage signal
+                    above are both computed deterministically; this is only
+                    ever the plain-English explanation of them. */}
+                {r.recap && (
+                  <p className="text-[12px] mt-1.5 leading-relaxed" style={{ color: 'var(--t2)' }}>
+                    {r.recap}
+                  </p>
+                )}
+                {/* Buy-low/sell-high usage signal — deliberately understated
+                    (no glow, no bright semantic color) to match Film Room's
+                    quietest palette; the arrow carries the direction. */}
+                {r.usageSignal && (
+                  <p className="mono-data text-[10.5px] mt-1.5" style={{ color: 'var(--t3)' }}>
+                    {r.usageSignal.direction === 'buy_low' ? '↑' : '↓'} {r.usageSignal.name}
+                    {r.usageSignal.position ? ` (${r.usageSignal.position})` : ''} — snap share{' '}
+                    {r.usageSignal.direction === 'buy_low' ? 'up' : 'down'} {r.usageSignal.deltaPct}pts
+                  </p>
+                )}
               </div>
             ))}
           </div>
@@ -410,6 +473,7 @@ export default function PulsePage() {
               item={item}
               mode={mode}
               isLeaving={leaving.has(item.id)}
+              isReprioritized={isMissionBriefing && item.type === 'waiver_alert'}
               onOpen={() => setDetail(item)}
               onAction={persistent ? handleAction : null}
             />
@@ -453,12 +517,14 @@ function PulseCard({
   item,
   mode,
   isLeaving,
+  isReprioritized,
   onOpen,
   onAction,
 }: {
   item: PulseItem
   mode: Mode
   isLeaving: boolean
+  isReprioritized: boolean
   onOpen: () => void
   onAction: ActionHandler
 }) {
@@ -469,13 +535,19 @@ function PulseCard({
       onClick={onOpen}
       onKeyDown={(e) => { if (e.key === 'Enter') onOpen() }}
       tabIndex={0}
-      className={`glass card-hover relative rounded-xl cursor-pointer ${isLeaving ? 'card-leave' : ''} ${mode === 'savant' ? 'p-3 pl-[18px]' : 'px-4 py-3 pl-[18px]'}`}
+      className={`glass card-hover relative rounded-xl cursor-pointer ${isLeaving ? 'card-leave' : isReprioritized ? 'waiver-reflow-in' : ''} ${mode === 'savant' ? 'p-3 pl-[18px]' : 'px-4 py-3 pl-[18px]'}`}
     >
-      {/* Glowing priority stripe */}
+      {/* Glowing priority stripe — Waiver Day (T-94): reprioritized waiver
+          targets get the opportunity-green Mission Briefing accent instead
+          of their ordinary priority color, reinforcing why they moved. */}
       <span
         aria-hidden="true"
         className="absolute left-0 top-2.5 bottom-2.5 w-[2.5px] rounded-full"
-        style={{ backgroundColor: PRIORITY_COLOR[item.priority], boxShadow: PRIORITY_GLOW[item.priority] }}
+        style={
+          isReprioritized
+            ? { backgroundColor: STATE_CONFIG.waiver_day.color, boxShadow: `0 0 8px ${STATE_CONFIG.waiver_day.color}99` }
+            : { backgroundColor: PRIORITY_COLOR[item.priority], boxShadow: PRIORITY_GLOW[item.priority] }
+        }
       />
 
       <div className="flex items-start justify-between gap-2.5">

@@ -188,6 +188,18 @@ body {
 }
 .draft-queue-slide-in { animation: draft-queue-slide-in 0.4s var(--ease-os); }
 
+/* T-94: Waiver Day — waiver_alert cards get bumped ahead of same-priority
+   items (a stable reorder, see pulse/page.tsx). Slides up from just below
+   its settled position with a brief opportunity-green flash, so the
+   reprioritization reads as motion rather than an instant, unexplained
+   jump to the top. */
+@keyframes waiver-reflow-in {
+  0% { opacity: 0; transform: translateY(10px); box-shadow: 0 0 0 1px rgba(29,158,117,.5), 0 0 16px rgba(29,158,117,.35); }
+  60% { opacity: 1; transform: none; }
+  100% { box-shadow: 0 0 0 0 rgba(29,158,117,0); }
+}
+.waiver-reflow-in { animation: waiver-reflow-in 0.6s var(--ease-os); }
+
 /* T-92: kickoff-triggered transition (6.13) — plays once, the first moment
    a client notices Game Day actually start. System Bar accent sweeps to
    the Game Day tone and settles, rather than an instant repaint. */
@@ -221,7 +233,8 @@ body {
   .ticker-crawl,
   .kickoff-sweep,
   .ticker-slide-in,
-  .draft-queue-slide-in {
+  .draft-queue-slide-in,
+  .waiver-reflow-in {
     animation: none;
   }
   .panel-enter { animation-duration: 0.01ms; }

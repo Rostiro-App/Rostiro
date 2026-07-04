@@ -107,9 +107,11 @@ export default function TickerBar() {
   // live game today, same public-market character as its ADP content.
   const liveGames = liveScores.filter((g) => g.statusState !== 'pre')
   const gameDayActive = rostiroState === 'game_day' && liveGames.length > 0
-  // T-92: plays once, the first moment this client notices Game Day start —
-  // the live segments below slide into the strip rather than just appearing.
-  const kickoffSweeping = useGameDayKickoffTransition(rostiroState)
+  // T-92/T-97: plays once, the first moment this client notices a game
+  // actually go live — the live segments below slide into the strip rather
+  // than just appearing. Gated on gameDayActive, not just rostiroState,
+  // since computeState now returns 'game_day' up to 3h before kickoff too.
+  const kickoffSweeping = useGameDayKickoffTransition(rostiroState, gameDayActive)
 
   // T-75: the visual crawl is decorative/duplicated (rendered twice for a
   // seamless loop) and can't be paused, so it's hidden from assistive tech

@@ -229,3 +229,61 @@ export async function generateDraftPickRecommendations(
   }
   return parsed.recommendations
 }
+
+interface FilmRoomRecapInput {
+  leagueName: string
+  won: boolean | null
+  myScore: number
+  opponentScore: number
+  usageSignal: { name: string; position: string | null; direction: 'buy_low' | 'sell_high'; deltaPct: number } | null
+  mode: Mode
+}
+
+// T-95: the win/loss, score, and usage signal are all computed
+// deterministically before this is called (lib/filmRoomSignals.ts,
+// app/api/film-room/route.ts) — Claude only narrates them. Non-punitive
+// framing on a loss is instructed directly (PRD Section 7 / 6.13's
+// "quietest palette" — Film Room reviews, it doesn't punish).
+export async function generateFilmRoomRecap(input: FilmRoomRecapInput): Promise<string> {
+  const anthropic = getClient()
+
+  const resultLine =
+    input.won === true
+      ? `Won ${input.myScore} to ${input.opponentScore}.`
+      : input.won === false
+        ? `Lost ${input.myScore} to ${input.opponentScore}.`
+        : `Tied ${input.myScore} to ${input.opponentScore}.`
+
+  const signalLine = input.usageSignal
+    ? input.usageSignal.direction === 'buy_low'
+      ? `${input.usageSignal.name} (${input.usageSignal.position})'s snap share rose ${input.usageSignal.deltaPct} points week over week.`
+      : `${input.usageSignal.name} (${input.usageSignal.position})'s snap share fell ${input.usageSignal.deltaPct} points week over week.`
+    : null
+
+  let message
+  try {
+    message = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 150,
+      thinking: { type: 'disabled' },
+      output_config: { effort: 'low' },
+      system:
+        `You write short, factual weekly fantasy football recaps. Use only the result and usage numbers given to you. Never invent stats, injuries, or plays that were not provided. A loss is reviewed the same even-handed way a win is — never scold, mock, or pile on. One to two sentences. ${toneInstruction(input.mode)}`,
+      messages: [
+        {
+          role: 'user',
+          content: `League: ${input.leagueName}. ${resultLine}${signalLine ? ` ${signalLine}` : ''} Write a brief recap of the week.`,
+        },
+      ],
+    })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    throw new ClaudeAPIError(`Claude request failed: ${message}`)
+  }
+
+  const textBlock = message.content.find((b) => b.type === 'text')
+  if (!textBlock || textBlock.type !== 'text') {
+    throw new ClaudeAPIError('Claude returned no text content')
+  }
+  return textBlock.text.trim()
+}

@@ -6,8 +6,11 @@
 // against risks a silent bug, so they're deliberately not attempted here.
 
 import { createSSRClient, createAdminClient } from '@/lib/supabase'
-import { getSleeperMatchups, computeFilmRoomResult } from '@/lib/sleeper'
-import { NextResponse } from 'next/server'
+import { getSleeperMatchups, computeFilmRoomResult, getSleeperRosters, SEASON } from '@/lib/sleeper'
+import { computeTopUsageSignal, type RosterUsageRow, type UsageSignal } from '@/lib/filmRoomSignals'
+import { generateFilmRoomRecap } from '@/lib/claude'
+import { NextResponse, type NextRequest } from 'next/server'
+import type { Mode } from '@/components/nav/AppShell'
 
 interface FilmRoomLeagueResult {
   leagueId: string
@@ -15,12 +18,19 @@ interface FilmRoomLeagueResult {
   myScore: number
   opponentScore: number
   won: boolean | null
+  usageSignal: UsageSignal | null
+  recap: string | null
 }
 
-export async function GET() {
+const VALID_MODES: Mode[] = ['focused', 'balanced', 'savant']
+
+export async function GET(request: NextRequest) {
   const supabase = await createSSRClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const modeParam = request.nextUrl.searchParams.get('mode')
+  const mode: Mode = VALID_MODES.includes(modeParam as Mode) ? (modeParam as Mode) : 'balanced'
 
   const { data: leagues } = await supabase
     .from('connected_leagues')
@@ -36,13 +46,33 @@ export async function GET() {
   // (every one is pre-season/pre-draft) — this is the only way to see the
   // real card render against something other than an empty state today.
   if (process.env.DEMO_MODE === 'true') {
-    const results: FilmRoomLeagueResult[] = rows.map((l) => ({
-      leagueId: l.id,
-      leagueName: l.league_name,
-      myScore: 132.4,
-      opponentScore: 118.6,
-      won: true,
-    }))
+    const demoSignal: UsageSignal = { playerId: 'demo', name: 'Backup RB', position: 'RB', direction: 'buy_low', deltaPct: 22 }
+    const results: FilmRoomLeagueResult[] = await Promise.all(
+      rows.map(async (l) => {
+        let recap: string | null = null
+        try {
+          recap = await generateFilmRoomRecap({
+            leagueName: l.league_name,
+            won: true,
+            myScore: 132.4,
+            opponentScore: 118.6,
+            usageSignal: demoSignal,
+            mode,
+          })
+        } catch {
+          // Recap is additive — a Claude failure shouldn't blank the score card.
+        }
+        return {
+          leagueId: l.id,
+          leagueName: l.league_name,
+          myScore: 132.4,
+          opponentScore: 118.6,
+          won: true,
+          usageSignal: demoSignal,
+          recap,
+        }
+      })
+    )
     return NextResponse.json({ results })
   }
 
@@ -57,12 +87,31 @@ export async function GET() {
       const matchups = await getSleeperMatchups(league.league_id, week)
       const result = computeFilmRoomResult(matchups, Number(league.team_id))
       if (!result) continue
+
+      const usageSignal = await computeLeagueUsageSignal(admin, league.league_id, Number(league.team_id), week)
+
+      let recap: string | null = null
+      try {
+        recap = await generateFilmRoomRecap({
+          leagueName: league.league_name,
+          won: result.won,
+          myScore: result.myScore,
+          opponentScore: result.opponentScore,
+          usageSignal,
+          mode,
+        })
+      } catch {
+        // Recap is additive — a Claude failure shouldn't blank the score card.
+      }
+
       results.push({
         leagueId: league.id,
         leagueName: league.league_name,
         myScore: result.myScore,
         opponentScore: result.opponentScore,
         won: result.won,
+        usageSignal,
+        recap,
       })
     } catch {
       // One league's Sleeper call failing shouldn't blank the others.
@@ -71,6 +120,58 @@ export async function GET() {
   }
 
   return NextResponse.json({ results })
+}
+
+// T-95: roster's week-over-week usage swing (T-87's player_usage_snapshots).
+// Best-effort — a missing migration or a preseason week with no snap data
+// yet just means no signal this week, never a broken Film Room card.
+async function computeLeagueUsageSignal(
+  admin: ReturnType<typeof createAdminClient>,
+  leagueId: string,
+  rosterId: number,
+  week: number
+): Promise<UsageSignal | null> {
+  try {
+    const rosters = await getSleeperRosters(leagueId)
+    const myRoster = rosters.find((r) => r.roster_id === rosterId)
+    if (!myRoster || myRoster.players.length === 0) return null
+
+    const [currentRes, previousRes, namesRes] = await Promise.all([
+      admin
+        .from('player_usage_snapshots')
+        .select('player_id, position, offense_pct')
+        .eq('season', SEASON)
+        .eq('week', week)
+        .in('player_id', myRoster.players),
+      admin
+        .from('player_usage_snapshots')
+        .select('player_id, offense_pct')
+        .eq('season', SEASON)
+        .eq('week', week - 1)
+        .in('player_id', myRoster.players),
+      admin
+        .from('players_cache')
+        .select('player_id, name')
+        .eq('platform', 'sleeper')
+        .in('player_id', myRoster.players),
+    ])
+    if (currentRes.error || previousRes.error) return null
+
+    const previousByPlayer = new Map((previousRes.data ?? []).map((r) => [r.player_id, r.offense_pct as number | null]))
+    const nameByPlayer = new Map((namesRes.data ?? []).map((r) => [r.player_id, r.name as string]))
+
+    const usageRows: RosterUsageRow[] = (currentRes.data ?? []).map((r) => ({
+      playerId: r.player_id,
+      name: nameByPlayer.get(r.player_id) ?? r.player_id,
+      position: r.position,
+      currentPct: r.offense_pct,
+      previousPct: previousByPlayer.get(r.player_id) ?? null,
+    }))
+
+    return computeTopUsageSignal(usageRows)
+  } catch {
+    return null
+  }
 }
 
 // Highest week where every scheduled game's live window (kickoff + 4h) has
