@@ -153,8 +153,8 @@ Unlike the changelog rows in `Rostiro_PRD_v5.md` (append-only, dated), this sect
 | 3 | Draft/Standard State surface wiring (T-104) | ✓ Done |
 | 4 | Mode threaded into remaining surfaces (T-105) | ✓ Done |
 | 5 | The Interrupt Stack (T-106) | ✓ Done |
-| 6 | Per-league waiver cutoff → Waiver Day State UI (T-107) | **Next up** |
-| 7 | Film Room State UI + matchup data (T-108) | Queued after (6) |
+| 6 | Per-league waiver cutoff (T-107) | ✓ Done |
+| 7 | Waiver Day State UI + Film Room State UI + matchup data (T-108) | **Next up** |
 
 ### Explicitly deferred — not forgotten, just not now
 | Item | Why deferred | Where it's tracked |
