@@ -15,6 +15,7 @@ export default function SleeperConnect({
   const [leagues, setLeagues] = useState<{ league_id: string; name: string; total_rosters: number }[]>([])
   const [saving, setSaving] = useState(false)
   const [skippedForPlan, setSkippedForPlan] = useState(0)
+  const [connectedCount, setConnectedCount] = useState(0)
 
   async function handleLookup(e: React.FormEvent) {
     e.preventDefault()
@@ -49,9 +50,12 @@ export default function SleeperConnect({
     if (res.ok) {
       const data: { connected: number; skippedForPlan: number } = await res.json()
       // T-103: Free is capped at 1 league — a username with several active
-      // leagues can hit that cap in one save. Never silently drop the rest;
-      // only interrupt the otherwise-instant flow when it actually happened.
+      // leagues can hit that cap in one save, and if the user was already at
+      // the cap from a different platform, this batch can connect zero. Never
+      // silently drop the rest; only interrupt the otherwise-instant flow
+      // when something was actually skipped.
       if (data.skippedForPlan > 0) {
+        setConnectedCount(data.connected)
         setSkippedForPlan(data.skippedForPlan)
       } else {
         onConnected()
@@ -132,7 +136,10 @@ export default function SleeperConnect({
       {skippedForPlan > 0 && (
         <div className="mt-4 rounded-lg px-3 py-2.5" style={{ backgroundColor: 'rgba(75,163,245,0.08)', border: '1px solid rgba(75,163,245,0.3)' }}>
           <p className="text-sm" style={{ color: 'var(--t1)' }}>
-            Connected 1 league — Free plan is limited to 1. {skippedForPlan} other{skippedForPlan !== 1 ? 's were' : ' was'} not connected. Upgrade to Pro to add the rest.
+            {connectedCount > 0
+              ? `Connected ${connectedCount} league${connectedCount !== 1 ? 's' : ''} — Free plan is limited to 1. `
+              : `You're already at your Free plan limit (1 league) — `}
+            {skippedForPlan} other{skippedForPlan !== 1 ? 's were' : ' was'} not connected. Upgrade to Pro to add {skippedForPlan !== 1 ? 'them' : 'it'}.
           </p>
           <button
             onClick={onConnected}
