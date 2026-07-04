@@ -17,12 +17,30 @@
 // login in the same tab still replays it.
 //
 // Starts every render (server AND initial client paint) at 'skip' —
-// sessionStorage is only ever read inside the effect below, never as part
-// of initial state, since window doesn't exist during SSR and branching
-// the very first render on it is a real hydration mismatch (caught live:
-// server has no overlay, client tried to render one, React flagged it).
+// sessionStorage is only ever read client-side, never as part of initial
+// render state, since window doesn't exist during SSR and branching the
+// very first render on it is a real hydration mismatch (caught live).
+//
+// Two real bugs found via the founder's own live testing after the first
+// version shipped:
+// 1. Clicks were dead across the whole app once the boot sequence ended
+//    naturally (without being skipped). Root cause: the timer scheduling
+//    lived in an effect keyed on `[phase]`, so the moment the "in -> out"
+//    timer fired, React re-ran the effect — cleaning up (clearing) the
+//    still-pending "out -> done" timer in the process. Phase got stuck at
+//    'out' forever: invisible (opacity 0, animation-fill-mode: forwards)
+//    but still mounted as a full-screen `fixed inset-0` layer, silently
+//    swallowing every click. Fixed by scheduling both timers once, in a
+//    mount-only effect (`[]` deps), so a phase change never re-triggers —
+//    and never cancels — them.
+// 2. The real UI flashed visibly for a frame before the boot overlay
+//    appeared. Root cause: the mount check lived in a plain useEffect,
+//    which runs *after* the browser paints the first frame. Fixed with
+//    useLayoutEffect (client-only, so it never fires during SSR and can't
+//    reintroduce the hydration mismatch above) — it commits and repaints
+//    with the overlay already in place before anything is shown on screen.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import PulseMark from '@/components/PulseMark'
 import type { RostiroState } from '@/lib/rostiroState'
 
@@ -36,19 +54,21 @@ type Phase = 'in' | 'out' | 'done' | 'skip'
 export default function BootSequence() {
   const [phase, setPhase] = useState<Phase>('skip')
   const [state, setState] = useState<RostiroState>('standard')
+  const timersRef = useRef<number[]>([])
 
-  // Runs once, client-only, after hydration — the one-time "should this
-  // tab session boot?" decision belongs here, not in initial render state.
-  useEffect(() => {
+  // useLayoutEffect (not useEffect) specifically so this resolves before
+  // the browser paints — see bug #2 above.
+  useLayoutEffect(() => {
     if (window.sessionStorage.getItem(BOOT_KEY)) return
     window.sessionStorage.setItem(BOOT_KEY, '1')
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time mount check, not a derived-state loop; same pre-existing pattern as InterruptStack/gameDayTransition.
     setPhase('in')
   }, [])
 
+  // Deliberately [] — not [phase] — so this never re-runs (and never
+  // clears its own not-yet-fired timer) when the timers it schedules
+  // change phase. See bug #1 above.
   useEffect(() => {
-    if (phase !== 'in') return
-
     // Best-effort — a slow or failed fetch just means the boot plays in
     // Standard's default blue rather than the real active state.
     fetch('/api/system/status')
@@ -62,17 +82,18 @@ export default function BootSequence() {
     const holdMs = reduced ? 200 : HOLD_MS
     const fadeMs = reduced ? 150 : FADE_OUT_MS
 
-    const timers = [
+    timersRef.current = [
       window.setTimeout(() => setPhase('out'), MARK_IN_MS + holdMs),
       window.setTimeout(() => setPhase('done'), MARK_IN_MS + holdMs + fadeMs),
     ]
-    return () => timers.forEach(window.clearTimeout)
-  }, [phase])
+    return () => timersRef.current.forEach(window.clearTimeout)
+  }, [])
 
   function skip() {
     if (phase !== 'in') return
+    timersRef.current.forEach(window.clearTimeout)
     setPhase('out')
-    window.setTimeout(() => setPhase('done'), 200)
+    timersRef.current = [window.setTimeout(() => setPhase('done'), 200)]
   }
 
   if (phase === 'done' || phase === 'skip') return null
