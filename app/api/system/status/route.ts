@@ -26,6 +26,8 @@ interface LeagueRow {
   league_id: string
   league_name: string
   team_id: string | null
+  waiver_cutoff_day: number | null
+  waiver_cutoff_hour: number | null
 }
 
 interface CacheRow {
@@ -72,12 +74,25 @@ export async function GET() {
 
   const { data: leagues, error } = await supabase
     .from('connected_leagues')
-    .select('id, platform, league_id, league_name, team_id')
+    .select('id, platform, league_id, league_name, team_id, waiver_cutoff_day, waiver_cutoff_hour')
     .eq('user_id', user.id)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  const rows = (leagues ?? []) as LeagueRow[]
+  let rows: LeagueRow[]
+  if (error?.code === '42703') {
+    // T-107: migration_waiver_cutoff.sql not run yet — degrade to the
+    // pre-T-107 select rather than 500ing the whole bar over two missing
+    // columns nothing critical depends on yet.
+    const fallback = await supabase
+      .from('connected_leagues')
+      .select('id, platform, league_id, league_name, team_id')
+      .eq('user_id', user.id)
+    if (fallback.error) return NextResponse.json({ error: fallback.error.message }, { status: 500 })
+    rows = (fallback.data ?? []).map((r) => ({ ...r, waiver_cutoff_day: null, waiver_cutoff_hour: null }))
+  } else if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  } else {
+    rows = (leagues ?? []) as LeagueRow[]
+  }
 
   // One free-agent pool query serves every league: top of the ADP board,
   // filtered per league against that league's rostered IDs.
@@ -230,7 +245,15 @@ export async function GET() {
   // nfl_schedule read errors — the System Bar should never blank out over a
   // pulse-mark color, per 10.1's "serve last-cached/best-guess, never a
   // blank screen" resilience rule.
-  const rostiroState = await getRostiroState(supabase, draftIncompleteFlags).catch(() => 'standard' as const)
+  // T-107: only Sleeper leagues get a real cutoff configured today (matches
+  // every other per-league feature's scope this session) — non-Sleeper rows
+  // simply pass through as unconfigured, same honest-degradation posture as
+  // UNKNOWN_HEALTH.
+  const leagueWaiverConfigs = rows.map((r) => ({
+    waiverCutoffDay: r.waiver_cutoff_day,
+    waiverCutoffHour: r.waiver_cutoff_hour,
+  }))
+  const rostiroState = await getRostiroState(supabase, draftIncompleteFlags, leagueWaiverConfigs).catch(() => 'standard' as const)
 
   // T-90: live scores, gated behind the same flag as the T-81 cron — an
   // instant kill switch that also stops this route from doing the extra

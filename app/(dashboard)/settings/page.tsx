@@ -14,7 +14,13 @@ interface SettingsData {
   pushEnabled: boolean
   mode: Mode | null
   createdAt: string
-  leagues: Array<{ id: string; platform: string; league_name: string }>
+  leagues: Array<{
+    id: string
+    platform: string
+    league_name: string
+    waiverCutoffDay: number | null
+    waiverCutoffHour: number | null
+  }>
 }
 
 const PLAN_LABEL: Record<string, string> = {
@@ -29,6 +35,10 @@ const PLATFORM_LABEL: Record<string, string> = {
   yahoo: 'YAHOO',
   espn: 'ESPN',
 }
+
+// T-107: real per-league waiver cutoff, used instead of the global Tue/Wed
+// default the moment it's set. 0=Sun..6=Sat, matching lib/rostiroState.ts.
+const WAIVER_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 const MODES: Array<{ id: Mode; label: string; tagline: string }> = [
   { id: 'focused', label: 'Focused', tagline: 'Just tell me what to do.' },
@@ -86,6 +96,29 @@ export default function SettingsPage() {
     } catch {
       setData((d) => (d ? { ...d, leagues: prev } : d))
       setError('Could not disconnect that league — try again.')
+      setTimeout(() => setError(null), 4000)
+    }
+  }
+
+  // T-107: null/null means "use the global Tue/Wed default" — same
+  // optimistic-update-with-rollback pattern as disconnect/togglePush.
+  async function updateWaiverCutoff(leagueId: string, waiverCutoffDay: number | null, waiverCutoffHour: number | null) {
+    if (!data) return
+    const prev = data.leagues
+    setData({
+      ...data,
+      leagues: prev.map((l) => (l.id === leagueId ? { ...l, waiverCutoffDay, waiverCutoffHour } : l)),
+    })
+    try {
+      const res = await fetch(`/api/leagues/${leagueId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ waiverCutoffDay, waiverCutoffHour }),
+      })
+      if (!res.ok) throw new Error()
+    } catch {
+      setData((d) => (d ? { ...d, leagues: prev } : d))
+      setError('Could not update waiver cutoff — try again.')
       setTimeout(() => setError(null), 4000)
     }
   }
@@ -188,42 +221,79 @@ export default function SettingsPage() {
                   </a>
                 </div>
                 {data.leagues.map((league) => (
-                  <div key={league.id} className="flex items-center justify-between gap-3 py-1.5">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span
-                        className="text-[10px] font-semibold px-1.5 rounded flex-shrink-0"
-                        style={{ color: 'var(--t2)', border: '1px solid var(--hairline)' }}
-                      >
-                        {PLATFORM_LABEL[league.platform] ?? league.platform.toUpperCase()}
-                      </span>
-                      <span className="text-sm text-white truncate">{league.league_name}</span>
-                    </div>
-                    {confirmingId === league.id ? (
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <button
-                          onClick={() => disconnect(league.id)}
-                          className="text-xs font-semibold px-2.5 py-1.5 rounded-lg"
-                          style={{ backgroundColor: 'rgba(232,80,74,.13)', color: 'var(--crit)' }}
+                  <div key={league.id} className="py-1.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span
+                          className="text-[10px] font-semibold px-1.5 rounded flex-shrink-0"
+                          style={{ color: 'var(--t2)', border: '1px solid var(--hairline)' }}
                         >
-                          Confirm
-                        </button>
-                        <button
-                          onClick={() => setConfirmingId(null)}
-                          className="text-xs px-2.5 py-1.5 rounded-lg"
-                          style={{ color: 'var(--t2)' }}
-                        >
-                          Cancel
-                        </button>
+                          {PLATFORM_LABEL[league.platform] ?? league.platform.toUpperCase()}
+                        </span>
+                        <span className="text-sm text-white truncate">{league.league_name}</span>
                       </div>
-                    ) : (
-                      <button
-                        onClick={() => setConfirmingId(league.id)}
-                        className="text-xs px-2.5 py-1.5 rounded-lg flex-shrink-0 transition-all"
-                        style={{ color: 'var(--t3)', border: '1px solid var(--hairline)' }}
+                      {confirmingId === league.id ? (
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <button
+                            onClick={() => disconnect(league.id)}
+                            className="text-xs font-semibold px-2.5 py-1.5 rounded-lg"
+                            style={{ backgroundColor: 'rgba(232,80,74,.13)', color: 'var(--crit)' }}
+                          >
+                            Confirm
+                          </button>
+                          <button
+                            onClick={() => setConfirmingId(null)}
+                            className="text-xs px-2.5 py-1.5 rounded-lg"
+                            style={{ color: 'var(--t2)' }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmingId(league.id)}
+                          className="text-xs px-2.5 py-1.5 rounded-lg flex-shrink-0 transition-all"
+                          style={{ color: 'var(--t3)', border: '1px solid var(--hairline)' }}
+                        >
+                          Disconnect
+                        </button>
+                      )}
+                    </div>
+
+                    {/* T-107: real per-league waiver cutoff — overrides the
+                        global Tue/Wed default for Waiver Day detection the
+                        moment it's set. Works for any platform; this is a
+                        calendar fact the user knows, not something that
+                        needs roster API access to determine. */}
+                    <div className="flex items-center gap-1.5 mt-1.5 pl-0.5">
+                      <span className="text-[10px]" style={{ color: 'var(--t3)' }}>Waiver cutoff</span>
+                      <select
+                        value={league.waiverCutoffDay ?? ''}
+                        onChange={(e) => {
+                          const day = e.target.value === '' ? null : Number(e.target.value)
+                          updateWaiverCutoff(league.id, day, day === null ? null : league.waiverCutoffHour ?? 3)
+                        }}
+                        className="text-[10px] rounded px-1.5 py-0.5 outline-none"
+                        style={{ backgroundColor: 'rgba(6,11,19,0.55)', border: '1px solid var(--hairline)', color: 'var(--t2)' }}
                       >
-                        Disconnect
-                      </button>
-                    )}
+                        <option value="">Default (Tue/Wed)</option>
+                        {WAIVER_DAYS.map((d, i) => (
+                          <option key={i} value={i}>{d}</option>
+                        ))}
+                      </select>
+                      {league.waiverCutoffDay !== null && (
+                        <select
+                          value={league.waiverCutoffHour ?? 3}
+                          onChange={(e) => updateWaiverCutoff(league.id, league.waiverCutoffDay, Number(e.target.value))}
+                          className="text-[10px] rounded px-1.5 py-0.5 outline-none"
+                          style={{ backgroundColor: 'rgba(6,11,19,0.55)', border: '1px solid var(--hairline)', color: 'var(--t2)' }}
+                        >
+                          {Array.from({ length: 24 }, (_, h) => (
+                            <option key={h} value={h}>{String(h).padStart(2, '0')}:00 ET</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

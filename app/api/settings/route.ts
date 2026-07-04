@@ -30,7 +30,7 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const [{ data: profile, error: profileError }, { data: leagues }] = await Promise.all([
+  const [{ data: profile, error: profileError }, { data: leagues, error: leaguesError }] = await Promise.all([
     supabase
       .from('users')
       .select('email, plan, push_enabled, mode, created_at')
@@ -38,10 +38,24 @@ export async function GET() {
       .maybeSingle(),
     supabase
       .from('connected_leagues')
-      .select('id, platform, league_name')
+      .select('id, platform, league_name, waiver_cutoff_day, waiver_cutoff_hour')
       .eq('user_id', user.id)
       .order('created_at', { ascending: true }),
   ])
+
+  // T-107: migration_waiver_cutoff.sql not run yet — retry without the two
+  // new columns so the rest of Settings (and league list) still works.
+  let leagueRows = leagues
+  if (leaguesError?.code === '42703') {
+    const fallback = await supabase
+      .from('connected_leagues')
+      .select('id, platform, league_name')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: true })
+    leagueRows = (fallback.data ?? []).map((l) => ({ ...l, waiver_cutoff_day: null, waiver_cutoff_hour: null }))
+  } else if (leaguesError) {
+    return NextResponse.json({ error: leaguesError.message }, { status: 500 })
+  }
 
   // 42703 = mode column missing (migration not run) — retry without it so
   // the rest of Settings still works.
@@ -67,7 +81,13 @@ export async function GET() {
     pushEnabled: row.push_enabled,
     mode: modeAvailable ? row.mode : null,
     createdAt: row.created_at,
-    leagues: leagues ?? [],
+    leagues: (leagueRows ?? []).map((l) => ({
+      id: l.id,
+      platform: l.platform,
+      league_name: l.league_name,
+      waiverCutoffDay: l.waiver_cutoff_day,
+      waiverCutoffHour: l.waiver_cutoff_hour,
+    })),
   })
 }
 
