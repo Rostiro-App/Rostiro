@@ -1,23 +1,27 @@
+// T-112: rebuilt on the real Rostiro OS tokens, matching PublicHeader.
+
 import Link from 'next/link'
 
 export default function PublicFooter() {
   return (
     <footer
       className="px-4 md:px-6 py-10"
-      style={{ backgroundColor: '#0A1520', borderTop: '1px solid #1A3048' }}
+      style={{ backgroundColor: 'var(--glass-solid)', borderTop: '1px solid var(--hairline)' }}
     >
       <div className="max-w-5xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-6">
         <div>
-          <span className="text-white font-bold tracking-[0.15em] text-sm block mb-1">ROSTIRO</span>
-          <p className="text-sm" style={{ color: '#3A5A7A' }}>Run Every League.</p>
+          <span className="mono-data font-bold tracking-[0.15em] text-sm block mb-1" style={{ color: 'var(--t1)' }}>
+            ROSTIRO
+          </span>
+          <p className="text-sm" style={{ color: 'var(--t3)' }}>Run Every League.</p>
         </div>
-        <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm" style={{ color: '#5A7A9A' }}>
-          <Link href="/draft" className="hover:text-white transition-colors">Draft Kit</Link>
-          <Link href="/login" className="hover:text-white transition-colors">Sign in</Link>
-          <Link href="/signup" className="hover:text-white transition-colors">Get started</Link>
+        <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm" style={{ color: 'var(--t2)' }}>
+          <Link href="/draft" className="transition-colors hover:opacity-80">Draft Kit</Link>
+          <Link href="/login" className="transition-colors hover:opacity-80">Sign in</Link>
+          <Link href="/signup" className="transition-colors hover:opacity-80">Get started</Link>
         </div>
       </div>
-      <p className="max-w-5xl mx-auto mt-8 text-xs" style={{ color: '#2A4560' }}>
+      <p className="max-w-5xl mx-auto mt-8 text-xs" style={{ color: 'var(--t4)' }}>
         &copy; {new Date().getFullYear()} Rostiro. Not affiliated with ESPN, Yahoo, or Sleeper.
       </p>
     </footer>
