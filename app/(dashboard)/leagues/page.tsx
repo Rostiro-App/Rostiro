@@ -154,6 +154,15 @@ function LeagueCard({
           {health.topFlag && (
             <p className="text-[11.5px] mt-2" style={{ color: 'var(--t2)' }}>{health.topFlag}</p>
           )}
+          {/* T-109 follow-up: "NO DATA YET" alone doesn't say why — a real
+              user reported an ESPN league showing nothing here with no
+              explanation. Health/Pulse/Lineup are Sleeper-only today; say
+              so honestly rather than leaving an unexplained blank. */}
+          {health.status === 'unknown' && (
+            <p className="text-[11.5px] mt-2" style={{ color: 'var(--t3)' }}>
+              Rostiro's live health scoring, Pulse, and Start/Sit only run on Sleeper leagues today — {PLATFORM_LABEL[league.platform] ?? league.platform} support is coming.
+            </p>
+          )}
         </div>
       </div>
 

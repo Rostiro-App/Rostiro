@@ -142,11 +142,18 @@ export default function SleeperConnect({
             {skippedForPlan} other{skippedForPlan !== 1 ? 's were' : ' was'} not connected. Upgrade to Pro to add {skippedForPlan !== 1 ? 'them' : 'it'}.
           </p>
           <button
-            onClick={onConnected}
+            // Only signal real success upward when something actually
+            // connected — this button previously called onConnected()
+            // unconditionally, which falsely marked Sleeper as "Connected"
+            // in onboarding's platform list even when the cap blocked
+            // every league in the batch. onBack lands on the same screen
+            // (onboarding's onBack also does setStep('connect')) without
+            // the false positive.
+            onClick={connectedCount > 0 ? onConnected : onBack}
             className="mt-2 text-sm font-medium underline"
             style={{ color: 'var(--signal)' }}
           >
-            Continue →
+            {connectedCount > 0 ? 'Continue →' : 'Back →'}
           </button>
         </div>
       )}
