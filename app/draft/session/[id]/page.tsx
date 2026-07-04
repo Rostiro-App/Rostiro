@@ -124,6 +124,18 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
     [bestAvailable, positionFilter]
   )
 
+  // Copilot Signal (renamed from an unlabeled recommendation list, per
+  // founder feedback watching a real draft): Claude never produces its own
+  // ranking (PRD 10.1 — deterministic first, AI second), it only narrates
+  // the order bestAvailable already computed. This rank lookup makes that
+  // fact visible instead of implicit — a #1/#2/#3 badge next to each
+  // recommendation proves it's the algorithm's live order, not a second,
+  // competing opinion from Claude.
+  const rankByPlayerId = useMemo(
+    () => new Map(bestAvailable.map((r, i) => [r.player.playerId, i + 1])),
+    [bestAvailable]
+  )
+
   const myPickNumbers = useMemo(
     () => (settings ? computeMyPickNumbers(settings.myDraftPosition, settings.teamCount, settings.totalRounds) : []),
     [settings]
@@ -281,6 +293,14 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
           <p className="text-xs font-semibold tracking-widest uppercase mb-3" style={{ color: '#EF9F27' }}>
             {picksLeft === 0 ? "You're on the clock" : `Your turn in ${picksLeft} pick${picksLeft === 1 ? '' : 's'}`}
           </p>
+
+          <div className="flex items-center gap-2 mb-2.5">
+            <span className="mono-data text-[9px] tracking-[0.16em]" style={{ color: 'var(--signal)' }}>
+              COPILOT SIGNAL
+            </span>
+            <span className="h-px flex-1" style={{ backgroundColor: 'var(--hairline)' }} />
+          </div>
+
           {recommendations.length === 0 ? (
             <p className="text-sm" style={{ color: 'var(--t2)' }}>Preparing recommendations...</p>
           ) : (
@@ -292,10 +312,20 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
                 // anything still here is still live.
                 const p = poolByPlayerId.get(rec.playerId)
                 if (!p || draftedIds.has(rec.playerId)) return null
+                const rank = rankByPlayerId.get(rec.playerId)
                 return (
-                  <div key={rec.playerId} className="draft-queue-slide-in">
-                    <p className="text-sm font-semibold text-white">{p.name} <span className="text-xs font-normal" style={{ color: 'var(--t3)' }}>{p.position} · ADP {Math.round(p.adpConsensus)}</span></p>
-                    <p className="text-sm mt-0.5" style={{ color: 'var(--t2)' }}>{rec.reasoning}</p>
+                  <div key={rec.playerId} className="draft-queue-slide-in flex gap-2.5">
+                    <span
+                      className="mono-data text-xs font-bold flex-shrink-0 mt-[1px]"
+                      style={{ color: 'var(--signal)' }}
+                      title="Current deterministic rank — Claude narrates this order, it doesn't set it"
+                    >
+                      {rank ? `#${rank}` : '–'}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-white">{p.name} <span className="text-xs font-normal" style={{ color: 'var(--t3)' }}>{p.position} · ADP {Math.round(p.adpConsensus)}</span></p>
+                      <p className="text-sm mt-0.5" style={{ color: 'var(--t2)' }}>{rec.reasoning}</p>
+                    </div>
                   </div>
                 )
               })}
