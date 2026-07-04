@@ -166,7 +166,7 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between py-1">
                 <p className="text-sm" style={{ color: 'var(--t2)' }}>No leagues connected.</p>
                 <a
-                  href="/onboarding"
+                  href="/leagues/add"
                   className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white"
                   style={{ backgroundColor: 'var(--cta)' }}
                 >
@@ -175,6 +175,18 @@ export default function SettingsPage() {
               </div>
             ) : (
               <div className="space-y-1">
+                {/* T-109: previously the only way to add a league at all was
+                    /onboarding — a returning user with leagues already
+                    connected had no path back to it anywhere in the app. */}
+                <div className="flex justify-end pb-1">
+                  <a
+                    href="/leagues/add"
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg"
+                    style={{ color: 'var(--signal)', border: '1px solid rgba(75,163,245,.4)' }}
+                  >
+                    + Add another
+                  </a>
+                </div>
                 {data.leagues.map((league) => (
                   <div key={league.id} className="flex items-center justify-between gap-3 py-1.5">
                     <div className="flex items-center gap-2.5 min-w-0">

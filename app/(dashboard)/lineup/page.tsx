@@ -1,8 +1,7 @@
 'use client'
 
-// T-63: Real Sleeper data via /api/lineup/sleeper. No weekly free/paid quota
-// yet — that needs a usage-tracking table (see PRD: Free 3/week, Starter+
-// unlimited), tracked as a follow-up.
+// T-63: Real Sleeper data via /api/lineup/sleeper. Weekly Free/Pro quota
+// enforced server-side (T-103, lib/usageLimits.ts).
 
 import { useEffect, useState } from 'react'
 import { useMode, type Mode } from '@/components/nav/AppShell'
@@ -34,8 +33,25 @@ export default function LineupPage() {
   const mode = useMode()
   const [recs, setRecs] = useState<StartSitRecommendation[]>([])
   const [leagueCount, setLeagueCount] = useState(0)
+  const [totalLeagueCount, setTotalLeagueCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // T-109: leagueCount below is Sleeper-only (this route's own backend) —
+  // this is every connected league, any platform, so the empty state can
+  // tell "truly no leagues" apart from "has leagues, none of them Sleeper."
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/system/status')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { leagues?: unknown[] } | null) => {
+        if (!cancelled && data) setTotalLeagueCount(data.leagues?.length ?? 0)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -77,7 +93,7 @@ export default function LineupPage() {
 
       {loading && <LoadingState />}
       {!loading && error && <ErrorState message={error} />}
-      {!loading && !error && leagueCount === 0 && <NoLeaguesState />}
+      {!loading && !error && leagueCount === 0 && <NoLeaguesState totalLeagueCount={totalLeagueCount} />}
       {!loading && !error && leagueCount > 0 && recs.length === 0 && <AllClearState />}
       {!loading && !error && recs.length > 0 && (
         <div className="space-y-3">
@@ -154,13 +170,25 @@ function ErrorState({ message }: { message: string }) {
   )
 }
 
-function NoLeaguesState() {
+function NoLeaguesState({ totalLeagueCount }: { totalLeagueCount: number }) {
+  const hasOtherLeagues = totalLeagueCount > 0
   return (
     <div className="rounded-xl p-6 text-center" style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', border: '1px solid var(--hairline)' }}>
-      <p className="text-sm font-medium text-white">Connect a league to see start/sit calls.</p>
-      <p className="text-sm mt-1" style={{ color: 'var(--t2)' }}>
-        Once a Sleeper league is connected, Rostiro compares your bench against your lineup every time you open this page.
+      <p className="text-sm font-medium text-white">
+        {hasOtherLeagues ? 'Start/sit needs a Sleeper league.' : 'Connect a league to see start/sit calls.'}
       </p>
+      <p className="text-sm mt-1" style={{ color: 'var(--t2)' }}>
+        {hasOtherLeagues
+          ? `You have ${totalLeagueCount} ${totalLeagueCount === 1 ? 'league' : 'leagues'} connected, but start/sit currently runs on Sleeper leagues only.`
+          : 'Once a Sleeper league is connected, Rostiro compares your bench against your lineup every time you open this page.'}
+      </p>
+      <a
+        href="/leagues/add"
+        className="inline-block text-sm font-semibold px-4 py-2 rounded-lg mt-4 transition-all hover:shadow-[0_0_18px_rgba(75,163,245,0.35)]"
+        style={{ backgroundColor: 'var(--signal-dim)', color: 'var(--signal)', border: '1px solid rgba(75,163,245,.4)' }}
+      >
+        {hasOtherLeagues ? 'Add a Sleeper league →' : 'Connect a league →'}
+      </a>
     </div>
   )
 }

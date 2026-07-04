@@ -84,13 +84,25 @@ export default function LeaguesPage() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 pt-6 pb-8 md:px-6 md:pt-8">
-      <div className="mb-6">
-        <h1 className="text-[22px] font-semibold tracking-tight" style={{ color: 'var(--t1)' }}>Leagues</h1>
-        <p className="text-[13px] mt-0.5" style={{ color: 'var(--t2)' }}>
-          {leagues.length > 0
-            ? `${leagues.length} ${leagues.length === 1 ? 'league' : 'leagues'} · Health recalculated on every sync`
-            : 'Health recalculated on every sync'}
-        </p>
+      <div className="mb-6 flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-[22px] font-semibold tracking-tight" style={{ color: 'var(--t1)' }}>Leagues</h1>
+          <p className="text-[13px] mt-0.5" style={{ color: 'var(--t2)' }}>
+            {leagues.length > 0
+              ? `${leagues.length} ${leagues.length === 1 ? 'league' : 'leagues'} · Health recalculated on every sync`
+              : 'Health recalculated on every sync'}
+          </p>
+        </div>
+        {/* T-109: previously only reachable when leagues.length === 0 — a
+            returning user with leagues already connected had no way to add
+            another one anywhere in the app. */}
+        <a
+          href="/leagues/add"
+          className="mono-data flex-shrink-0 text-[11px] font-semibold tracking-[0.05em] px-3 py-1.5 rounded-lg transition-all hover:brightness-110"
+          style={{ backgroundColor: 'var(--signal-dim)', color: 'var(--signal)', border: '1px solid rgba(75,163,245,.4)' }}
+        >
+          + Add league
+        </a>
       </div>
 
       {loading && <SkeletonGrid />}
@@ -236,7 +248,7 @@ function NoLeagues() {
         Connect a league and Rostiro starts scoring its health on every sync.
       </p>
       <a
-        href="/onboarding"
+        href="/leagues/add"
         className="inline-block text-sm font-semibold px-4 py-2 rounded-lg transition-all hover:shadow-[0_0_18px_rgba(75,163,245,0.35)]"
         style={{ backgroundColor: 'var(--signal-dim)', color: 'var(--signal)', border: '1px solid rgba(75,163,245,.4)' }}
       >

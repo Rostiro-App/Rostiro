@@ -72,6 +72,11 @@ export default function PulsePage() {
   const [rostiroState, setRostiroState] = useState<RostiroState>('standard')
   const [liveScores, setLiveScores] = useState<LiveGameScore[]>([])
   const [scoresGated, setScoresGated] = useState(false)
+  // T-109: leagueCount above is Sleeper-only (buildPulseItemsForUser's own
+  // filter) — this is every connected league, any platform, so the empty
+  // state can tell "truly no leagues" apart from "has leagues, none of
+  // them Sleeper," which otherwise look identical and aren't.
+  const [totalLeagueCount, setTotalLeagueCount] = useState(0)
 
   // T-94/T-90: Waiver Day Mission Briefing framing + Game Day live scores
   // (PRD 6.10/6.13). One-shot fetch — this page doesn't need the 60s
@@ -83,11 +88,12 @@ export default function PulsePage() {
     let cancelled = false
     fetch('/api/system/status')
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { rostiroState?: RostiroState; liveScores?: LiveGameScore[]; scoresGated?: boolean } | null) => {
+      .then((data: { rostiroState?: RostiroState; liveScores?: LiveGameScore[]; scoresGated?: boolean; leagues?: unknown[] } | null) => {
         if (cancelled || !data) return
         if (data.rostiroState) setRostiroState(data.rostiroState)
         setLiveScores(data.liveScores ?? [])
         setScoresGated(data.scoresGated ?? false)
+        setTotalLeagueCount(data.leagues?.length ?? 0)
       })
       .catch(() => {})
     return () => {
@@ -333,7 +339,7 @@ export default function PulsePage() {
       {/* Body */}
       {loading && <LoadingState />}
       {!loading && error && <ErrorState message={error} />}
-      {!loading && !error && leagueCount === 0 && <NoLeaguesState />}
+      {!loading && !error && leagueCount === 0 && <NoLeaguesState totalLeagueCount={totalLeagueCount} />}
       {!loading && !error && leagueCount > 0 && items.length === 0 && (
         <AllClearState doneToday={doneToday} />
       )}
@@ -631,13 +637,28 @@ function ErrorState({ message }: { message: string }) {
   )
 }
 
-function NoLeaguesState() {
+// T-109: leagueCount === 0 here means "zero Sleeper leagues," which isn't
+// the same thing as "zero leagues" — an ESPN/Yahoo-only account would
+// otherwise see this and think nothing is connected at all.
+function NoLeaguesState({ totalLeagueCount }: { totalLeagueCount: number }) {
+  const hasOtherLeagues = totalLeagueCount > 0
   return (
     <div className="glass rounded-xl p-6 text-center">
-      <p className="text-sm font-medium" style={{ color: 'var(--t1)' }}>Connect a league to activate Pulse.</p>
-      <p className="text-sm mt-1" style={{ color: 'var(--t2)' }}>
-        Once a Sleeper league is connected, Rostiro checks it every time you open this page.
+      <p className="text-sm font-medium" style={{ color: 'var(--t1)' }}>
+        {hasOtherLeagues ? 'Pulse needs a Sleeper league.' : 'Connect a league to activate Pulse.'}
       </p>
+      <p className="text-sm mt-1" style={{ color: 'var(--t2)' }}>
+        {hasOtherLeagues
+          ? `You have ${totalLeagueCount} ${totalLeagueCount === 1 ? 'league' : 'leagues'} connected, but Pulse currently runs on Sleeper leagues only. Connect a Sleeper league to activate it here.`
+          : 'Once a Sleeper league is connected, Rostiro checks it every time you open this page.'}
+      </p>
+      <a
+        href="/leagues/add"
+        className="inline-block text-sm font-semibold px-4 py-2 rounded-lg mt-4 transition-all hover:shadow-[0_0_18px_rgba(75,163,245,0.35)]"
+        style={{ backgroundColor: 'var(--signal-dim)', color: 'var(--signal)', border: '1px solid rgba(75,163,245,.4)' }}
+      >
+        {hasOtherLeagues ? 'Add a Sleeper league →' : 'Connect a league →'}
+      </a>
     </div>
   )
 }
