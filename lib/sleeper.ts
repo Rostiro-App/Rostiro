@@ -52,6 +52,9 @@ interface SleeperLeague {
     rec: number
     bonus_rec_te: number
     pass_td: number
+    // T-108: total FAAB budget for the league — verified live against a
+    // real 2026 league (waiver_budget: 100).
+    waiver_budget?: number
   }
   roster_positions: string[]
 }
@@ -68,6 +71,9 @@ interface SleeperRoster {
     ties: number
     fpts: number
     fpts_against: number
+    // T-108: FAAB already spent by this roster — verified live (0 on a
+    // pre-draft league, as expected).
+    waiver_budget_used?: number
   }
 }
 

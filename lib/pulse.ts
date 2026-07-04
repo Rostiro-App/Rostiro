@@ -12,7 +12,8 @@
 //   deadline:draft:{leagueRowId}:{startTime}   — reschedule = new item
 //   lineup:{leagueRowId}:{starterId}:{benchId} — specific swap suggestion
 
-import { getSleeperDrafts, getSleeperRosters } from '@/lib/sleeper'
+import { getSleeperDrafts, getSleeperLeague, getSleeperRosters } from '@/lib/sleeper'
+import { computeLeagueHealth, type HealthPlayer } from '@/lib/healthScore'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AffectedLeague, PulseItem, PulseItemStatus, PulseItemType, PulsePriority } from '@/types'
 
@@ -109,9 +110,13 @@ async function buildLeagueItems(
   league: LeagueRow,
   topPool: CachedPlayer[]
 ): Promise<BuiltPulseItem[]> {
-  const [rosters, drafts] = await Promise.all([
+  const [rosters, drafts, sleeperLeague] = await Promise.all([
     getSleeperRosters(league.league_id),
     getSleeperDrafts(league.league_id).catch(() => []),
+    // T-108: real FAAB budget context for the waiver_alert deepening below —
+    // best-effort, a failed fetch just means that context is omitted, same
+    // resilience posture as the draft fetch beside it.
+    getSleeperLeague(league.league_id).catch(() => null),
   ])
 
   const affectedLeague: AffectedLeague = {
@@ -224,15 +229,58 @@ async function buildLeagueItems(
   }
 
   // ─── Waiver opportunity ──────────────────────────────────────────────────
+  // T-108/T-98: deepened past the framing-and-reorder-only slice — real
+  // FAAB remaining (Sleeper's actual waiver_budget/waiver_budget_used,
+  // verified live) and a projected League Health delta, reusing
+  // computeLeagueHealth (already-tested, PRD 6.2) rather than inventing new
+  // scoring logic: simulate adding the candidate to the bench and compare.
   const rosteredIds = new Set(rosters.flatMap((r) => (Array.isArray(r.players) ? r.players : [])))
   const bestWaiver = topPool.find((p) => !rosteredIds.has(p.player_id))
   if (bestWaiver) {
+    const secondBestWaiver = topPool.find(
+      (p) => !rosteredIds.has(p.player_id) && p.player_id !== bestWaiver.player_id
+    ) ?? null
+
+    const healthPlayers: HealthPlayer[] = myPlayers.map((p) => ({
+      playerId: p.player_id,
+      adp: p.adp_sleeper,
+      injuryStatus: p.injury_status,
+    }))
+    const currentHealth = computeLeagueHealth({
+      myPlayers: healthPlayers,
+      starterIds,
+      bestFreeAgentAdp: bestWaiver.adp_sleeper,
+      bestFreeAgentName: bestWaiver.name,
+    })
+    // The candidate is now "claimed" in this hypothetical, so the next-best
+    // remaining free agent is whoever's second on the board today.
+    const hypotheticalHealth = computeLeagueHealth({
+      myPlayers: [
+        ...healthPlayers,
+        { playerId: bestWaiver.player_id, adp: bestWaiver.adp_sleeper, injuryStatus: bestWaiver.injury_status },
+      ],
+      starterIds,
+      bestFreeAgentAdp: secondBestWaiver?.adp_sleeper ?? null,
+      bestFreeAgentName: secondBestWaiver?.name ?? null,
+    })
+    const healthDelta =
+      currentHealth.score !== null && hypotheticalHealth.score !== null
+        ? hypotheticalHealth.score - currentHealth.score
+        : null
+
+    const myRosterFaab = rosters.find((r) => String(r.roster_id) === league.team_id)?.settings?.waiver_budget_used
+    const totalBudget = sleeperLeague?.settings?.waiver_budget ?? null
+    const remainingBudget = totalBudget !== null && myRosterFaab !== undefined ? totalBudget - myRosterFaab : null
+
+    const faabNote = remainingBudget !== null ? ` You have $${remainingBudget} of your $${totalBudget} FAAB budget left.` : ''
+    const healthNote = healthDelta !== null ? ` Adding them projects to ${healthDelta >= 0 ? '+' : ''}${healthDelta} on your League Health score.` : ''
+
     items.push({
       fingerprint: `waiver:${league.id}:${bestWaiver.player_id}`,
       type: 'waiver_alert',
       priority: bestWaiver.adp_sleeper! < 100 ? 'important' : 'info',
       headline: `${bestWaiver.name} is unrostered`,
-      reasoning: `${bestWaiver.name} (${bestWaiver.position}) has an ADP of ${Math.round(bestWaiver.adp_sleeper!)} and isn't on any roster in this league yet.`,
+      reasoning: `${bestWaiver.name} (${bestWaiver.position}) has an ADP of ${Math.round(bestWaiver.adp_sleeper!)} and isn't on any roster in this league yet.${faabNote}${healthNote}`,
       affectedLeagues: [affectedLeague],
       deadline: null,
       actionUrl: leagueLink,
