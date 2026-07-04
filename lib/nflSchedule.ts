@@ -5,6 +5,8 @@
 // game (gametime is always Eastern time per nflverse's own docs, regardless
 // of where the game is actually played — see migration_nfl_schedule.sql).
 
+import { parseCsvLine } from '@/lib/csv'
+
 const GAMES_CSV_URL = 'https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv'
 
 export interface ScheduledGame {
@@ -16,37 +18,6 @@ export interface ScheduledGame {
   gameTimeEt: string // HH:MM (24h, Eastern) — nflverse convention
   homeTeam: string
   awayTeam: string
-}
-
-// Minimal RFC 4180 CSV row parser — handles quoted fields containing commas
-// (a small number of rows have these, e.g. in referee/stadium names). No new
-// dependency: this dataset is simple enough not to warrant a CSV library.
-function parseCsvLine(line: string): string[] {
-  const fields: string[] = []
-  let current = ''
-  let inQuotes = false
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i]
-    if (inQuotes) {
-      if (char === '"' && line[i + 1] === '"') {
-        current += '"'
-        i++
-      } else if (char === '"') {
-        inQuotes = false
-      } else {
-        current += char
-      }
-    } else if (char === '"') {
-      inQuotes = true
-    } else if (char === ',') {
-      fields.push(current)
-      current = ''
-    } else {
-      current += char
-    }
-  }
-  fields.push(current)
-  return fields
 }
 
 export async function fetchNflSchedule(season: number): Promise<ScheduledGame[]> {

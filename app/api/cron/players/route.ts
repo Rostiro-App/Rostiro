@@ -4,7 +4,8 @@
 // fetch at most once/day.
 
 import { createAdminClient } from '@/lib/supabase'
-import { getSleeperPlayers } from '@/lib/sleeper'
+import { getSleeperPlayers, SEASON } from '@/lib/sleeper'
+import { fetchPlayerUsageSnapshots } from '@/lib/nflverseUsage'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function GET(request: NextRequest) {
@@ -85,7 +86,43 @@ export async function GET(request: NextRequest) {
       if (!injError) injuriesSnapshotted = injuryRows.length
     }
 
-    return NextResponse.json({ synced, snapshotted, injuriesSnapshotted, source: 'sleeper' })
+    // T-87: weekly snap-count/usage ingestion. Best-effort like the two
+    // snapshot steps above — nflverse won't publish a file for the current
+    // season until real games start (~preseason week 1), and a missing
+    // migration shouldn't fail the player sync either.
+    let usageSynced = 0
+    try {
+      const usageRows = await fetchPlayerUsageSnapshots(SEASON, players)
+      if (usageRows.length > 0) {
+        const CHUNK = 1000
+        for (let i = 0; i < usageRows.length; i += CHUNK) {
+          const chunk = usageRows.slice(i, i + CHUNK).map((r) => ({
+            season: r.season,
+            week: r.week,
+            player_id: r.playerId,
+            position: r.position,
+            team: r.team,
+            opponent: r.opponent,
+            offense_snaps: r.offenseSnaps,
+            offense_pct: r.offensePct,
+            defense_snaps: r.defenseSnaps,
+            defense_pct: r.defensePct,
+            st_snaps: r.stSnaps,
+            st_pct: r.stPct,
+            updated_at: new Date().toISOString(),
+          }))
+          const { error: usageError } = await admin
+            .from('player_usage_snapshots')
+            .upsert(chunk, { onConflict: 'season,week,player_id' })
+          if (usageError) break
+          usageSynced += chunk.length
+        }
+      }
+    } catch {
+      // Network/parse failure on nflverse's side — never fail the player sync over it.
+    }
+
+    return NextResponse.json({ synced, snapshotted, injuriesSnapshotted, usageSynced, source: 'sleeper' })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })

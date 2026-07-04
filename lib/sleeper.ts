@@ -5,7 +5,7 @@
 import { SleeperAPIError } from '@/types'
 
 const BASE_URL = 'https://api.sleeper.app/v1'
-const SEASON = 2026
+export const SEASON = 2026
 const SPORT = 'nfl'
 
 async function sleeperFetch<T>(path: string): Promise<T> {
@@ -274,6 +274,11 @@ interface SleeperPlayerRaw {
   status: string | null
   injury_status: string | null
   search_rank: number | null
+  // T-87: NFL's official "Game Statistics and Information System" ID —
+  // confirmed present on Sleeper's real payload (e.g. Todd Gurley:
+  // "00-0032241"). This is the join key back to nflverse's snap-count data,
+  // which has no Sleeper ID of its own (see lib/nflverseUsage.ts).
+  gsis_id: string | null
 }
 
 export interface SleeperCachePlayer {
@@ -285,6 +290,7 @@ export interface SleeperCachePlayer {
   nflTeam: string | null
   injuryStatus: string | null
   adpSleeper: number
+  gsisId: string | null
 }
 
 export async function getSleeperPlayers(): Promise<SleeperCachePlayer[]> {
@@ -307,6 +313,7 @@ export async function getSleeperPlayers(): Promise<SleeperCachePlayer[]> {
       nflTeam: p.team,
       injuryStatus: p.injury_status,
       adpSleeper: p.search_rank,
+      gsisId: p.gsis_id,
     }))
     .sort((a, b) => a.adpSleeper - b.adpSleeper)
 }
