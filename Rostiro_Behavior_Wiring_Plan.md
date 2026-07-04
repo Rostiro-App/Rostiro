@@ -138,3 +138,31 @@ Ordered by dependency and leverage, not just fence position:
 7. **Film Room State UI + matchup data (5.6)**.
 
 Everything in Part 4's "Expansion" section stays explicitly out of scope until this sequence clears — consistent with the standing rule this whole session: don't build ahead of the question that's actually in front of us.
+
+---
+
+## Part 7 — Status tracker (kept current, not a changelog)
+
+Unlike the changelog rows in `Rostiro_PRD_v5.md` (append-only, dated), this section reflects **current** state — update in place, don't just add more rows.
+
+### Sequence progress
+| # | Item | Status |
+|---|---|---|
+| 1 | Mode-aware AI voice (T-102) | ✓ Done |
+| 2 | Usage quota enforcement (T-103) | ✓ Done |
+| 3 | Draft/Standard State surface wiring (T-104) | ✓ Done |
+| 4 | Mode threaded into remaining surfaces (T-105) | ✓ Done |
+| 5 | The Interrupt Stack (T-106) | ✓ Done |
+| 6 | Per-league waiver cutoff → Waiver Day State UI (T-107) | **Next up** |
+| 7 | Film Room State UI + matchup data (T-108) | Queued after (6) |
+
+### Explicitly deferred — not forgotten, just not now
+| Item | Why deferred | Where it's tracked |
+|---|---|---|
+| Full Founder recognition — priority feedback access, early feature previews | Neither is mechanically defined yet (support channel? beta-flag gate?) — a product decision, not an engineering default | T-111, PRD task table |
+| Marketing copy acknowledging Founders | Marketing surfaces are untouched pending a designer pass (standing since the v5.0 changelog) — waits on that regardless of this item | T-111, PRD task table |
+| Tooltip/tutorial UX fork — mandatory walkthrough vs. the originally-spec'd skippable boot sequence | Real UX-philosophy decision (forced completion vs. skippable), not something to silently resolve either way | T-72 open question, PRD task table (6.8) |
+| T-101 — Live Fantasy Matchup Scoring | Standalone, multi-day build; needs its own design pass (data source, scoring engine, refresh cadence) | T-101, PRD task table |
+| Opportunity Surge, injury-during-play, trade-offer-received triggers | Each blocked on a data pipeline that doesn't exist (T-87 nflverse ingestion, a live injury feed, per-platform incoming-trade polling) | `lib/engagementTriggers.ts` header, PRD 6.12 |
+| Player Intelligence Card (T-89) | Doesn't exist at all yet — building state-aware tabs for it is premature | PRD task table |
+| ESPN league lifecycle/activity messaging (e.g. "league not open for 2026 yet") | Real gap (found via user testing), but deliberately scoped down to the honest static explanation already shipped (T-109) rather than building live ESPN draft/season-activity detection | `Rostiro_UX_Behavior_Spec.md` Leagues surface section |
