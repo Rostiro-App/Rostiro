@@ -62,8 +62,20 @@ These are real `pulse_items` rows, not ambient state — they only exist because
 | Same scoring event, 3 leagues all touched | **One** card/push naming all 3 leagues — never 3 separate ones | `byUser` aggregation keyed by `user_id` | Built |
 | **Which specific player actually scored** | **Cannot say.** `live_scores` is a team-level score cache (T-81) with no play-by-play — the card names everyone you own on the scoring team, never the actual scorer | `detectTouchdownSwings` header comment | **Deliberate limitation — not fixable without a new data source (see Known Gaps #2 note)** |
 | Lineup about to lock, flagged/empty starter | Names the specific player(s) and their status, minutes-to-kickoff | `detectLineupLockUrgency` | Built |
-| All your relevant games end | Calm summary naming league count | `detectMissionComplete` | Built |
+| All your relevant games end | Calm summary naming league count, rendered in the **ordinary Action-layer Pulse queue** — 6.12 itself calls this "a calm summary card," not an interrupt | `detectMissionComplete` | Built |
 | Injury during live play, live fantasy lead-change, trade offer received, Opportunity Surge | **Don't exist** — no detection code at all | — | **Planned, blocked on new data pipelines (PRD 6.12, `lib/engagementTriggers.ts` header)** |
+
+## Surface: The Interrupt Stack (`components/InterruptStack.tsx`, T-106)
+
+7.1's Interrupt layer, made real — "one persistent interrupt slot at a time," rendered on **every authenticated page** (mounted once in `AppShell`), not just Pulse. Until 2026-07-04, `touchdown_swing` and `lineup_lock` rendered through the same Action-layer Pulse queue (Done/Snooze/Dismiss) as a waiver decision — worked, but wasn't the layer 7.1 actually specifies for them.
+
+| Scenario | What renders | Source | Status |
+|---|---|---|---|
+| touchdown_swing fires | Floating card below System Bar, signal-blue left border, auto-dismisses after 7s | `InterruptStack`, `detectTouchdownSwings` (`layer: 'interrupt'`) | Built |
+| lineup_lock fires (P0) | Same card, critical-red border, **persists until manually dismissed** (✕ button) — no auto-dismiss timer | `InterruptStack`, `detectLineupLockUrgency` (`layer: 'interrupt'`) | Built |
+| Two interrupts open at once | Only `items[0]` renders — the rest wait their turn, never stack. Critical (P0) sorts ahead of info (P1) regardless of which fired first | `PRIORITY_RANK` sort in `/api/pulse/interrupts` | Built |
+| mission_complete fires | **Does not appear here** — stays in the ordinary Pulse queue by design (6.12's own "calm summary card" language) | — | Deliberate |
+| Migration not yet run (`layer` column missing) | Stack renders nothing, no error — degrades to an empty list | `/api/pulse/interrupts` catches `42703` | Built |
 
 ---
 

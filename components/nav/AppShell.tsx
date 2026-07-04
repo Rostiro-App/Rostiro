@@ -6,6 +6,7 @@ import BottomNav from './BottomNav'
 import SystemBar from './SystemBar'
 import TickerBar from './TickerBar'
 import CommandPalette from '@/components/palette/CommandPalette'
+import InterruptStack from '@/components/InterruptStack'
 
 export type Mode = 'focused' | 'balanced' | 'savant'
 
@@ -90,6 +91,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {/* T-70: ⌘K palette + mobile FAB — listens for the system bar's
             'rostiro:open-command-palette' event and the keyboard shortcut. */}
         <CommandPalette mode={mode} onModeChange={handleModeChange} />
+
+        {/* T-106: the Interrupt layer (PRD 7.1) — visible on every
+            authenticated page, not just Pulse. */}
+        <InterruptStack />
 
         <div className="flex flex-1 min-h-0 relative z-10">
           {/* Desktop icon dock — hidden on mobile */}

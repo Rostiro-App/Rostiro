@@ -93,6 +93,11 @@ async function insertPulseItem(
     headline: string
     reasoning: string
     affectedLeagues: { leagueId: string; leagueName: string; platform: 'sleeper' }[]
+    // T-106 / PRD 7.1: 'interrupt' routes through components/InterruptStack.tsx
+    // (transient, one slot at a time) instead of the persistent Action-layer
+    // Pulse queue. Defaults to 'action' — mission_complete stays there,
+    // matching 6.12's own "Pulse settles to a calm summary card" language.
+    layer?: 'action' | 'interrupt'
   }
 ) {
   // Deliberately no fingerprint. lib/pulse.ts's syncPulseItems (the daily
@@ -110,6 +115,7 @@ async function insertPulseItem(
     reasoning: item.reasoning,
     affected_leagues_json: item.affectedLeagues,
     platform: 'sleeper',
+    layer: item.layer ?? 'action',
     status: 'open',
   })
 }
@@ -187,6 +193,7 @@ export async function detectTouchdownSwings(admin: AdminClient, deltas: ScoreDel
         headline,
         reasoning,
         affectedLeagues: info.leagues.map((l) => ({ leagueId: l.id, leagueName: l.league_name, platform: 'sleeper' })),
+        layer: 'interrupt',
       })
       await pushToUser(admin, userId, 'Touchdown!', headline)
     }
@@ -261,6 +268,7 @@ export async function detectLineupLockUrgency(admin: AdminClient, todayEt: strin
       headline,
       reasoning,
       affectedLeagues: [{ leagueId: league.id, leagueName: league.league_name, platform: 'sleeper' }],
+      layer: 'interrupt',
     })
     await pushToUser(admin, league.user_id, headline, reasoning)
   }
