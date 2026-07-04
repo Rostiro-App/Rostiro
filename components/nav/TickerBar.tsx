@@ -12,6 +12,7 @@
 // endpoint keeps the same response shape so this component won't change.
 
 import { useEffect, useState } from 'react'
+import { useGameDayKickoffTransition } from '@/lib/gameDayTransition'
 import type { LiveGameScore, RostiroState } from '@/types'
 
 interface Mover {
@@ -106,6 +107,9 @@ export default function TickerBar() {
   // live game today, same public-market character as its ADP content.
   const liveGames = liveScores.filter((g) => g.statusState !== 'pre')
   const gameDayActive = rostiroState === 'game_day' && liveGames.length > 0
+  // T-92: plays once, the first moment this client notices Game Day start —
+  // the live segments below slide into the strip rather than just appearing.
+  const kickoffSweeping = useGameDayKickoffTransition(rostiroState)
 
   const segments: React.ReactNode[] = []
   if (gameDayActive) {
@@ -113,6 +117,7 @@ export default function TickerBar() {
       segments.push(
         <span
           key={g.gameId}
+          className={kickoffSweeping ? 'ticker-slide-in' : ''}
           style={{ color: 'var(--t1)', filter: scoresGated ? 'blur(4px)' : 'none' }}
         >
           {gameLabel(g)}

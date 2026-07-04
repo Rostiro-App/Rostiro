@@ -11,6 +11,7 @@
 import { useEffect, useState } from 'react'
 import { useMode, type Mode } from '@/components/nav/AppShell'
 import { STATE_CONFIG } from '@/lib/brandTokens'
+import { useGameDayKickoffTransition } from '@/lib/gameDayTransition'
 import type { LiveGameScore, PulseItem, PulseItemType, PulsePriority, RostiroState } from '@/types'
 
 // ─── Priority + type config ────────────────────────────────────────────────────
@@ -173,6 +174,9 @@ export default function PulsePage() {
   const liveGames = rostiroState === 'game_day'
     ? liveScores.filter((g) => g.rosterRelevant && g.statusState !== 'pre')
     : []
+  const isMissionControl = rostiroState === 'game_day'
+  // T-92: plays once, the first moment this client notices Game Day start.
+  const kickoffSweeping = useGameDayKickoffTransition(rostiroState)
 
   return (
     <div className="max-w-2xl mx-auto px-4 pt-6 pb-8 md:px-6 md:pt-8">
@@ -192,6 +196,24 @@ export default function PulsePage() {
             }}
           >
             MISSION BRIEFING
+          </span>
+        )}
+        {/* T-92/6.13: Pulse's header relabel to "Mission Control" for Game
+            Day — persistent while the state holds, but the kickoff sweep
+            (once per day, the actual transition moment) flickers it in via
+            the same mono-value grammar as the System Bar's sync label
+            rather than popping in instantly. */}
+        {isMissionControl && (
+          <span
+            key={kickoffSweeping ? 'mission-control-sweep' : 'mission-control-steady'}
+            className={`mono-data inline-block text-[9.5px] tracking-[0.16em] px-2 py-0.5 rounded-full mb-2 ${kickoffSweeping ? 'value-tick' : ''}`}
+            style={{
+              color: STATE_CONFIG.game_day.color,
+              border: `1px solid ${STATE_CONFIG.game_day.color}`,
+              backgroundColor: 'color-mix(in srgb, currentColor 12%, transparent)',
+            }}
+          >
+            MISSION CONTROL
           </span>
         )}
         <h1 className="text-[22px] font-semibold tracking-tight" style={{ color: 'var(--t1)' }}>

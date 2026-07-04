@@ -170,6 +170,24 @@ body {
 }
 .ticker-pause:hover .ticker-crawl { animation-play-state: paused; }
 
+/* T-92: kickoff-triggered transition (6.13) — plays once, the first moment
+   a client notices Game Day actually start. System Bar accent sweeps to
+   the Game Day tone and settles, rather than an instant repaint. */
+@keyframes kickoff-sweep {
+  0% { box-shadow: inset 0 0 0 0 rgba(226, 75, 74, 0); }
+  45% { box-shadow: inset 0 -20px 26px -14px rgba(226, 75, 74, 0.4); }
+  100% { box-shadow: inset 0 0 0 0 rgba(226, 75, 74, 0); }
+}
+.kickoff-sweep { animation: kickoff-sweep 1.8s var(--ease-os); }
+
+/* Ticker's live-score segments sliding in for the first time that day,
+   distinct from the continuous crawl loop they sit inside. */
+@keyframes ticker-slide-in {
+  from { opacity: 0; transform: translateX(28px); }
+  to { opacity: 1; transform: none; }
+}
+.ticker-slide-in { animation: ticker-slide-in 0.7s var(--ease-os); }
+
 /* iOS safe area support for bottom nav */
 @supports (padding: env(safe-area-inset-bottom)) {
   .pb-safe {
@@ -182,7 +200,9 @@ body {
   .ambient-ground::after,
   .ping-dot::after,
   .breathe,
-  .ticker-crawl {
+  .ticker-crawl,
+  .kickoff-sweep,
+  .ticker-slide-in {
     animation: none;
   }
   .panel-enter { animation-duration: 0.01ms; }

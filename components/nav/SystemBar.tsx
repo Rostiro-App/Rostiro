@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { type Mode, ModeButton, ModeSwitcher } from './AppShell'
 import PulseMark from '@/components/PulseMark'
+import { useGameDayKickoffTransition } from '@/lib/gameDayTransition'
 import type { LeagueHealthStatus, LiveGameScore, SystemStatus } from '@/types'
 
 const POLL_INTERVAL_MS = 60_000
@@ -86,10 +87,14 @@ export default function SystemBar({
   const deadline = status?.nextDeadline ?? null
   const deadlineMs = deadline ? new Date(deadline.at).getTime() - now : null
 
+  // T-92: plays once, the first moment this client notices Game Day start —
+  // never on every 60s poll while already in it.
+  const kickoffSweeping = useGameDayKickoffTransition(status?.rostiroState ?? null)
+
   return (
     <>
       <div
-        className="glass-bar mono-data flex items-center gap-3 md:gap-5 px-3 md:px-4 flex-shrink-0 relative z-20"
+        className={`glass-bar mono-data flex items-center gap-3 md:gap-5 px-3 md:px-4 flex-shrink-0 relative z-20 ${kickoffSweeping ? 'kickoff-sweep' : ''}`}
         style={{ borderBottom: '1px solid var(--hairline)', height: '42px', fontSize: '11px' }}
       >
         {/* Pulse mark — the one element that visibly reflects the active
