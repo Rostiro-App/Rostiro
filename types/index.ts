@@ -23,6 +23,13 @@ export type PulseItemType =
   | 'opponent_intel'
   | 'deadline_reminder'
   | 'exposure_flag'
+  // T-93 / PRD 6.12 — the three Game Day engagement triggers buildable
+  // against real data today (team-level score deltas + roster/schedule
+  // data). Injury-during-play, live fantasy lead-change, trade-offer, and
+  // Opportunity Surge all need data pipelines that don't exist yet.
+  | 'touchdown_swing'
+  | 'lineup_lock'
+  | 'mission_complete'
 
 export type DraftStatus = 'setup' | 'active' | 'complete'
 
@@ -328,7 +335,7 @@ export interface SystemStatusLeague {
 }
 
 export interface SystemDeadline {
-  kind: 'draft' | 'waivers'
+  kind: 'draft' | 'waivers' | 'lineup_lock'
   label: string // e.g. "Draft"
   leagueName: string
   at: string // ISO timestamp

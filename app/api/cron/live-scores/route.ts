@@ -8,6 +8,7 @@
 import { createAdminClient } from '@/lib/supabase'
 import { fetchLiveScores } from '@/lib/liveScores'
 import { isFeatureEnabled } from '@/lib/featureFlags'
+import { detectLineupLockUrgency, detectMissionComplete, detectTouchdownSwings, type ScoreDelta } from '@/lib/engagementTriggers'
 import { NextResponse, type NextRequest } from 'next/server'
 
 const GAME_DURATION_HOURS = 4 // matches lib/rostiroState.ts's window
@@ -36,6 +37,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ skipped: 'no games scheduled today' })
   }
 
+  // T-93: these two read already-persisted state (kickoff times, starters,
+  // prior live_scores rows) rather than needing this poll's fresh ESPN
+  // fetch, so they run even when no game is currently mid-window — that's
+  // exactly when lineup-lock (pregame) and the last game's mission-complete
+  // moment need to fire. Best-effort: a detection bug should never break
+  // the score sync itself.
+  await detectLineupLockUrgency(admin, todayEt).catch(() => {})
+  await detectMissionComplete(admin, todayEt).catch(() => {})
+
   // Cheap early-exit: only fetch if at least one of today's games is within
   // its live window right now (kickoff <= now <= kickoff + 4h). Otherwise
   // this cron run costs one Supabase query and nothing else — no ESPN call.
@@ -52,6 +62,18 @@ export async function GET(request: NextRequest) {
   )
 
   if (scores.length > 0) {
+    // Captured before the upsert below overwrites them — this is the "prev"
+    // half of the delta detectTouchdownSwings needs (10.2's own engineering
+    // note: detection is a diff between this poll and the last one).
+    const { data: prevRows } = await admin
+      .from('live_scores')
+      .select('game_id, home_score, away_score')
+      .in('game_id', scores.map((s) => s.gameId))
+    const prevByGameId = new Map(
+      ((prevRows ?? []) as { game_id: string; home_score: number; away_score: number }[]).map((r) => [r.game_id, r])
+    )
+    const gameById = new Map(inWindow.map((g) => [g.game_id, g]))
+
     const { error: upsertError } = await admin.from('live_scores').upsert(
       scores.map((s) => ({
         game_id: s.gameId,
@@ -65,6 +87,21 @@ export async function GET(request: NextRequest) {
       { onConflict: 'game_id' }
     )
     if (upsertError) return NextResponse.json({ error: upsertError.message }, { status: 500 })
+
+    const deltas: ScoreDelta[] = scores.map((s) => {
+      const game = gameById.get(s.gameId)!
+      const prev = prevByGameId.get(s.gameId)
+      return {
+        gameId: s.gameId,
+        homeTeam: game.home_team,
+        awayTeam: game.away_team,
+        prevHomeScore: prev?.home_score ?? 0,
+        prevAwayScore: prev?.away_score ?? 0,
+        newHomeScore: s.homeScore,
+        newAwayScore: s.awayScore,
+      }
+    })
+    await detectTouchdownSwings(admin, deltas).catch(() => {})
   }
 
   return NextResponse.json({ synced: scores.length, gamesInWindow: inWindow.length })

@@ -33,6 +33,7 @@ interface CacheRow {
   name: string
   adp_sleeper: number | null
   injury_status: string | null
+  nfl_team: string | null
 }
 
 interface ScheduleRow {
@@ -93,6 +94,24 @@ export async function GET() {
   // second round of roster fetches.
   const myRosteredPlayerIds: string[] = []
 
+  // T-93 (6.12 lineup-lock countdown): today's kickoff time per team,
+  // computed once up front rather than per-league, so the System Bar can
+  // show the calm->warm->urgent ramp toward whichever starter kicks off
+  // first. Separate from the live-scores block's own schedule fetch below —
+  // that one's gated behind the live_scores flag and this isn't (the
+  // countdown itself doesn't reveal scores, so it stays ungated).
+  const todayEtForDeadline = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date())
+  const { data: todaysGamesForDeadline } = await supabase
+    .from('nfl_schedule')
+    .select('home_team, away_team, kickoff_at')
+    .eq('game_date', todayEtForDeadline)
+  const kickoffByTeam = new Map<string, number>()
+  for (const g of (todaysGamesForDeadline ?? []) as { home_team: string; away_team: string; kickoff_at: string }[]) {
+    const k = new Date(g.kickoff_at).getTime()
+    kickoffByTeam.set(g.home_team, k)
+    kickoffByTeam.set(g.away_team, k)
+  }
+
   const results = await Promise.allSettled(
     rows.map(async (league): Promise<SystemStatusLeague> => {
       // Health + deadlines are Sleeper-only until Yahoo/ESPN league sync is
@@ -132,7 +151,7 @@ export async function GET() {
       // Enrich my roster from the cache in one query.
       const { data: myRows } = await supabase
         .from('players_cache')
-        .select('player_id, name, adp_sleeper, injury_status')
+        .select('player_id, name, adp_sleeper, injury_status, nfl_team')
         .eq('platform', 'sleeper')
         .in('player_id', myIds.length > 0 ? myIds : ['__none__'])
       const cacheById = new Map(((myRows ?? []) as CacheRow[]).map((r) => [r.player_id, r]))
@@ -142,6 +161,34 @@ export async function GET() {
         adp: cacheById.get(id)?.adp_sleeper ?? null,
         injuryStatus: cacheById.get(id)?.injury_status ?? null,
       }))
+
+      // T-93 (6.12 lineup-lock countdown): earliest kickoff among this
+      // league's starters, only surfaced as a deadline when a starter slot
+      // is questionable/doubtful/empty — a clean lineup isn't urgent.
+      const starterIds = (myRoster.starters ?? []).filter((id) => id !== '0')
+      const hasEmptyStarterSlot = (myRoster.starters?.length ?? 0) > starterIds.length
+      const hasFlaggedStarter = starterIds.some((id) => {
+        const status = cacheById.get(id)?.injury_status?.toLowerCase()
+        return status === 'questionable' || status === 'doubtful'
+      })
+      if (hasEmptyStarterSlot || hasFlaggedStarter) {
+        const starterKickoffs = starterIds
+          .map((id) => cacheById.get(id)?.nfl_team)
+          .filter((team): team is string => !!team)
+          .map((team) => kickoffByTeam.get(team))
+          .filter((k): k is number => k !== undefined)
+        if (starterKickoffs.length > 0) {
+          const earliestKickoff = Math.min(...starterKickoffs)
+          if (earliestKickoff > now) {
+            deadlines.push({
+              kind: 'lineup_lock',
+              label: 'Lineup Lock',
+              leagueName: league.league_name,
+              at: new Date(earliestKickoff).toISOString(),
+            })
+          }
+        }
+      }
 
       const bestFreeAgent = topPool.find((p) => !allRosteredIds.has(p.player_id)) ?? null
 

@@ -183,18 +183,24 @@ export default function SystemBar({
 
         <span className="flex-1" />
 
-        {/* Deadline countdown */}
+        {/* Deadline countdown — T-93/6.12: a lineup-lock deadline ramps
+            calm -> warm -> urgent as it nears (extending T-67's existing
+            countdown pattern); draft/waiver deadlines keep the flat amber
+            they've always had. */}
         {deadline && deadlineMs !== null && deadlineMs > 0 && (
           <span className="flex items-baseline gap-2 flex-shrink-0">
             <span
               className="text-[9px] tracking-[0.14em] uppercase truncate max-w-28 md:max-w-none"
-              style={{ color: 'var(--warn)' }}
+              style={{ color: deadline.kind === 'lineup_lock' ? lineupLockRampColor(deadlineMs) : 'var(--warn)' }}
             >
               {deadline.label} · {deadline.leagueName}
             </span>
             <span
-              className="text-xs"
-              style={{ color: 'var(--t1)', textShadow: '0 0 14px rgba(245,166,35,0.25)' }}
+              className={`text-xs ${deadline.kind === 'lineup_lock' && deadlineMs < 5 * 60_000 ? 'breathe' : ''}`}
+              style={{
+                color: 'var(--t1)',
+                textShadow: `0 0 14px ${deadline.kind === 'lineup_lock' ? lineupLockRampGlow(deadlineMs) : 'rgba(245,166,35,0.25)'}`,
+              }}
             >
               {formatCountdown(deadlineMs)}
             </span>
@@ -282,6 +288,20 @@ function LiveScoreBadge({ games, gated }: { games: LiveGameScore[]; gated: boole
 function gameLabel(g: LiveGameScore): string {
   const clock = g.statusState === 'post' ? 'FINAL' : `Q${g.period} ${g.displayClock}`
   return `${g.awayTeam} ${g.awayScore} – ${g.homeTeam} ${g.homeScore} · ${clock}`
+}
+
+// T-93/6.12: calm -> warm -> urgent as a lineup-lock deadline nears. Plain
+// hex/rgba, not var() references — these feed a template string alongside
+// an opacity/blur suffix, which CSS custom properties can't do.
+function lineupLockRampColor(ms: number): string {
+  if (ms < 5 * 60_000) return '#E8504A' // urgent — matches --crit
+  if (ms < 15 * 60_000) return '#F5A623' // warm — matches --warn
+  return '#4BA3F5' // calm — matches --signal
+}
+function lineupLockRampGlow(ms: number): string {
+  if (ms < 5 * 60_000) return 'rgba(232,80,74,0.35)'
+  if (ms < 15 * 60_000) return 'rgba(245,166,35,0.25)'
+  return 'rgba(75,163,245,0.2)'
 }
 
 function formatSyncAge(ms: number): string {

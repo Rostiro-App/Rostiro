@@ -36,6 +36,12 @@ const TYPE_CONFIG: Record<PulseItemType, { color: string; label: string }> = {
   opponent_intel:    { color: 'var(--t2)',     label: 'INTEL' },
   deadline_reminder: { color: 'var(--warn)',   label: 'DEADLINE' },
   exposure_flag:     { color: 'var(--crit)',   label: 'EXPOSURE' },
+  // T-93: excitement/ownership pride (6.12) — same green as a waiver win.
+  touchdown_swing:   { color: 'var(--live)',   label: 'TOUCHDOWN' },
+  // Urgency without punishment (6.12) — amber, same as the deadline chip.
+  lineup_lock:       { color: 'var(--warn)',   label: 'LINEUP LOCK' },
+  // Relief, not celebration or alarm — calm signal blue, deliberately quiet.
+  mission_complete:  { color: 'var(--signal)', label: 'MISSION COMPLETE' },
 }
 
 type PulseAction = 'done' | 'dismiss' | 'snooze'
