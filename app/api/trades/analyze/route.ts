@@ -4,8 +4,9 @@
 // disclosed, transparent formula, not a black-box score); Claude only writes
 // the reasoning for numbers already computed.
 
-import { createSSRClient } from '@/lib/supabase'
+import { createSSRClient, createAdminClient } from '@/lib/supabase'
 import { generateTradeReasoning } from '@/lib/claude'
+import { checkAndIncrementUsage, isFreePlan } from '@/lib/usageLimits'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import type { Confidence, TradeAnalysis } from '@/types'
@@ -15,6 +16,8 @@ const Body = z.object({
   receive: z.array(z.string()).min(1),
   mode: z.enum(['focused', 'balanced', 'savant']).default('balanced'),
 })
+
+const WEEKLY_FREE_LIMIT = 3
 
 interface CachedPlayer {
   player_id: string
@@ -79,17 +82,32 @@ export async function POST(request: Request) {
   const receivePositions = countPositions(receivePlayers)
   const rosterImpact = describePositionShift(givePositions, receivePositions)
 
+  // T-103: Free is 3 AI-written trade explanations/week — verdict/value
+  // above are already deterministic, so past-quota still returns a correct
+  // analysis, just with the plain fallback sentence instead of Claude's prose.
+  const fallbackReasoning = `Based on ADP-implied value, this trade is a ${verdict === 'win' ? 'net win' : verdict === 'lose' ? 'net loss' : 'roughly even'} (${Math.round(netValue)} point swing).`
+
   let reasoning: string
-  try {
-    reasoning = await generateTradeReasoning({
-      give: givePlayers.map((p) => ({ name: p.name, position: p.position ?? '', adp: p.adp_sleeper! })),
-      receive: receivePlayers.map((p) => ({ name: p.name, position: p.position ?? '', adp: p.adp_sleeper! })),
-      verdict,
-      netValue: Math.round(netValue),
-      mode,
-    })
-  } catch {
-    reasoning = `Based on ADP-implied value, this trade is a ${verdict === 'win' ? 'net win' : verdict === 'lose' ? 'net loss' : 'roughly even'} (${Math.round(netValue)} point swing).`
+  const admin = createAdminClient()
+  const free = await isFreePlan(admin, user.id)
+  // Fail open on a metering error — same posture as every other
+  // degradation in this codebase; a broken quota check should never block
+  // a working trade analysis.
+  const withinQuota = !free || (await checkAndIncrementUsage(admin, user.id, 'trade_analysis', WEEKLY_FREE_LIMIT).catch(() => ({ allowed: true, remaining: 0 }))).allowed
+  if (!withinQuota) {
+    reasoning = fallbackReasoning
+  } else {
+    try {
+      reasoning = await generateTradeReasoning({
+        give: givePlayers.map((p) => ({ name: p.name, position: p.position ?? '', adp: p.adp_sleeper! })),
+        receive: receivePlayers.map((p) => ({ name: p.name, position: p.position ?? '', adp: p.adp_sleeper! })),
+        verdict,
+        netValue: Math.round(netValue),
+        mode,
+      })
+    } catch {
+      reasoning = fallbackReasoning
+    }
   }
 
   const analysis: TradeAnalysis = { verdict, confidence, reasoning, rosValueComparison, rosterImpact }

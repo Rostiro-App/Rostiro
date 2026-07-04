@@ -14,6 +14,7 @@ export default function SleeperConnect({
   const [error, setError] = useState<string | null>(null)
   const [leagues, setLeagues] = useState<{ league_id: string; name: string; total_rosters: number }[]>([])
   const [saving, setSaving] = useState(false)
+  const [skippedForPlan, setSkippedForPlan] = useState(0)
 
   async function handleLookup(e: React.FormEvent) {
     e.preventDefault()
@@ -46,7 +47,15 @@ export default function SleeperConnect({
 
     setSaving(false)
     if (res.ok) {
-      onConnected()
+      const data: { connected: number; skippedForPlan: number } = await res.json()
+      // T-103: Free is capped at 1 league — a username with several active
+      // leagues can hit that cap in one save. Never silently drop the rest;
+      // only interrupt the otherwise-instant flow when it actually happened.
+      if (data.skippedForPlan > 0) {
+        setSkippedForPlan(data.skippedForPlan)
+      } else {
+        onConnected()
+      }
     } else {
       const data = await res.json()
       setError(data.error ?? 'Failed to save Sleeper leagues.')
@@ -116,6 +125,21 @@ export default function SleeperConnect({
             style={{ backgroundColor: 'var(--signal)' }}
           >
             {saving ? 'Connecting...' : `Connect ${leagues.length} league${leagues.length !== 1 ? 's' : ''} →`}
+          </button>
+        </div>
+      )}
+
+      {skippedForPlan > 0 && (
+        <div className="mt-4 rounded-lg px-3 py-2.5" style={{ backgroundColor: 'rgba(75,163,245,0.08)', border: '1px solid rgba(75,163,245,0.3)' }}>
+          <p className="text-sm" style={{ color: 'var(--t1)' }}>
+            Connected 1 league — Free plan is limited to 1. {skippedForPlan} other{skippedForPlan !== 1 ? 's were' : ' was'} not connected. Upgrade to Pro to add the rest.
+          </p>
+          <button
+            onClick={onConnected}
+            className="mt-2 text-sm font-medium underline"
+            style={{ color: 'var(--signal)' }}
+          >
+            Continue →
           </button>
         </div>
       )}

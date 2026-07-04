@@ -5,17 +5,21 @@
 // asked to write the explanation sentence for a gap we already found, never
 // to decide the swap itself (same split as the Pulse waiver logic).
 //
-// v1 scope: no weekly quota gate yet (PRD says Free: 3/week, Starter+:
-// unlimited) — that needs a usage-tracking table that doesn't exist yet.
-// Computed live per request, same as /api/pulse/sleeper, for the same reason:
-// no dismiss/cache table built yet.
+// T-103: Free is 3 AI-written explanations/week (PRD Section 9) — but the
+// verdict/confidence above are already deterministic, so hitting the cap
+// never blocks the feature. It just falls back to the same plain ADP
+// sentence the catch-block already used for a failed Claude call — Free
+// users always get a correct recommendation, Pro gets the fuller prose.
 
-import { createSSRClient } from '@/lib/supabase'
+import { createSSRClient, createAdminClient } from '@/lib/supabase'
 import { getSleeperRosters } from '@/lib/sleeper'
 import { generateStartSitReasoning } from '@/lib/claude'
+import { checkAndIncrementUsage, isFreePlan } from '@/lib/usageLimits'
 import { NextResponse, type NextRequest } from 'next/server'
 import type { Mode } from '@/components/nav/AppShell'
 import type { Confidence, NFLPosition, Platform, Player, StartSitRecommendation } from '@/types'
+
+const WEEKLY_FREE_LIMIT = 3
 
 const VALID_MODES: readonly Mode[] = ['focused', 'balanced', 'savant']
 
@@ -55,11 +59,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ recommendations: [], leagueCount: 0 })
   }
 
+  const admin = createAdminClient()
+  const free = await isFreePlan(admin, user.id)
+
   const recommendations: StartSitRecommendation[] = []
 
   for (const league of leagues) {
     try {
-      const leagueRecs = await buildLeagueRecommendations(supabase, league, mode)
+      const leagueRecs = await buildLeagueRecommendations(supabase, league, mode, admin, user.id, free)
       recommendations.push(...leagueRecs)
     } catch {
       continue
@@ -98,7 +105,10 @@ function verdictForDelta(delta: number): { verdict: StartSitRecommendation['verd
 async function buildLeagueRecommendations(
   supabase: Awaited<ReturnType<typeof createSSRClient>>,
   league: { id: string; league_id: string; league_name: string; team_id: string | null },
-  mode: Mode
+  mode: Mode,
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string,
+  free: boolean
 ): Promise<StartSitRecommendation[]> {
   const rosters = await getSleeperRosters(league.league_id)
   const myRoster = rosters.find((r) => String(r.roster_id) === league.team_id)
@@ -155,19 +165,29 @@ async function buildLeagueRecommendations(
   for (const c of top) {
     const { verdict, confidence } = verdictForDelta(c.delta)
 
+    const fallbackReasoning = `${c.bench.name} has a stronger ADP (${Math.round(c.bench.adp_sleeper!)}) than ${c.starter.name} (${Math.round(c.starter.adp_sleeper!)}).`
+
     let reasoning: string
-    try {
-      reasoning = await generateStartSitReasoning({
-        starterName: c.starter.name,
-        starterPosition: c.starter.position ?? '',
-        starterAdp: c.starter.adp_sleeper!,
-        benchName: c.bench.name,
-        benchPosition: c.bench.position ?? '',
-        benchAdp: c.bench.adp_sleeper!,
-        mode,
-      })
-    } catch {
-      reasoning = `${c.bench.name} has a stronger ADP (${Math.round(c.bench.adp_sleeper!)}) than ${c.starter.name} (${Math.round(c.starter.adp_sleeper!)}).`
+    // Fail open on a metering error (e.g. migration_usage_limits.sql not
+    // run yet) — a broken quota check should never take down a working
+    // recommendation, same posture as every other degradation in this file.
+    const withinQuota = !free || (await checkAndIncrementUsage(admin, userId, 'start_sit', WEEKLY_FREE_LIMIT).catch(() => ({ allowed: true, remaining: 0 }))).allowed
+    if (!withinQuota) {
+      reasoning = fallbackReasoning
+    } else {
+      try {
+        reasoning = await generateStartSitReasoning({
+          starterName: c.starter.name,
+          starterPosition: c.starter.position ?? '',
+          starterAdp: c.starter.adp_sleeper!,
+          benchName: c.bench.name,
+          benchPosition: c.bench.position ?? '',
+          benchAdp: c.bench.adp_sleeper!,
+          mode,
+        })
+      } catch {
+        reasoning = fallbackReasoning
+      }
     }
 
     recommendations.push({

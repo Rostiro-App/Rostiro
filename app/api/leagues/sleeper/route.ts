@@ -1,6 +1,7 @@
 import { createSSRClient, createAdminClient } from '@/lib/supabase'
 import { fetchAllSleeperLeagues } from '@/lib/sleeper'
 import { normalizeSleeperLeague } from '@/lib/normalize'
+import { canConnectNewLeague } from '@/lib/usageLimits'
 import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 
@@ -25,9 +26,21 @@ export async function POST(request: NextRequest) {
 
     const admin = createAdminClient()
     const inserted = []
+    let skippedForPlan = 0
 
     for (const raw of rawLeagues) {
       const normalized = normalizeSleeperLeague(raw.league, raw.myRoster.roster_id)
+
+      // T-103: Free is capped at 1 connected league. A single username can
+      // return many leagues at once — re-syncs of already-connected ones
+      // always go through; only genuinely new leagues count against the
+      // cap, and once it's hit the rest are skipped (not erroring the
+      // whole batch) with the count reported back to the client.
+      const capCheck = await canConnectNewLeague(admin, user.id, 'sleeper', normalized.leagueId, normalized.season)
+      if (!capCheck.allowed) {
+        skippedForPlan++
+        continue
+      }
 
       const { data, error } = await admin
         .from('connected_leagues')
@@ -50,7 +63,7 @@ export async function POST(request: NextRequest) {
       if (!error && data) inserted.push(data)
     }
 
-    return NextResponse.json({ connected: inserted.length, leagues: inserted })
+    return NextResponse.json({ connected: inserted.length, leagues: inserted, skippedForPlan })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })
