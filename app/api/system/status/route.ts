@@ -18,7 +18,7 @@ import { getRostiroState } from '@/lib/rostiroState'
 import { toNflverseTeamCode } from '@/lib/liveScores'
 import { isFeatureEnabled } from '@/lib/featureFlags'
 import { NextResponse } from 'next/server'
-import type { LeagueHealth, LiveGameScore, RelevantPlayer, SystemDeadline, SystemStatus, SystemStatusLeague } from '@/types'
+import type { LeagueHealth, LiveGameScore, RelevantPlayer, SystemDeadline, SystemStatus, SystemStatusLeague, UserPlan } from '@/types'
 
 interface LeagueRow {
   id: string
@@ -63,6 +63,12 @@ export async function GET() {
   const supabase = await createSSRClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // T-110: surfaced in the System Bar so a paid plan is actually visible
+  // somewhere — previously nothing in the UI showed it at all. Also reused
+  // below for scoresGated instead of a second, redundant fetch.
+  const { data: profile } = await supabase.from('users').select('plan').eq('id', user.id).maybeSingle()
+  const plan: UserPlan = (profile?.plan as UserPlan) ?? 'free'
 
   const { data: leagues, error } = await supabase
     .from('connected_leagues')
@@ -310,8 +316,7 @@ export async function GET() {
         }
       })
 
-      const { data: profile } = await supabase.from('users').select('plan').eq('id', user.id).maybeSingle()
-      scoresGated = (profile?.plan ?? 'free') === 'free'
+      scoresGated = plan === 'free'
     }
   }
 
@@ -322,6 +327,7 @@ export async function GET() {
     rostiroState,
     liveScores,
     scoresGated,
+    plan,
   }
 
   return NextResponse.json(status)

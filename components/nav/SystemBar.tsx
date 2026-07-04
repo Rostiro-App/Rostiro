@@ -11,7 +11,19 @@ import { useEffect, useRef, useState } from 'react'
 import { type Mode, ModeButton, ModeSwitcher } from './AppShell'
 import PulseMark from '@/components/PulseMark'
 import { useGameDayKickoffTransition } from '@/lib/gameDayTransition'
-import type { LeagueHealthStatus, LiveGameScore, SystemStatus } from '@/types'
+import type { LeagueHealthStatus, LiveGameScore, SystemStatus, UserPlan } from '@/types'
+
+// T-110: nothing in the UI showed plan at all — free deliberately gets no
+// badge (nothing to flaunt, and it avoids a naggy "FREE" label); paid tiers
+// get a real, visible marker. Gold matches PLAYOFFS_OVERLAY's championship
+// accent already established in brandTokens.ts — a deliberate reuse, not a
+// new color introduced just for this.
+const PLAN_LABEL: Record<UserPlan, string | null> = {
+  free: null,
+  starter: 'STARTER',
+  pro: 'PRO',
+  commissioner: 'FOUNDER',
+}
 
 const POLL_INTERVAL_MS = 60_000
 
@@ -204,6 +216,21 @@ export default function SystemBar({
             >
               {formatCountdown(deadlineMs)}
             </span>
+          </span>
+        )}
+
+        {/* Plan badge — visible on both breakpoints, unlike the wordmark's
+            "OS" chip which is desktop-only. */}
+        {status && PLAN_LABEL[status.plan] && (
+          <span
+            className="text-[8.5px] font-bold tracking-[0.14em] px-1.5 py-0.5 rounded flex-shrink-0"
+            style={{
+              color: '#F5C842',
+              border: '1px solid rgba(245,200,66,0.5)',
+              textShadow: '0 0 10px rgba(245,200,66,0.5)',
+            }}
+          >
+            {PLAN_LABEL[status.plan]}
           </span>
         )}
 

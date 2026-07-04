@@ -379,6 +379,9 @@ export interface SystemStatus {
   // Pro (and up) sees them unblurred. Computed server-side from users.plan
   // so the client never has to know the plan enum, just whether to blur.
   scoresGated: boolean
+  // T-110: nothing in the UI showed plan at all — surfaced so System Bar
+  // can show a real "you paid for this" indicator.
+  plan: UserPlan
 }
 
 // ─── Error Classes ─────────────────────────────────────────────────────────────
