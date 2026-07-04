@@ -33,7 +33,7 @@ export async function GET() {
   const [{ data: profile, error: profileError }, { data: leagues }] = await Promise.all([
     supabase
       .from('users')
-      .select('email, plan, push_enabled, mode, seen_hints, created_at')
+      .select('email, plan, push_enabled, mode, created_at')
       .eq('id', user.id)
       .maybeSingle(),
     supabase
