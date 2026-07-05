@@ -16,9 +16,11 @@ import {
   computeMyPickNumbers,
   detectPositionRun,
   findSnipedQueueTargets,
+  getStrategyWeight,
   picksUntilMyTurn,
   STRATEGY_LABELS,
   type PositionRun,
+  type RankedPlayer,
 } from '@/lib/draftBoard'
 import { useMode } from '@/components/nav/AppShell'
 import type { ADPPlayer, DraftPick, DraftSettings, DraftStrategy, NFLPosition, Platform } from '@/types'
@@ -41,6 +43,9 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
   const [recommendations, setRecommendations] = useState<DraftPickRecommendation[]>([])
   const [error, setError] = useState<string | null>(null)
   const [positionFilter, setPositionFilter] = useState<NFLPosition | 'ALL'>('ALL')
+  // Set when a strategy switch would drop currently-queued players — see
+  // requestStrategyChange/confirmStrategyChange below.
+  const [pendingStrategy, setPendingStrategy] = useState<{ next: DraftStrategy; drops: RankedPlayer[] } | null>(null)
 
   const recommendedForPick = useRef<string | null>(null)
   const recommendedPlayerIds = useRef<Set<string>>(new Set())
@@ -307,6 +312,33 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
     })
   }
 
+  // Founder decision (July 6, 2026): switching strategy mid-draft should
+  // re-evaluate every queued player against the NEW strategy, not just
+  // future Copilot suggestions — a player actively deprioritized (negative
+  // weight) under the new philosophy this round no longer belongs in the
+  // shortlist, whether Copilot queued them or the user starred them by
+  // hand. Since this can silently remove a deliberate manual pick (unlike
+  // the Copilot-only pruning above, which never touches one), it needs a
+  // real disclaimer first — a confirmation naming exactly who'd be
+  // dropped, not a generic warning.
+  function requestStrategyChange(next: DraftStrategy) {
+    const drops = myQueue.filter((r) => getStrategyWeight(next, r.player.position, currentRound) < 0)
+    if (drops.length === 0) {
+      changeStrategy(next)
+      return
+    }
+    setPendingStrategy({ next, drops })
+  }
+
+  function confirmStrategyChange() {
+    if (!pendingStrategy) return
+    const dropIds = new Set(pendingStrategy.drops.map((r) => r.player.playerId))
+    for (const id of dropIds) copilotQueuedIds.current.delete(id)
+    changeStrategy(pendingStrategy.next)
+    persistQueue(queue.filter((id) => !dropIds.has(id)))
+    setPendingStrategy(null)
+  }
+
   function toggleQueue(playerId: string) {
     const next = queue.includes(playerId) ? queue.filter((id) => id !== playerId) : [...queue, playerId]
     // A manual star (add) means the user has personally reviewed and wants
@@ -498,7 +530,7 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
         </div>
         <select
           value={strategy}
-          onChange={(e) => changeStrategy(e.target.value as DraftStrategy)}
+          onChange={(e) => requestStrategyChange(e.target.value as DraftStrategy)}
           className="flex-shrink-0 text-xs font-semibold px-2.5 py-1.5 rounded-lg outline-none"
           style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', border: '1px solid var(--hairline)', color: 'var(--signal)' }}
         >
@@ -507,6 +539,52 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
           ))}
         </select>
       </div>
+
+      {pendingStrategy && (
+        // Disclaimer for switching strategy mid-draft (founder decision,
+        // July 6, 2026): naming exactly who gets dropped, not a generic
+        // warning — this can remove a player the user deliberately starred
+        // by hand, so it needs to be a real, informed confirmation.
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center panel-enter"
+          style={{ backgroundColor: 'rgba(5,9,16,.72)' }}
+          onClick={() => setPendingStrategy(null)}
+        >
+          <div
+            className="w-full max-w-sm mx-4 rounded-2xl p-5"
+            style={{ backgroundColor: 'var(--bg2, #0a121f)', border: '1px solid var(--hairline-bright)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-sm font-semibold text-white">Switch to {STRATEGY_LABELS[pendingStrategy.next]}?</p>
+            <p className="text-sm mt-2" style={{ color: 'var(--t2)' }}>
+              {pendingStrategy.drops.length === 1 ? 'This player no' : `These ${pendingStrategy.drops.length} players no`} longer fit{pendingStrategy.drops.length === 1 ? 's' : ''} this strategy and will be dropped from your queue:
+            </p>
+            <div className="mt-2.5 space-y-1">
+              {pendingStrategy.drops.map((r) => (
+                <p key={r.player.playerId} className="text-sm" style={{ color: 'var(--t1)' }}>
+                  {r.player.name} <span style={{ color: 'var(--t3)' }}>{r.player.position}</span>
+                </p>
+              ))}
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => setPendingStrategy(null)}
+                className="flex-1 text-sm font-semibold py-2 rounded-lg"
+                style={{ color: 'var(--t2)', border: '1px solid var(--hairline)' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmStrategyChange}
+                className="flex-1 text-sm font-semibold py-2 rounded-lg"
+                style={{ color: 'white', backgroundColor: 'var(--signal)' }}
+              >
+                Switch anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* T-105 / PRD 3: Focused gets a shorter, quieter list — 5 rows, no
           strategy-weight indicators (a Balanced/Savant supporting stat).
