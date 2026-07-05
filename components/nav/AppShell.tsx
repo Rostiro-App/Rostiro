@@ -10,6 +10,7 @@ import PlayerIntelligenceCard from '@/components/players/PlayerIntelligenceCard'
 import SimulationPanel from '@/components/admin/SimulationPanel'
 import InterruptStack from '@/components/InterruptStack'
 import BootSequence from '@/components/BootSequence'
+import LiveUnlockAnnouncement from '@/components/LiveUnlockAnnouncement'
 
 export type Mode = 'focused' | 'balanced' | 'savant'
 
@@ -110,6 +111,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {/* T-106: the Interrupt layer (PRD 7.1) — visible on every
             authenticated page, not just Pulse. */}
         <InterruptStack />
+
+        {/* The real "LIVE just opened" announcement — global because the
+            LIVE nav item has no href until unlocked, so a page-scoped
+            version could never be seen through normal navigation. */}
+        <LiveUnlockAnnouncement />
 
         <div className="flex flex-1 min-h-0 relative z-10">
           {/* Desktop icon dock — hidden on mobile */}
