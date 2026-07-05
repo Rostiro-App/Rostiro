@@ -8,6 +8,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useWakeLock } from '@/lib/useWakeLock'
+import { useIdleDim } from '@/lib/useIdleDim'
 
 interface LiveGameContext {
   homeTeam: string
@@ -66,7 +68,9 @@ interface LiveStatus {
   windowRecap: WindowRecap | null
 }
 
-const POLL_MS = 15_000
+const POLL_MS_ACTIVE = 15_000
+const POLL_MS_IDLE = 45_000 // battery/network backoff once no one's touched the screen in a while
+const KEEP_AWAKE_KEY = 'rostiro_live_keep_awake'
 
 function playerPhotoUrl(playerId: string): string {
   return `https://sleepercdn.com/content/nfl/players/${playerId}.jpg`
@@ -77,6 +81,33 @@ export default function LivePage() {
   const [loading, setLoading] = useState(true)
   const [bigPlay, setBigPlay] = useState<{ player: LiveRosterPlayer; event: RecentEvent } | null>(null)
   const shownEventKeys = useRef(new Set<string>())
+  const { idle, wake } = useIdleDim()
+  const [keepAwake, setKeepAwake] = useState(false)
+  const [readStorage, setReadStorage] = useState(false)
+
+  // Adjust during render rather than in an effect — React's own documented
+  // pattern for "correct state once you notice a mismatch after mount,"
+  // avoiding both a synchronous-setState-in-effect cascade and a hydration
+  // mismatch (server has no localStorage, so it always renders `false`;
+  // this only ever runs client-side, in the same commit as hydration).
+  // State, not a ref — refs can't be read during render.
+  // Opt-in, never a silent default — the battery cost of hours of "screen
+  // always on" is real enough that the user should choose it.
+  if (!readStorage && typeof window !== 'undefined') {
+    setReadStorage(true)
+    const stored = localStorage.getItem(KEEP_AWAKE_KEY) === 'true'
+    if (stored !== keepAwake) setKeepAwake(stored)
+  }
+
+  useWakeLock(keepAwake)
+
+  function toggleKeepAwake() {
+    setKeepAwake((current) => {
+      const next = !current
+      localStorage.setItem(KEEP_AWAKE_KEY, String(next))
+      return next
+    })
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -106,12 +137,14 @@ export default function LivePage() {
     }
 
     poll()
-    const interval = setInterval(poll, POLL_MS)
+    // Re-armed whenever `idle` flips, so going idle immediately slows the
+    // next tick rather than waiting out a stale, faster interval.
+    const interval = setInterval(poll, idle ? POLL_MS_IDLE : POLL_MS_ACTIVE)
     return () => {
       cancelled = true
       clearInterval(interval)
     }
-  }, [])
+  }, [idle])
 
   useEffect(() => {
     if (!bigPlay) return
@@ -156,10 +189,36 @@ export default function LivePage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 pt-6 pb-16 md:px-6 md:pt-8 relative">
-      <div className="flex items-center gap-2 mb-6">
-        <span className="w-2 h-2 rounded-full breathe" style={{ backgroundColor: 'var(--crit)' }} />
-        <h1 className="mono-data text-[13px] font-bold tracking-widest" style={{ color: 'var(--crit)' }}>LIVE</h1>
+    <div
+      className="max-w-4xl mx-auto px-4 pt-6 pb-16 md:px-6 md:pt-8 relative"
+      style={{ filter: idle ? 'brightness(0.4)' : 'none', transition: 'filter 1.2s' }}
+      onClick={idle ? wake : undefined}
+    >
+      {idle && (
+        <p className="mono-data text-[9px] tracking-widest uppercase text-center mb-3" style={{ color: 'var(--t4)' }}>
+          Dimmed · tap to wake · still tracking
+        </p>
+      )}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full breathe" style={{ backgroundColor: 'var(--crit)' }} />
+          <h1 className="mono-data text-[13px] font-bold tracking-widest" style={{ color: 'var(--crit)' }}>LIVE</h1>
+        </div>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            toggleKeepAwake()
+          }}
+          className="mono-data text-[9.5px] font-semibold tracking-wide px-2.5 py-1 rounded-full"
+          style={
+            keepAwake
+              ? { color: 'var(--signal)', border: '1px solid var(--signal)', backgroundColor: 'var(--signal-dim)' }
+              : { color: 'var(--t3)', border: '1px solid var(--hairline)' }
+          }
+        >
+          {keepAwake ? 'SCREEN STAYS ON' : 'KEEP SCREEN ON'}
+        </button>
       </div>
 
       {status.windowRecap && (
