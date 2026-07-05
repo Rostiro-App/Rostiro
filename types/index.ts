@@ -35,6 +35,14 @@ export type PulseItemType =
   // never actually built. One-time per league, fingerprinted so it never
   // resurfaces once dismissed.
   | 'roster_grade'
+  // T-95 follow-up (July 5, 2026): ESPN RSS news, filtered to rostered
+  // players only (PRD anti-pattern: "no generic NFL news blasts unfiltered
+  // by roster relevance").
+  | 'player_news'
+  // T-99 (July 5, 2026): the Opportunity Surge trigger named in 7.1 but
+  // blocked above on "data pipelines that don't exist yet" — real NFL
+  // depth_chart_order (lib/opportunitySurge.ts) closed that gap.
+  | 'opportunity_surge'
 
 export type DraftStatus = 'setup' | 'active' | 'complete'
 

@@ -14,14 +14,25 @@
 
 import { getSleeperDrafts, getSleeperLeague, getSleeperRosters } from '@/lib/sleeper'
 import { computeLeagueHealth, type HealthPlayer } from '@/lib/healthScore'
+import { detectOpportunitySurges, type SurgeEvent } from '@/lib/opportunitySurge'
+import { generatePlayerNewsContext, generateOpportunitySurgeContext } from '@/lib/claude'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AffectedLeague, PulseItem, PulseItemStatus, PulseItemType, PulsePriority } from '@/types'
+
+// Pulse generation isn't mode-scoped today (unlike Start/Sit, Draft Copilot)
+// — matches toneInstruction's own 'balanced' default rather than plumbing a
+// new parameter through every caller for a one-sentence tone difference.
+const PULSE_MODE = 'balanced' as const
 
 const DRAFT_REMINDER_WINDOW_MS = 14 * 24 * 60 * 60 * 1000
 const DRAFT_CRITICAL_WINDOW_MS = 48 * 60 * 60 * 1000
 // A bench player must beat the starter's ADP by this many picks before we
 // suggest a swap — inside the margin it's noise, not a decision.
 const LINEUP_ADP_MARGIN = 20
+// News older than this stops being "what's new" — matches the injury/waiver
+// cards' own implicit freshness (they're recomputed from current state
+// every generation, not accumulated forever).
+const NEWS_WINDOW_MS = 72 * 60 * 60 * 1000
 
 interface LeagueRow {
   id: string
@@ -36,6 +47,23 @@ interface CachedPlayer {
   position: string | null
   injury_status: string | null
   adp_sleeper: number | null
+}
+
+interface NewsRow {
+  id: string
+  headline: string
+  summary: string | null
+  link: string
+  player_ids: string[]
+}
+
+interface DepthPlayer {
+  player_id: string
+  name: string
+  position: string | null
+  nfl_team: string | null
+  injury_status: string | null
+  depth_chart_order: number | null
 }
 
 export interface BuiltPulseItem {
@@ -91,8 +119,30 @@ export async function buildPulseItemsForUser(
     .limit(200)
   const topPool = (topPlayers ?? []) as CachedPlayer[]
 
+  // T-95 follow-up: recent ESPN news, already player-tagged at ingest
+  // (lib/newsRelevance.ts) — fetched once and filtered per-league below to
+  // rostered players only.
+  const newsWindowStart = new Date(Date.now() - NEWS_WINDOW_MS).toISOString()
+  const { data: newsRows } = await supabase
+    .from('news_items')
+    .select('id, headline, summary, link, player_ids')
+    .gte('published_at', newsWindowStart)
+    .order('published_at', { ascending: false })
+  const recentNews = (newsRows ?? []) as NewsRow[]
+
+  // T-99: real NFL depth chart data (every fantasy-relevant player who has
+  // one), not fantasy-roster data — this is what lets
+  // detectOpportunitySurges find "starter's out, who benefits" independent
+  // of who owns whom in any particular league.
+  const { data: depthRows } = await supabase
+    .from('players_cache')
+    .select('player_id, name, position, nfl_team, injury_status, depth_chart_order')
+    .eq('platform', 'sleeper')
+    .not('depth_chart_order', 'is', null)
+  const surgeEvents = detectOpportunitySurges((depthRows ?? []) as DepthPlayer[])
+
   const results = await Promise.allSettled(
-    rows.map((league) => buildLeagueItems(supabase, league, topPool))
+    rows.map((league) => buildLeagueItems(supabase, league, topPool, recentNews, surgeEvents))
   )
 
   // One league failing (Sleeper down, league deleted) shouldn't blank the
@@ -108,7 +158,9 @@ export async function buildPulseItemsForUser(
 async function buildLeagueItems(
   supabase: SupabaseClient,
   league: LeagueRow,
-  topPool: CachedPlayer[]
+  topPool: CachedPlayer[],
+  recentNews: NewsRow[],
+  surgeEvents: SurgeEvent[]
 ): Promise<BuiltPulseItem[]> {
   const [rosters, drafts, sleeperLeague] = await Promise.all([
     getSleeperRosters(league.league_id),
@@ -330,7 +382,136 @@ async function buildLeagueItems(
     })
   }
 
+  // ─── Player news (rostered players only) ─────────────────────────────────
+  // T-95 follow-up: recentNews is already tagged with every player_id it
+  // mentions at ingest (lib/newsRelevance.ts) — this only ever surfaces the
+  // ones actually on THIS league's roster, per the PRD's explicit
+  // anti-pattern against unfiltered news blasts.
+  const myPlayersById = new Map(myPlayers.map((p) => [p.player_id, p]))
+  for (const news of recentNews) {
+    for (const playerId of news.player_ids) {
+      const player = myPlayersById.get(playerId)
+      if (!player) continue
+
+      const reasoning = await getOrGenerateNewsReasoning(supabase, player, news)
+      if (!reasoning) continue // Claude found no real fantasy implication — don't surface it
+
+      items.push({
+        fingerprint: `news:${league.id}:${news.id}:${playerId}`,
+        type: 'player_news',
+        priority: 'info',
+        headline: news.headline,
+        reasoning,
+        affectedLeagues: [affectedLeague],
+        deadline: null,
+        actionUrl: news.link,
+      })
+    }
+  }
+
+  // ─── Opportunity surge (T-99) ─────────────────────────────────────────────
+  // surgeEvents is computed once, globally, from real NFL depth charts —
+  // independent of any fantasy roster. Classify per league: a beneficiary
+  // already on this league's bench is a start-them signal; one sitting
+  // unrostered here is a waiver pickup signal; one already rostered by an
+  // opponent in this league isn't actionable for this user here.
+  for (const surge of surgeEvents) {
+    const onMyBench = myPlayersById.has(surge.beneficiaryPlayerId) && !starterSet.has(surge.beneficiaryPlayerId)
+    const isFreeAgentHere = !rosteredIds.has(surge.beneficiaryPlayerId)
+    if (!onMyBench && !isFreeAgentHere) continue
+
+    const reasoning = await getOrGenerateSurgeReasoning(supabase, surge)
+
+    items.push({
+      fingerprint: `surge:${league.id}:${surge.outgoingPlayerId}:${surge.outgoingStatus}:${surge.beneficiaryPlayerId}`,
+      type: 'opportunity_surge',
+      priority: 'important',
+      headline: onMyBench ? `${surge.beneficiaryName} — start them?` : `${surge.beneficiaryName} is available on waivers`,
+      reasoning,
+      affectedLeagues: [affectedLeague],
+      deadline: null,
+      actionUrl: leagueLink,
+    })
+  }
+
   return items
+}
+
+// Cached once per (player x news item) — read-through so a repeat Pulse
+// generation for the same event never re-spends a Claude call, whether it's
+// a real sentence or Claude's own "not fantasy-relevant" decline (stored as
+// an empty string sentinel, since the column is not-null).
+async function getOrGenerateNewsReasoning(
+  supabase: SupabaseClient,
+  player: CachedPlayer,
+  news: NewsRow
+): Promise<string | null> {
+  const { data: cached } = await supabase
+    .from('player_context_cache')
+    .select('reasoning')
+    .eq('player_id', player.player_id)
+    .eq('platform', 'sleeper')
+    .eq('kind', 'news')
+    .eq('source_id', news.id)
+    .maybeSingle()
+  if (cached) return cached.reasoning || null
+
+  const reasoning = await generatePlayerNewsContext({
+    playerName: player.name,
+    playerPosition: player.position ?? '',
+    headline: news.headline,
+    summary: news.summary,
+    mode: PULSE_MODE,
+  }).catch(() => null)
+
+  // Best-effort: a race with another of the user's leagues hitting this
+  // same (player, news) pair concurrently just no-ops via the unique
+  // constraint — never worth failing the request over.
+  await supabase.from('player_context_cache').insert({
+    player_id: player.player_id,
+    platform: 'sleeper',
+    kind: 'news',
+    source_id: news.id,
+    reasoning: reasoning ?? '',
+  })
+
+  return reasoning
+}
+
+// Same read-through cache pattern as above, keyed on the specific
+// (outgoing player, status, beneficiary) triple so a status change (e.g.
+// Doubtful -> Out) generates fresh reasoning rather than reusing stale text.
+async function getOrGenerateSurgeReasoning(supabase: SupabaseClient, surge: SurgeEvent): Promise<string> {
+  const sourceId = `${surge.outgoingPlayerId}:${surge.outgoingStatus}:${surge.beneficiaryPlayerId}`
+  const { data: cached } = await supabase
+    .from('player_context_cache')
+    .select('reasoning')
+    .eq('player_id', surge.beneficiaryPlayerId)
+    .eq('platform', 'sleeper')
+    .eq('kind', 'opportunity_surge')
+    .eq('source_id', sourceId)
+    .maybeSingle()
+  if (cached) return cached.reasoning
+
+  const fallback = `${surge.beneficiaryName} is next in line at ${surge.beneficiaryPosition} for the ${surge.nflTeam} with ${surge.outgoingName} listed as ${surge.outgoingStatus.toLowerCase()}.`
+  const reasoning = await generateOpportunitySurgeContext({
+    outgoingName: surge.outgoingName,
+    outgoingStatus: surge.outgoingStatus,
+    beneficiaryName: surge.beneficiaryName,
+    beneficiaryPosition: surge.beneficiaryPosition,
+    nflTeam: surge.nflTeam,
+    mode: PULSE_MODE,
+  }).catch(() => fallback)
+
+  await supabase.from('player_context_cache').insert({
+    player_id: surge.beneficiaryPlayerId,
+    platform: 'sleeper',
+    kind: 'opportunity_surge',
+    source_id: sourceId,
+    reasoning,
+  })
+
+  return reasoning
 }
 
 function injuryPriority(status: string, isStarter: boolean): PulsePriority | null {

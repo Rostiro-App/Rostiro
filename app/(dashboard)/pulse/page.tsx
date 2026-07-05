@@ -47,6 +47,12 @@ const TYPE_CONFIG: Record<PulseItemType, { color: string; label: string }> = {
   // Pride/ownership (PRD line 737's "post-draft" emotional beat) — same
   // green as a waiver win, a positive moment without being loud about it.
   roster_grade:      { color: 'var(--live)',   label: 'ROSTER GRADE' },
+  // Quiet informational tone — a neutral gray, distinct from the alert
+  // colors above since this is "here's news," not "something needs a call."
+  player_news:       { color: 'var(--t2)',     label: 'NEWS' },
+  // T-99: the positive mirror to injury_alert — same green family as a
+  // waiver win/roster grade, since it's an opportunity, not a warning.
+  opportunity_surge: { color: 'var(--live)',   label: 'OPPORTUNITY' },
 }
 
 type PulseAction = 'done' | 'dismiss' | 'snooze'
