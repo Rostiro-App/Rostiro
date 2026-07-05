@@ -334,7 +334,7 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
         // text's "opportunity green," which was never reconciled with the
         // real STATE_CONFIG values.
         <div
-          className="rounded-xl p-4 mb-4"
+          className="rounded-xl p-4 mb-4 flex-shrink-0"
           style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', border: '1px solid #EF9F27', borderLeft: '3px solid #EF9F27' }}
         >
           <p className="text-xs font-semibold tracking-widest uppercase mb-3" style={{ color: '#EF9F27' }}>
@@ -351,7 +351,15 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
           {recommendations.length === 0 ? (
             <p className="text-sm" style={{ color: 'var(--t2)' }}>Preparing recommendations...</p>
           ) : (
-            <div className="space-y-3">
+            // Real bug found live during a real draft (July 6, 2026): this had
+            // no height cap, so up to 5 full recommendations (name + 2-line
+            // reasoning each) could run 500-700px tall — starving the sibling
+            // Best Available list below of nearly all the vertical space in a
+            // typical viewport (it still scrolled, but only ~1 row was ever
+            // visible at a time). Capped and made internally scrollable, same
+            // pattern the Recent Picks sidebar panel already uses, so both
+            // regions get a real, guaranteed share of the screen.
+            <div className="space-y-3 max-h-[280px] overflow-y-auto pr-1">
               {recommendations.map((rec) => {
                 // Render from the recommendation itself, not the live top-5 —
                 // if the board shifted since this was fetched, the
