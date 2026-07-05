@@ -118,11 +118,21 @@ export async function runScenario1(admin: AdminClient): Promise<{ ok: boolean; n
 
   const todayEt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date())
   const kickoffAt = new Date(Date.now() + 4 * 60_000) // 4 real minutes out — inside SystemBar's <5min "red" ramp immediately
+  // nfl_schedule.kickoff_at is a generated column (game_date + game_time_et)
+  // — a direct write to it errors ("cannot insert a non-DEFAULT value").
+  // Found live while verifying LIVE's roster builder: this same mistake
+  // was silently failing this exact insert the whole time, which is why
+  // "fake schedule rows: []" showed up during this scenario's own earlier
+  // verification and wasn't caught then.
+  const gameTimeEt = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).format(kickoffAt)
   const gameId = `SIM-LOCKWINDOW-${league.id}`
-  await admin.from('nfl_schedule').upsert(
-    { game_id: gameId, game_date: todayEt, home_team: starter.nflTeam, away_team: 'SIM', kickoff_at: kickoffAt.toISOString() },
+  const { error: scheduleError } = await admin.from('nfl_schedule').upsert(
+    { game_id: gameId, season: 2026, game_type: 'REG', week: 1, game_date: todayEt, game_time_et: gameTimeEt, home_team: starter.nflTeam, away_team: 'SIM' },
     { onConflict: 'game_id' }
   )
+  if (scheduleError) throw new Error(`nfl_schedule seed failed: ${scheduleError.message}`)
   await appendRestore(admin, { table: 'nfl_schedule', match: { game_id: gameId }, delete: true })
 
   const affectedLeagues = [{ leagueId: league.id, leagueName: league.league_name, platform: 'sleeper' }]
