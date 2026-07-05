@@ -123,9 +123,25 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
     [pool, draftedIds, rosterNeeds, rosterCounts, strategy, currentRound]
   )
 
+  const queueSet = useMemo(() => new Set(queue), [queue])
+
+  // Queued players (starred by hand, or auto-queued from Copilot Signal
+  // below) get their own "My Queue" list — excluded here so Best Available
+  // reads as "what's left to consider," not a duplicate of the queue.
   const filteredBestAvailable = useMemo(
-    () => (positionFilter === 'ALL' ? bestAvailable : bestAvailable.filter((r) => r.player.position === positionFilter)),
-    [bestAvailable, positionFilter]
+    () =>
+      bestAvailable.filter(
+        (r) => !queueSet.has(r.player.playerId) && (positionFilter === 'ALL' || r.player.position === positionFilter)
+      ),
+    [bestAvailable, positionFilter, queueSet]
+  )
+
+  // My Queue — every queued player still actually available, ADP order
+  // (bestAvailable's own sort), regardless of position filter; a shortlist
+  // isn't something you want narrowed by whatever tab happens to be active.
+  const myQueue = useMemo(
+    () => bestAvailable.filter((r) => queueSet.has(r.player.playerId)),
+    [bestAvailable, queueSet]
   )
 
   // Copilot Signal (renamed from an unlabeled recommendation list, per
@@ -251,8 +267,7 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [picksLeft, currentPickNumber, bestAvailable])
 
-  function toggleQueue(playerId: string) {
-    const next = queue.includes(playerId) ? queue.filter((id) => id !== playerId) : [...queue, playerId]
+  function persistQueue(next: string[]) {
     setQueue(next)
     fetch(`/api/draft/session/${sessionId}`, {
       method: 'PATCH',
@@ -262,6 +277,33 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
       // Persisting the queue is best-effort — it still works client-side for this session
     })
   }
+
+  function toggleQueue(playerId: string) {
+    const next = queue.includes(playerId) ? queue.filter((id) => id !== playerId) : [...queue, playerId]
+    persistQueue(next)
+  }
+
+  // Real founder feedback, live during a real draft (July 6, 2026): starring
+  // a player did nothing visible beyond a snipe alert later — "what is our
+  // behavior here... they don't go anywhere else?" Two changes close that
+  // gap: Copilot's own recommendations now auto-queue themselves (so the
+  // AI's picks and the user's hand-picks land in the exact same place, one
+  // shortlist, not two competing ones), and the Best Available list below
+  // excludes anything already queued (rendered separately in "My Queue"),
+  // so starring a player now visibly moves them out of the noise instead of
+  // just toggling an icon in place.
+  useEffect(() => {
+    if (recommendations.length === 0) return
+    // Deferred rather than called directly in the effect body — same
+    // react-hooks/set-state-in-effect avoidance used elsewhere in this app
+    // (e.g. lib/useLiveUnlockTransition.ts).
+    const t = window.setTimeout(() => {
+      const newIds = recommendations.map((r) => r.playerId).filter((id) => !queue.includes(id))
+      if (newIds.length > 0) persistQueue([...queue, ...newIds])
+    }, 0)
+    return () => window.clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recommendations])
 
   if (error && !settings) {
     return (
@@ -355,11 +397,12 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
             // no height cap, so up to 5 full recommendations (name + 2-line
             // reasoning each) could run 500-700px tall — starving the sibling
             // Best Available list below of nearly all the vertical space in a
-            // typical viewport (it still scrolled, but only ~1 row was ever
-            // visible at a time). Capped and made internally scrollable, same
-            // pattern the Recent Picks sidebar panel already uses, so both
-            // regions get a real, guaranteed share of the screen.
-            <div className="space-y-3 max-h-[280px] overflow-y-auto pr-1">
+            // typical viewport. Tightened further (280px -> 170px) now that
+            // every recommendation also auto-queues into "My Queue" (the
+            // sidebar) — the full reasoning is still one scroll away, but you
+            // no longer need to see all 5 in place just to know what got
+            // recommended.
+            <div className="space-y-3 max-h-[170px] overflow-y-auto pr-1">
               {recommendations.map((rec) => {
                 // Render from the recommendation itself, not the live top-5 —
                 // if the board shifted since this was fetched, the
@@ -445,13 +488,16 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
                 className="flex items-center gap-3 px-4 py-2.5"
                 style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', borderTop: i === 0 ? 'none' : '1px solid var(--hairline)' }}
               >
+                {/* One-way here — a queued player no longer appears in this
+                    list at all (it moved to "My Queue" in the sidebar), so
+                    this is always the empty star, never a toggle-in-place. */}
                 <button
                   onClick={() => toggleQueue(p.playerId)}
                   className="flex-shrink-0 text-base"
-                  style={{ color: queue.includes(p.playerId) ? 'var(--warn)' : 'var(--t3)' }}
-                  aria-label="Toggle target"
+                  style={{ color: 'var(--t3)' }}
+                  aria-label="Add to queue"
                 >
-                  {queue.includes(p.playerId) ? '★' : '☆'}
+                  ☆
                 </button>
                 <span className="text-xs font-semibold flex-shrink-0 w-9" style={{ color: 'var(--t3)' }}>
                   ADP {p.overallRank}
@@ -484,6 +530,42 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
           it, so both are visible the whole draft without scrolling to
           find them. */}
       <div className="flex flex-col gap-4 lg:w-[300px] lg:flex-shrink-0 lg:min-h-0">
+        {/* My Queue — every starred player (hand-picked or auto-queued from
+            Copilot Signal), segmented out of Best Available entirely rather
+            than just toggling an icon in place. Star here removes; the same
+            star in Best Available adds. */}
+        <div className="flex flex-col min-h-0" style={{ flex: '0 1 auto' }}>
+          <h2 className="text-sm font-semibold text-white mb-2 flex-shrink-0">My queue ({myQueue.length})</h2>
+          <div className="rounded-xl overflow-y-auto max-h-[220px]" style={{ border: '1px solid var(--hairline)' }}>
+            {myQueue.length === 0 ? (
+              <div className="px-4 py-3" style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)' }}>
+                <p className="text-sm" style={{ color: 'var(--t2)' }}>No targets queued yet — star a player below, or wait for Copilot Signal.</p>
+              </div>
+            ) : (
+              myQueue.map((r, i) => (
+                <div
+                  key={r.player.playerId}
+                  className="flex items-center gap-2.5 px-4 py-2"
+                  style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', borderTop: i === 0 ? 'none' : '1px solid var(--hairline)' }}
+                >
+                  <button
+                    onClick={() => toggleQueue(r.player.playerId)}
+                    className="flex-shrink-0 text-base"
+                    style={{ color: 'var(--warn)' }}
+                    aria-label="Remove from queue"
+                  >
+                    ★
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-white truncate">{r.player.name}</p>
+                    <p className="text-xs truncate" style={{ color: 'var(--t3)' }}>{r.player.position} · ADP {r.player.overallRank}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
         <div className="flex flex-col min-h-0" style={{ flex: '0 1 auto' }}>
           <h2 className="text-sm font-semibold text-white mb-2 flex-shrink-0">Recent picks</h2>
           <div className="rounded-xl overflow-y-auto max-h-[260px]" style={{ border: '1px solid var(--hairline)' }}>
