@@ -7,6 +7,7 @@ import SystemBar from './SystemBar'
 import TickerBar from './TickerBar'
 import CommandPalette from '@/components/palette/CommandPalette'
 import PlayerIntelligenceCard from '@/components/players/PlayerIntelligenceCard'
+import SimulationPanel from '@/components/admin/SimulationPanel'
 import InterruptStack from '@/components/InterruptStack'
 import BootSequence from '@/components/BootSequence'
 
@@ -101,6 +102,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             'rostiro:open-player-card' event, same decoupling as the palette
             above. */}
         <PlayerIntelligenceCard />
+
+        {/* Dev-only Simulation Suite — self-hides for everyone except the
+            founder's own account (checked server-side, not by NODE_ENV). */}
+        <SimulationPanel />
 
         {/* T-106: the Interrupt layer (PRD 7.1) — visible on every
             authenticated page, not just Pulse. */}
