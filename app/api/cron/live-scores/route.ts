@@ -9,6 +9,8 @@ import { createAdminClient } from '@/lib/supabase'
 import { fetchLiveScores } from '@/lib/liveScores'
 import { isFeatureEnabled } from '@/lib/featureFlags'
 import { detectLineupLockUrgency, detectMissionComplete, detectTouchdownSwings, type ScoreDelta } from '@/lib/engagementTriggers'
+import { pollAllLiveMatchupPoints } from '@/lib/liveMatchupPoints'
+import { classifyDeltas } from '@/lib/liveEvents'
 import { NextResponse, type NextRequest } from 'next/server'
 
 const GAME_DURATION_HOURS = 4 // matches lib/rostiroState.ts's window
@@ -104,5 +106,28 @@ export async function GET(request: NextRequest) {
     await detectTouchdownSwings(admin, deltas).catch(() => {})
   }
 
-  return NextResponse.json({ synced: scores.length, gamesInWindow: inWindow.length })
+  // T-111: LIVE tab's per-player point tracking — same inWindow gate as
+  // everything above, best-effort so a classification bug never breaks the
+  // score sync itself.
+  let liveEventsRecorded = 0
+  try {
+    const pointDeltas = await pollAllLiveMatchupPoints(admin)
+    const classified = await classifyDeltas(admin, pointDeltas)
+    if (classified.length > 0) {
+      await admin.from('live_events').insert(
+        classified.map((c) => ({
+          league_row_id: c.leagueRowId,
+          platform: c.platform,
+          player_id: c.playerId,
+          event_type: c.eventType,
+          delta: c.delta,
+        }))
+      )
+      liveEventsRecorded = classified.length
+    }
+  } catch {
+    // Best-effort — never fails the score sync over this.
+  }
+
+  return NextResponse.json({ synced: scores.length, gamesInWindow: inWindow.length, liveEventsRecorded })
 }
