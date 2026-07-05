@@ -10,10 +10,14 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-// Long enough for /live's full-screen "LIVE IS OPEN" overlay to actually
-// land (founder: the original subtle reveal "could be missed") — the nav
-// icon flash just plays within the same window.
-const SWEEP_DURATION_MS = 3200
+// Long enough for the global full-screen "LIVE IS OPEN" announcement
+// (components/LiveUnlockAnnouncement.tsx) to actually land and hold
+// (founder: the original subtle reveal "could be missed") — the nav icon
+// flash just plays within the same window. This is the "fully visible"
+// hold time only; LiveUnlockAnnouncement adds its own fade-out on top of
+// this before actually removing itself, so the real on-screen duration is
+// longer than this constant alone.
+const SWEEP_DURATION_MS = 4700
 
 function todayEt(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date())

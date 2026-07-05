@@ -282,8 +282,24 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
   // the right (lg+) so it's visible the whole time without scrolling to
   // find it. Below lg, there's genuinely not enough width for two columns
   // side by side — falls back to stacked, same as before.
+  //
+  // Real bug found live during a real draft (July 5, 2026): the fixed-
+  // height/internal-scroll mechanism (h-full, flex-1 min-h-0) was applied
+  // UNCONDITIONALLY, not gated to lg+ — so "falls back to stacked" never
+  // actually delivered normal page scroll below lg. CSS Grid's row-stretch
+  // behavior (which is what let a bare min-h-0/flex-1 pair size correctly
+  // at lg+, both columns sharing one row's height) only applies when the
+  // two panels sit in the SAME grid row (the lg+ 2-column case) — stacked
+  // to grid-cols-1, they become two separate auto-height rows, and a
+  // flex-1 min-h-0 descendant inside an auto-height row has nothing real
+  // to size against, so it collapsed instead of scrolling: the ADP list
+  // rendered a sliver, unreachable by any scroll. Fixed by switching the
+  // row to flexbox (flex-col below lg, flex-row at lg+) and gating every
+  // height-constraining class to lg: — below lg now genuinely falls back
+  // to natural block height, letting <main>'s own page-level scroll (in
+  // AppShell.tsx) reach everything, exactly as the comment always intended.
   return (
-    <div className="max-w-6xl mx-auto px-4 pt-6 pb-4 md:px-6 md:pt-8 h-full flex flex-col min-h-0">
+    <div className="max-w-6xl mx-auto px-4 pt-6 pb-4 md:px-6 md:pt-8 flex flex-col lg:h-full lg:min-h-0">
       <TurnHeader
         round={currentRound}
         pickNumber={currentPickNumber}
@@ -309,8 +325,8 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
         />
       )}
 
-      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4">
-      <div className="min-h-0 flex flex-col">
+      <div className="flex flex-col lg:flex-row lg:flex-1 lg:min-h-0 gap-4">
+      <div className="flex flex-col lg:flex-1 lg:min-h-0">
 
       {showPanicPanel && (
         // T-104 / 6.13: Draft State's accent — matches the already-shipped
@@ -401,7 +417,7 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
           Bounded + internally scrolling (not mb-4 unbounded) — this is the
           one region genuinely long enough to need its own scroll; nothing
           else on the page should have to compete with it for space. */}
-      <div className="rounded-xl overflow-y-auto flex-1 min-h-0" style={{ border: '1px solid var(--hairline)' }}>
+      <div className="rounded-xl overflow-y-auto lg:flex-1 lg:min-h-0" style={{ border: '1px solid var(--hairline)' }}>
         {filteredBestAvailable.slice(0, mode === 'focused' ? 5 : 20).map((r, i) => {
           const p = r.player
           const prevTier = i > 0 ? filteredBestAvailable[i - 1].player.tier : null
@@ -459,7 +475,7 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
       {/* Sidebar — pinned beside the board (lg+) instead of trailing below
           it, so both are visible the whole draft without scrolling to
           find them. */}
-      <div className="min-h-0 flex flex-col gap-4">
+      <div className="flex flex-col gap-4 lg:w-[300px] lg:flex-shrink-0 lg:min-h-0">
         <div className="flex flex-col min-h-0" style={{ flex: '0 1 auto' }}>
           <h2 className="text-sm font-semibold text-white mb-2 flex-shrink-0">Recent picks</h2>
           <div className="rounded-xl overflow-y-auto max-h-[260px]" style={{ border: '1px solid var(--hairline)' }}>
@@ -500,7 +516,7 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
           </div>
         </div>
 
-        <div className="flex flex-col min-h-0 flex-1">
+        <div className="flex flex-col lg:min-h-0 lg:flex-1">
           <h2 className="text-sm font-semibold text-white mb-2 flex-shrink-0">My roster ({myPicks.length})</h2>
           <div className="rounded-xl overflow-y-auto" style={{ border: '1px solid var(--hairline)' }}>
             {myPicks.length === 0 ? (

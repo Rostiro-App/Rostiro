@@ -251,6 +251,17 @@ body {
 }
 .live-reveal { animation: live-reveal 0.6s var(--ease-os); }
 
+/* LiveUnlockAnnouncement's exit — a slow dissolve-and-expand rather than
+   an instant unmount, so the still-pulsing LIVE nav icon (live-unlock-flash
+   above) is what the eye lands on once the screen clears, not a jarring
+   cut back to the page underneath. Duration kept in sync with
+   LIVE_ANNOUNCE_FADE_MS in components/LiveUnlockAnnouncement.tsx. */
+@keyframes live-announce-out {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.04); }
+}
+.live-announce-out { animation: live-announce-out 1.4s var(--ease-os) forwards; }
+
 /* iOS safe area support for bottom nav */
 @supports (padding: env(safe-area-inset-bottom)) {
   .pb-safe {
