@@ -36,6 +36,31 @@ async function seedLiveGame(
   statusState: 'pre' | 'in' | 'post'
 ): Promise<void> {
   const todayEt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date())
+
+  // A real NFL team plays at most once on a given date, but different
+  // scenarios in this suite each resolve a starter independently and often
+  // land on the exact same real team (pickRealStarter/firstStarterWithTeam
+  // are deterministic against the same roster) — each seeding its OWN
+  // schedule row under a different game_id. detectLineupLockUrgency's
+  // per-team kickoff map has no tiebreaker for two rows naming the same
+  // team, so an earlier scenario's now-stale row (already-past kickoff)
+  // can silently win over the one just seeded here, failing that
+  // detector's window check with no visible error. Real nflverse data can
+  // never hit this — only accumulated SIM- rows can — so clean those up
+  // here rather than requiring "Clear simulation" between every scenario.
+  const { data: stale } = await admin
+    .from('nfl_schedule')
+    .select('game_id')
+    .eq('game_date', todayEt)
+    .neq('game_id', gameId)
+    .like('game_id', 'SIM-%')
+    .or(`home_team.eq.${homeTeam},away_team.eq.${homeTeam}`)
+  const staleIds = ((stale ?? []) as { game_id: string }[]).map((r) => r.game_id)
+  if (staleIds.length > 0) {
+    await admin.from('live_scores').delete().in('game_id', staleIds)
+    await admin.from('nfl_schedule').delete().in('game_id', staleIds)
+  }
+
   const kickoffAt = new Date(Date.now() + kickoffOffsetMinutes * 60_000)
   const gameTimeEt = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit',

@@ -58,12 +58,20 @@ export async function GET() {
     startOfToday.setHours(0, 0, 0, 0)
 
     const [{ data: openRows }, { count }] = await Promise.all([
+      // layer='action', not "has a fingerprint" — mission_complete is a real
+      // Action-layer card (T-93/6.12 calls it "a calm summary card," not an
+      // interrupt) but is deliberately inserted with NO fingerprint (see
+      // engagementTriggers.ts's insertPulseItem comment: a fingerprint would
+      // let this rebuild's stale-cleanup silently delete it). Filtering on
+      // fingerprint instead of layer meant mission_complete could never
+      // appear here at all — found while verifying the Game Day engagement
+      // scenarios actually surface where the PRD says they should.
       admin
         .from('pulse_items')
         .select('id, user_id, type, priority, headline, reasoning, affected_leagues_json, deadline, action_url, platform, status, created_at')
         .eq('user_id', user.id)
         .eq('status', 'open')
-        .not('fingerprint', 'is', null),
+        .eq('layer', 'action'),
       admin
         .from('pulse_items')
         .select('id', { count: 'exact', head: true })

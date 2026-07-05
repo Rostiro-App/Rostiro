@@ -61,6 +61,17 @@ const LIVE_SCENARIOS: { key: string; label: string; desc: string }[] = [
   { key: '14', label: 'Lineup-lock (empty slot)', desc: 'Opportunistic, read-only — fires only if a connected roster genuinely has an empty starter slot right now.' },
 ]
 
+// useLiveUnlockTransition and useGameDayKickoffTransition each gate their
+// full-screen animation behind a once-per-ET-day localStorage key — real,
+// deliberate production behavior (don't replay the reveal on every refresh),
+// but it also means a scenario that triggers one can only ever show it once
+// per calendar day per browser. Clearing both here lets the same scenario
+// be retriggered same-day without waiting for midnight ET or digging into
+// devtools.
+function todayEtKey(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date())
+}
+
 async function callSimulate(body: Record<string, unknown>) {
   const res = await fetch('/api/admin/simulate', {
     method: 'POST',
@@ -77,6 +88,13 @@ export default function SimulationPanel() {
   const [busy, setBusy] = useState(false)
   const [lastNote, setLastNote] = useState<string | null>(null)
   const [timeInput, setTimeInput] = useState('')
+
+  function resetAnimations() {
+    const today = todayEtKey()
+    localStorage.removeItem(`rostiro:live-unlock-sweep:${today}`)
+    localStorage.removeItem(`rostiro:kickoff-sweep:${today}`)
+    setLastNote('Cleared today\'s once-per-day animation flags — LIVE Unlocks and any kickoff-triggered sweep can replay now.')
+  }
 
   const refresh = () => {
     fetch('/api/admin/simulate')
@@ -254,6 +272,15 @@ export default function SimulationPanel() {
               </button>
             ))}
           </div>
+
+          <button
+            type="button"
+            onClick={resetAnimations}
+            className="w-full mt-3 mono-data text-[9.5px] font-semibold tracking-wide px-2.5 py-1.5 rounded-lg"
+            style={{ color: 'var(--live)', border: '1px solid var(--hairline)' }}
+          >
+            Reset today&rsquo;s unlock/kickoff animations
+          </button>
 
           {lastNote && (
             <p className="text-[10.5px] mt-4 leading-relaxed" style={{ color: 'var(--t2)' }}>{lastNote}</p>
