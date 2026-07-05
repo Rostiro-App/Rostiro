@@ -28,6 +28,8 @@ export async function GET(request: NextRequest) {
       nfl_team: p.nflTeam,
       injury_status: p.injuryStatus,
       adp_sleeper: p.adpSleeper,
+      depth_chart_order: p.depthChartOrder,
+      depth_chart_position: p.depthChartPosition,
       last_updated: new Date().toISOString(),
     }))
 

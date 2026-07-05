@@ -291,6 +291,12 @@ interface SleeperPlayerRaw {
   // "00-0032241"). This is the join key back to nflverse's snap-count data,
   // which has no Sleeper ID of its own (see lib/nflverseUsage.ts).
   gsis_id: string | null
+  // T-110: real NFL depth chart position/order — confirmed present on
+  // Sleeper's payload live (e.g. SF: McCaffrey order 1, Guerendo order 5).
+  // This is what turns "starter goes down" into a deterministic "who
+  // benefits" lookup instead of guesswork — see lib/opportunitySurge.ts.
+  depth_chart_order: number | null
+  depth_chart_position: string | null
 }
 
 export interface SleeperCachePlayer {
@@ -301,8 +307,15 @@ export interface SleeperCachePlayer {
   position: string
   nflTeam: string | null
   injuryStatus: string | null
-  adpSleeper: number
+  // T-110: nullable now — a depth-charted-but-unranked player (e.g. a real
+  // QB2/RB3 handcuff) is included below even with no meaningful ADP, so it
+  // can still be name-resolved for opportunity-surge lookups. Draft Kit
+  // already filters `.not('adp_sleeper', 'is', null)` server-side, so this
+  // never leaks an unranked player into ADP-facing UI.
+  adpSleeper: number | null
   gsisId: string | null
+  depthChartOrder: number | null
+  depthChartPosition: string | null
 }
 
 export async function getSleeperPlayers(): Promise<SleeperCachePlayer[]> {
@@ -310,11 +323,18 @@ export async function getSleeperPlayers(): Promise<SleeperCachePlayer[]> {
 
   return Object.values(raw)
     .filter(
-      (p): p is SleeperPlayerRaw & { position: string; search_rank: number } =>
+      (p): p is SleeperPlayerRaw & { position: string } =>
         p.position !== null &&
         FANTASY_POSITIONS.has(p.position) &&
-        typeof p.search_rank === 'number' &&
-        p.search_rank < 9999999 // Sleeper uses this as an "unranked" sentinel
+        // T-110: found live (July 5, 2026) that 123 real depth-charted
+        // fantasy players — including handcuff-relevant names like a
+        // backup QB and rostered-bench RBs — carry Sleeper's "unranked"
+        // sentinel (search_rank: 9999999) and were silently excluded from
+        // players_cache entirely by the old ranked-only filter. Keep any
+        // player who's either meaningfully ranked OR on a real depth
+        // chart — the two populations Rostiro actually needs.
+        ((typeof p.search_rank === 'number' && p.search_rank < 9999999) ||
+          (p.depth_chart_order !== null && p.team !== null))
     )
     .map((p) => ({
       playerId: p.player_id,
@@ -324,10 +344,12 @@ export async function getSleeperPlayers(): Promise<SleeperCachePlayer[]> {
       position: p.position,
       nflTeam: p.team,
       injuryStatus: p.injury_status,
-      adpSleeper: p.search_rank,
+      adpSleeper: typeof p.search_rank === 'number' && p.search_rank < 9999999 ? p.search_rank : null,
       gsisId: p.gsis_id,
+      depthChartOrder: p.depth_chart_order,
+      depthChartPosition: p.depth_chart_position,
     }))
-    .sort((a, b) => a.adpSleeper - b.adpSleeper)
+    .sort((a, b) => (a.adpSleeper ?? Infinity) - (b.adpSleeper ?? Infinity))
 }
 
 // Fetch all leagues for a Sleeper username
