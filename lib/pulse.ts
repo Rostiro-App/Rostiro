@@ -16,6 +16,7 @@ import { getSleeperDrafts, getSleeperLeague, getSleeperRosters } from '@/lib/sle
 import { computeLeagueHealth, type HealthPlayer } from '@/lib/healthScore'
 import { detectOpportunitySurges, type SurgeEvent } from '@/lib/opportunitySurge'
 import { generatePlayerNewsContext, generateOpportunitySurgeContext } from '@/lib/claude'
+import { pushToUser } from '@/lib/engagementTriggers'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AffectedLeague, PulseItem, PulseItemStatus, PulseItemType, PulsePriority } from '@/types'
 
@@ -594,6 +595,18 @@ export async function syncPulseItems(
         status: 'open',
       }))
     )
+
+    // T-111: found while building LIVE that this pipeline never pushed at
+    // all — only the 3 Game Day engagement triggers did. injury_alert is
+    // the one PRD 6.6 explicitly calls "the core retention mechanic";
+    // player_news is what LIVE's own updates digest surfaces, so it
+    // deserves the same "catch someone not looking" treatment. Scoped to
+    // just these two, not every Pulse type — the rest stay in-app-only,
+    // same as before.
+    for (const b of toInsert) {
+      if (b.type !== 'injury_alert' && b.type !== 'player_news') continue
+      await pushToUser(admin, userId, b.headline, b.reasoning, b.actionUrl ?? undefined).catch(() => {})
+    }
   }
 
   // Refresh content on still-open items — a draft reminder's priority

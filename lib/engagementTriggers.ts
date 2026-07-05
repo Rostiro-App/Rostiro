@@ -66,7 +66,12 @@ async function claimTrigger(
   return true
 }
 
-async function pushToUser(admin: AdminClient, userId: string, title: string, message: string, url?: string) {
+// Exported (T-111) so lib/pulse.ts's regular Pulse pipeline can reuse the
+// exact same Pro-gate + subscription lookup, rather than a second copy of
+// this logic — found while building LIVE that the regular pipeline
+// (injury_alert, player_news, etc.) never pushed at all, only these three
+// Game Day triggers did.
+export async function pushToUser(admin: AdminClient, userId: string, title: string, message: string, url?: string) {
   // PRD 9: push notifications are a Pro feature — the in-app Pulse card
   // (inserted separately, unconditionally) is the free tier's "smell what's
   // cooking" layer; getting proactively pinged the instant it happens,

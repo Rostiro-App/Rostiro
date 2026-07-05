@@ -7,6 +7,7 @@
 import { getSleeperRosters, getSleeperMatchups } from '@/lib/sleeper'
 import { generateWindowRecap } from '@/lib/claude'
 import { currentNflWeek } from '@/lib/liveMatchupPoints'
+import { pushToUser } from '@/lib/engagementTriggers'
 import { createAdminClient } from '@/lib/supabase'
 
 type AdminClient = ReturnType<typeof createAdminClient>
@@ -145,19 +146,88 @@ export async function detectAndSendWindowRecaps(admin: AdminClient): Promise<num
         mode: 'balanced',
       }).catch(() => 'Your window is complete — check LIVE for the full breakdown.')
 
+      const headline = 'Your window wrapped'
       await admin.from('pulse_items').insert({
         user_id: userId,
         type: 'window_recap',
         priority: 'info',
-        headline: 'Your window wrapped',
+        headline,
         reasoning,
         affected_leagues_json: relevantLeagues.map((r) => ({ leagueId: r.league.id, leagueName: r.league.league_name, platform: 'sleeper' })),
         platform: 'sleeper',
         layer: 'action',
         status: 'open',
       })
+      await pushToUser(admin, userId, headline, reasoning).catch(() => {})
       sent++
     }
+  }
+
+  return sent
+}
+
+// "LIVE is open" — fires once per day per user, the first time any of
+// their rostered players' teams enters today's pregame-ramp-through-live
+// window (same 3h pregame ramp lib/rostiroState.ts already uses for Game
+// Day State itself — no separate threshold invented here). Reuses
+// window_recap_log as a generic per-user daily dedupe ledger rather than
+// a new table for one more "send this once a day" check.
+const PREGAME_RAMP_MS = 3 * 60 * 60 * 1000
+const GAME_DURATION_MS = 4 * 60 * 60 * 1000
+
+export async function detectAndSendLiveUnlockPush(admin: AdminClient): Promise<number> {
+  const todayEt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date())
+  const { data: todaysGames } = await admin.from('nfl_schedule').select('home_team, away_team, kickoff_at').eq('game_date', todayEt)
+  const games = (todaysGames ?? []) as { home_team: string; away_team: string; kickoff_at: string }[]
+  if (games.length === 0) return 0
+
+  const now = Date.now()
+  const activeTeams = new Set(
+    games
+      .filter((g) => {
+        const k = new Date(g.kickoff_at).getTime()
+        return now >= k - PREGAME_RAMP_MS && now <= k + GAME_DURATION_MS
+      })
+      .flatMap((g) => [g.home_team, g.away_team])
+  )
+  if (activeTeams.size === 0) return 0
+
+  const { data: leagues } = await admin
+    .from('connected_leagues')
+    .select('id, user_id, league_id, team_id')
+    .eq('platform', 'sleeper')
+    .not('team_id', 'is', null)
+  const leagueRows = (leagues ?? []) as { id: string; user_id: string; league_id: string; team_id: string }[]
+
+  const byUser = new Map<string, typeof leagueRows>()
+  for (const l of leagueRows) byUser.set(l.user_id, [...(byUser.get(l.user_id) ?? []), l])
+
+  let sent = 0
+  for (const [userId, userLeagues] of byUser) {
+    const unlockKey = `unlock:${todayEt}`
+    let relevant = false
+    for (const league of userLeagues) {
+      const rosters = await getSleeperRosters(league.league_id).catch(() => [])
+      const myRoster = rosters.find((r) => String(r.roster_id) === league.team_id)
+      if (!myRoster?.players?.length) continue
+      const { data: cached } = await admin
+        .from('players_cache')
+        .select('nfl_team')
+        .eq('platform', 'sleeper')
+        .in('player_id', myRoster.players)
+      const myTeams = new Set(((cached ?? []) as { nfl_team: string | null }[]).map((p) => p.nfl_team))
+      if ([...activeTeams].some((t) => myTeams.has(t))) {
+        relevant = true
+        break
+      }
+    }
+    if (!relevant) continue
+
+    const { error: claimError } = await admin.from('window_recap_log').insert({ user_id: userId, window_key: unlockKey })
+    if (claimError) continue // already sent today
+
+    await pushToUser(admin, userId, 'LIVE is open', 'One of your rostered players has a game underway or about to start.', '/live').catch(() => {})
+    sent++
   }
 
   return sent

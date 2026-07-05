@@ -11,7 +11,7 @@ import { isFeatureEnabled } from '@/lib/featureFlags'
 import { detectLineupLockUrgency, detectMissionComplete, detectTouchdownSwings, type ScoreDelta } from '@/lib/engagementTriggers'
 import { pollAllLiveMatchupPoints } from '@/lib/liveMatchupPoints'
 import { classifyDeltas } from '@/lib/liveEvents'
-import { detectAndSendWindowRecaps } from '@/lib/windowRecap'
+import { detectAndSendWindowRecaps, detectAndSendLiveUnlockPush } from '@/lib/windowRecap'
 import { NextResponse, type NextRequest } from 'next/server'
 
 const GAME_DURATION_HOURS = 4 // matches lib/rostiroState.ts's window
@@ -52,8 +52,14 @@ export async function GET(request: NextRequest) {
   // fires the moment a wave of games goes final, which is exactly when no
   // game is currently mid-window (the gap before the next wave kicks off).
   let windowRecapsSent = 0
+  let liveUnlockPushesSent = 0
   try {
     windowRecapsSent = await detectAndSendWindowRecaps(admin)
+  } catch {
+    // Best-effort — never fails the score sync over this.
+  }
+  try {
+    liveUnlockPushesSent = await detectAndSendLiveUnlockPush(admin)
   } catch {
     // Best-effort — never fails the score sync over this.
   }
@@ -139,5 +145,5 @@ export async function GET(request: NextRequest) {
     // Best-effort — never fails the score sync over this.
   }
 
-  return NextResponse.json({ synced: scores.length, gamesInWindow: inWindow.length, liveEventsRecorded, windowRecapsSent })
+  return NextResponse.json({ synced: scores.length, gamesInWindow: inWindow.length, liveEventsRecorded, windowRecapsSent, liveUnlockPushesSent })
 }
