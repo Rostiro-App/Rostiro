@@ -59,6 +59,11 @@ interface WindowRecap {
   created_at: string
 }
 
+interface StatLine {
+  label: string
+  value: number
+}
+
 interface LiveStatus {
   unlocked: boolean
   liveRoster: LiveRosterPlayer[]
@@ -81,6 +86,19 @@ export default function LivePage() {
   const [loading, setLoading] = useState(true)
   const [bigPlay, setBigPlay] = useState<{ player: LiveRosterPlayer; event: RecentEvent } | null>(null)
   const shownEventKeys = useRef(new Set<string>())
+  const [statSheet, setStatSheet] = useState<{ player: LiveRosterPlayer; loading: boolean; lines: StatLine[] } | null>(null)
+
+  function openStatSheet(player: LiveRosterPlayer) {
+    setStatSheet({ player, loading: true, lines: [] })
+    fetch(`/api/live/player-stats?playerId=${encodeURIComponent(player.playerId)}`)
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error('Failed to load'))))
+      .then((data: { stats: StatLine[] }) => {
+        setStatSheet((current) => (current && current.player.playerId === player.playerId ? { ...current, loading: false, lines: data.stats } : current))
+      })
+      .catch(() => {
+        setStatSheet((current) => (current && current.player.playerId === player.playerId ? { ...current, loading: false, lines: [] } : current))
+      })
+  }
   const { idle, wake } = useIdleDim()
   const [keepAwake, setKeepAwake] = useState(false)
   const [readStorage, setReadStorage] = useState(false)
@@ -240,8 +258,23 @@ export default function LivePage() {
             {players.map((p) => {
               const recentEvent = status.recentEvents.find((e) => e.player_id === p.playerId)
               const ringColor = recentEvent?.event_type === 'negative' ? 'var(--warn)' : recentEvent ? 'var(--live)' : 'transparent'
+              const eventLabel = recentEvent
+                ? recentEvent.event_type === 'touchdown'
+                  ? 'TD'
+                  : recentEvent.event_type === 'reception'
+                    ? 'REC'
+                    : recentEvent.event_type === 'negative'
+                      ? 'INT/FUM'
+                      : 'YDS'
+                : null
               return (
-                <div key={p.playerId} className="flex items-center gap-3 px-3 py-2.5" style={{ borderTop: '1px solid var(--hairline)', backgroundColor: 'rgba(8,15,26,0.6)' }}>
+                <button
+                  type="button"
+                  key={p.playerId}
+                  onClick={() => openStatSheet(p)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left"
+                  style={{ borderTop: '1px solid var(--hairline)', backgroundColor: 'rgba(8,15,26,0.6)' }}
+                >
                   <img
                     src={playerPhotoUrl(p.playerId)}
                     alt={p.name}
@@ -268,8 +301,18 @@ export default function LivePage() {
                       ))}
                     </div>
                   </div>
-                  <p className="mono-data text-lg font-bold flex-shrink-0" style={{ color: 'var(--t1)' }}>{p.points.toFixed(1)}</p>
-                </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="mono-data text-lg font-bold" style={{ color: 'var(--t1)' }}>{p.points.toFixed(1)}</p>
+                    {recentEvent && eventLabel && (
+                      <p
+                        className="mono-data text-[9.5px] font-semibold tracking-wide mt-0.5"
+                        style={{ color: recentEvent.event_type === 'negative' ? 'var(--warn)' : 'var(--live)' }}
+                      >
+                        {recentEvent.delta > 0 ? '+' : ''}{recentEvent.delta.toFixed(1)} {eventLabel}
+                      </p>
+                    )}
+                  </div>
+                </button>
               )
             })}
           </div>
@@ -336,6 +379,54 @@ export default function LivePage() {
           <p className="mono-data text-2xl font-extrabold mt-2.5" style={{ color: 'var(--live)' }}>
             +{bigPlay.event.delta.toFixed(1)} PTS
           </p>
+        </div>
+      )}
+
+      {statSheet && (
+        <div
+          className="fixed inset-0 z-50 flex items-end md:items-center justify-center panel-enter"
+          style={{ backgroundColor: 'rgba(5,9,16,.72)' }}
+          onClick={() => setStatSheet(null)}
+        >
+          <div
+            className="w-full md:max-w-sm rounded-t-2xl md:rounded-2xl p-5"
+            style={{ backgroundColor: 'var(--bg2, #0a121f)', border: '1px solid var(--hairline-bright)', maxHeight: '80vh', overflowY: 'auto' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <img
+                src={playerPhotoUrl(statSheet.player.playerId)}
+                alt={statSheet.player.name}
+                className="w-12 h-12 rounded-full object-cover flex-shrink-0"
+                style={{ backgroundColor: 'var(--glass-solid)' }}
+                onError={(e) => { e.currentTarget.style.visibility = 'hidden' }}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-base font-semibold text-white truncate">{statSheet.player.name}</p>
+                <p className="text-xs" style={{ color: 'var(--t3)' }}>{statSheet.player.position} · {statSheet.player.nflTeam}</p>
+              </div>
+              <button type="button" onClick={() => setStatSheet(null)} aria-label="Close" style={{ color: 'var(--t3)' }} className="text-lg px-1">✕</button>
+            </div>
+
+            <p className="mono-data text-[9px] tracking-widest uppercase mt-5 mb-2" style={{ color: 'var(--t3)' }}>Live box score · Sleeper</p>
+
+            {statSheet.loading ? (
+              <div className="h-16 rounded-lg animate-pulse" style={{ backgroundColor: 'rgba(8,15,26,0.6)' }} />
+            ) : statSheet.lines.length === 0 ? (
+              <p className="text-sm" style={{ color: 'var(--t3)' }}>
+                No recorded stats yet for this player this week — check back once the game is underway.
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {statSheet.lines.map((s) => (
+                  <div key={s.label} className="rounded-lg px-3 py-2" style={{ border: '1px solid var(--hairline)' }}>
+                    <p className="mono-data text-[9px] tracking-wide" style={{ color: 'var(--t3)' }}>{s.label}</p>
+                    <p className="mono-data text-lg font-bold" style={{ color: 'var(--t1)' }}>{s.value}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

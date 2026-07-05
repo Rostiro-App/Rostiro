@@ -16,6 +16,7 @@ import { getSleeperRosters, getSleeperMatchups } from '@/lib/sleeper'
 import { currentNflWeek } from '@/lib/liveMatchupPoints'
 import { classifyDeltas, type ClassifiedLiveEvent } from '@/lib/liveEvents'
 import { detectAndSendLiveUnlockPush } from '@/lib/windowRecap'
+import { buildPulseItemsForUser, syncPulseItems } from '@/lib/pulse'
 import {
   loadFounderLeagues,
   pickRealStarter,
@@ -186,6 +187,15 @@ export async function runInterceptionScenario(admin: AdminClient): Promise<{ ok:
 // (getSleeperMatchups' own matchup_id), flipping who's ahead — tests the
 // matchup rail rendering a real score swing, not a hardcoded "you're
 // winning" string.
+//
+// Also seeds a real live game for each side's chosen starter. Found while
+// verifying this scenario in isolation: buildLiveRoster's own early-exit
+// gate (no live_scores row with status_state 'in' -> return empty roster
+// AND empty matchups) meant this scenario produced nothing at all on
+// /live when nothing else had already made a game live — the matchup
+// rail isn't independent of "is anyone actually playing," so this
+// scenario needs to make that true itself, not assume another scenario
+// already has.
 export async function runLeadChangeScenario(admin: AdminClient): Promise<{ ok: boolean; note: string }> {
   const { leagues } = await loadFounderLeagues(admin)
   const league = leagues[0]
@@ -203,26 +213,53 @@ export async function runLeadChangeScenario(admin: AdminClient): Promise<{ ok: b
   const rosters = await getSleeperRosters(league.league_id).catch(() => [])
   const myRoster = rosters.find((r) => String(r.roster_id) === league.team_id)
   const opponentRoster = rosters.find((r) => r.roster_id === opponent.roster_id)
-  const myFirstStarter = (myRoster?.starters ?? []).find((id: string) => id && id !== '0')
-  const opponentFirstStarter = (opponentRoster?.starters ?? []).find((id: string) => id && id !== '0')
-  if (!myFirstStarter || !opponentFirstStarter) return { ok: false, note: 'Could not resolve a real starter on one of the two rosters.' }
+
+  const myPlayer = await firstStarterWithTeam(admin, myRoster?.starters ?? [])
+  const opponentPlayer = await firstStarterWithTeam(admin, opponentRoster?.starters ?? [])
+  if (!myPlayer || !opponentPlayer) return { ok: false, note: 'Could not resolve a real starter with a known NFL team on one of the two rosters.' }
+
+  await seedLiveGame(admin, `SIM-LEAD-A-${league.id}`, myPlayer.nflTeam, 'SIM', -20, 'in')
+  await seedLiveGame(admin, `SIM-LEAD-B-${league.id}`, opponentPlayer.nflTeam, 'SIM', -25, 'in')
 
   // The matchup rail sums real starters' cached points (see liveRoster.ts) —
   // putting the whole target total on one real starter id each is enough
   // to prove the sum renders correctly; it doesn't need to be spread
   // realistically across the roster for this specific test.
-  await seedMatchupPoints(admin, league.league_id, week, league.team_id!, { [myFirstStarter]: 68.2 })
-  await seedMatchupPoints(admin, league.league_id, week, String(opponent.roster_id), { [opponentFirstStarter]: 61.4 })
+  await seedMatchupPoints(admin, league.league_id, week, league.team_id!, { [myPlayer.playerId]: 68.2 })
+  await seedMatchupPoints(admin, league.league_id, week, String(opponent.roster_id), { [opponentPlayer.playerId]: 61.4 })
 
-  return { ok: true, note: `${league.league_name}: you now lead 68.2–61.4 (was trailing) — real starter points, summed by the real matchup rail logic, not a hardcoded string. Refresh /live to see it.` }
+  return { ok: true, note: `${league.league_name}: you now lead 68.2–61.4 (was trailing) — real starter points, summed by the real matchup rail logic, not a hardcoded string. Both starters' games seeded live. Open /live to see it.` }
+}
+
+async function firstStarterWithTeam(
+  admin: AdminClient,
+  starters: string[]
+): Promise<{ playerId: string; nflTeam: string } | null> {
+  const ids = starters.filter((id) => id && id !== '0')
+  if (ids.length === 0) return null
+  const { data: rows } = await admin.from('players_cache').select('player_id, nfl_team').eq('platform', 'sleeper').in('player_id', ids)
+  const byId = new Map(((rows ?? []) as { player_id: string; nfl_team: string | null }[]).map((r) => [r.player_id, r.nfl_team]))
+  for (const id of ids) {
+    const nflTeam = byId.get(id)
+    if (nflTeam) return { playerId: id, nflTeam }
+  }
+  return null
 }
 
 // ─── Scenario: Player injury, not live (digest strip only) ─────────────────
 // Deliberately does NOT seed any live game — proves the injury shows in
 // the "Player updates" digest, never as a live roster card, since the
 // player isn't playing right now.
+//
+// Flipping players_cache.injury_status alone produces nothing visible —
+// the real injury_alert pulse_item only gets created by
+// buildPulseItemsForUser + syncPulseItems, which normally run on a cron.
+// Waiting for that cron to happen to fire next isn't a real test, so this
+// calls the exact same real functions synchronously, right here, the same
+// way the cron does — the effect is then immediately visible in Player
+// updates instead of "eventually, whenever the cron next runs."
 export async function runNonLiveInjuryScenario(admin: AdminClient): Promise<{ ok: boolean; note: string }> {
-  const { leagues } = await loadFounderLeagues(admin)
+  const { userId, leagues } = await loadFounderLeagues(admin)
   const league = leagues[0]
   if (!league) return { ok: false, note: 'No connected Sleeper league to attach this scenario to.' }
 
@@ -237,8 +274,17 @@ export async function runNonLiveInjuryScenario(admin: AdminClient): Promise<{ ok
   })
   await admin.from('players_cache').update({ injury_status: 'questionable' }).eq('player_id', starter.playerId).eq('platform', 'sleeper')
 
+  const { items } = await buildPulseItemsForUser(admin, userId)
+  await syncPulseItems(admin, userId, items)
+
+  const fingerprint = `injury:${league.id}:${starter.playerId}:questionable`
+  const { data: itemRow } = await admin.from('pulse_items').select('id').eq('user_id', userId).eq('fingerprint', fingerprint).maybeSingle()
+  if (itemRow) await appendRestore(admin, { table: 'pulse_items', match: { id: itemRow.id }, delete: true })
+
   return {
-    ok: true,
-    note: `${starter.name} flagged questionable — no live game seeded, so this belongs in the Player updates strip once the real Pulse cron regenerates injury_alert for it, never in "Live now."`,
+    ok: itemRow ? true : false,
+    note: itemRow
+      ? `${starter.name} flagged questionable, real injury_alert pulse_item created (fingerprint ${fingerprint}) — no live game seeded, so it belongs in Player updates, never "Live now." Open /live or /pulse to see it now.`
+      : `${starter.name} flagged questionable, but the real generator didn't produce an injury_alert for them — check whether they're actually a starter in this league or already had an open alert for a different status.`,
   }
 }

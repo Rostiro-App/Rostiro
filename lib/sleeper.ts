@@ -45,6 +45,53 @@ async function sleeperFetch<T>(path: string): Promise<T> {
   return res.json() as Promise<T>
 }
 
+// ─── Real box-score stats (T-111: player stat sheet) ──────────────────────────
+// A separate real Sleeper endpoint, not under /v1 — verified live:
+// https://api.sleeper.app/stats/nfl/2025/18?season_type=regular returns a
+// list of every player's raw per-stat-category line (pass_yd, rush_td,
+// rec, rec_yd, etc.), distinct from the fantasy-points-only totals the
+// league matchups endpoint returns. This is the one place actual box-score
+// numbers — not a computed fantasy total — are available from the
+// platform. ~2MB for a full week, so callers should cache/reuse the
+// result rather than refetch per player.
+const STATS_BASE_URL = 'https://api.sleeper.app/stats/nfl'
+const weekStatsCache = new Map<string, { data: Map<string, Record<string, number>>; expiresAt: number }>()
+const WEEK_STATS_TTL_MS = 30_000
+
+interface SleeperWeekStatRow {
+  player_id: string
+  stats: Record<string, number>
+}
+
+export async function getSleeperWeekStats(season: number, week: number): Promise<Map<string, Record<string, number>>> {
+  const cacheKey = `${season}-${week}`
+  const cached = weekStatsCache.get(cacheKey)
+  if (cached && cached.expiresAt > Date.now()) return cached.data
+
+  await checkCircuitBreaker('sleeper')
+  const start = Date.now()
+  const path = `/nfl/${season}/${week}?season_type=regular (stats)`
+  const url = `${STATS_BASE_URL}/${season}/${week}?season_type=regular`
+  let res: Response
+
+  try {
+    res = await fetch(url, { next: { revalidate: 0 } })
+  } catch (err) {
+    await recordApiCall('sleeper', path, Date.now() - start, false)
+    throw new SleeperAPIError(`Network error fetching ${path}: ${String(err)}`, 'SLEEPER_NETWORK_ERROR')
+  }
+  if (!res.ok) {
+    await recordApiCall('sleeper', path, Date.now() - start, false, res.status)
+    throw new SleeperAPIError(`Sleeper API error ${res.status} on ${path}`, 'SLEEPER_HTTP_ERROR', res.status)
+  }
+  await recordApiCall('sleeper', path, Date.now() - start, true, res.status)
+
+  const rows = (await res.json()) as SleeperWeekStatRow[]
+  const byId = new Map(rows.filter((r) => r.stats && Object.keys(r.stats).length > 0).map((r) => [r.player_id, r.stats]))
+  weekStatsCache.set(cacheKey, { data: byId, expiresAt: Date.now() + WEEK_STATS_TTL_MS })
+  return byId
+}
+
 // ─── Types (raw Sleeper API shapes) ───────────────────────────────────────────
 
 interface SleeperUser {

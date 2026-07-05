@@ -8,7 +8,14 @@ import { buildLiveRoster } from '@/lib/liveRoster'
 import { buildUpdatesDigest } from '@/lib/liveUpdatesDigest'
 import { NextResponse } from 'next/server'
 
-const RECENT_EVENTS_WINDOW_MS = 60_000
+// Long enough to survive realistic click-to-check latency (switch to the
+// sim panel, fire a scenario, switch back, wait for the next poll) — a
+// 60s window meant a real, correctly-classified event routinely vanished
+// before anyone saw it, which read as "the scenario doesn't work" when the
+// backend had actually done its job. The one-time touchdown takeover still
+// can't double-fire (shownEventKeys.current on the client dedupes by
+// player+timestamp), so widening this doesn't risk replaying an old play.
+const RECENT_EVENTS_WINDOW_MS = 10 * 60_000
 
 export async function GET() {
   const supabase = await createSSRClient()
