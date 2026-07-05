@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useFocusTrap } from '@/lib/useFocusTrap'
+import { playerPhotoUrl, teamLogoUrl } from '@/lib/playerImages'
 
 interface Availability {
   leagueId: string
@@ -149,17 +150,36 @@ export default function PlayerIntelligenceCard() {
             <span className="mono-data text-[9px] tracking-[0.16em]" style={{ color: 'var(--signal)' }}>
               PLAYER INTELLIGENCE
             </span>
-            <h2 className="text-[19px] font-semibold mt-2" style={{ color: 'var(--t1)' }}>{data.player.name}</h2>
-            <p className="mono-data text-[10.5px] mt-1" style={{ color: 'var(--t3)' }}>
-              {data.player.position} · {data.player.nflTeam || 'FA'}
-              {data.player.adpSleeper !== null ? ` · ADP ${Math.round(data.player.adpSleeper)}` : ''}
-              {data.player.depthChartOrder !== null ? ` · Depth #${data.player.depthChartOrder}` : ''}
-            </p>
-            {data.player.injuryStatus && (
-              <p className="mono-data text-[10.5px] mt-1" style={{ color: 'var(--crit)' }}>
-                {data.player.injuryStatus.toUpperCase()}
-              </p>
-            )}
+
+            <div className="flex items-center gap-3.5 mt-2.5">
+              <PlayerPhoto playerId={data.player.playerId} name={data.player.name} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-[19px] font-semibold truncate" style={{ color: 'var(--t1)' }}>{data.player.name}</h2>
+                  {data.player.nflTeam && (
+                    // Onerror hides a missing logo entirely rather than showing
+                    // a broken-image icon — team abbreviations we don't have a
+                    // mapping quirk for (rare) just fall back to text-only.
+                    <img
+                      src={teamLogoUrl(data.player.nflTeam)}
+                      alt=""
+                      className="w-5 h-5 flex-shrink-0"
+                      onError={(e) => { e.currentTarget.style.display = 'none' }}
+                    />
+                  )}
+                </div>
+                <p className="mono-data text-[10.5px] mt-0.5" style={{ color: 'var(--t3)' }}>
+                  {data.player.position} · {data.player.nflTeam || 'FA'}
+                  {data.player.adpSleeper !== null ? ` · ADP ${Math.round(data.player.adpSleeper)}` : ''}
+                  {data.player.depthChartOrder !== null ? ` · Depth #${data.player.depthChartOrder}` : ''}
+                </p>
+                {data.player.injuryStatus && (
+                  <p className="mono-data text-[10.5px] mt-0.5" style={{ color: 'var(--crit)' }}>
+                    {data.player.injuryStatus.toUpperCase()}
+                  </p>
+                )}
+              </div>
+            </div>
 
             {data.context && (
               <div className="mt-4 rounded-[10px] px-3.5 py-3" style={{ border: '1px solid var(--hairline)', backgroundColor: 'rgba(75,163,245,0.06)' }}>
@@ -208,5 +228,36 @@ export default function PlayerIntelligenceCard() {
       </div>
     </div>,
     document.body
+  )
+}
+
+// Falls back to an initials badge on a failed image load (a very recently
+// signed player Sleeper's CDN hasn't caught up on yet) rather than a
+// broken-image icon — tracked via local state since onError needs to
+// swap the rendered element, not just hide it.
+function PlayerPhoto({ playerId, name }: { playerId: string; name: string }) {
+  const [failed, setFailed] = useState(false)
+  const initials = name.split(' ').map((w) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase()
+
+  if (failed) {
+    return (
+      <div
+        className="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0 mono-data text-[15px] font-semibold"
+        style={{ backgroundColor: 'var(--signal-dim)', color: 'var(--signal)' }}
+      >
+        {initials}
+      </div>
+    )
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- external CDN, not a local/optimizable asset
+    <img
+      src={playerPhotoUrl(playerId)}
+      alt={name}
+      className="w-14 h-14 rounded-full flex-shrink-0 object-cover"
+      style={{ backgroundColor: 'var(--glass-solid)', border: '1px solid var(--hairline)' }}
+      onError={() => setFailed(true)}
+    />
   )
 }
