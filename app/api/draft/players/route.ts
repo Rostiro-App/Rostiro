@@ -61,6 +61,11 @@ export async function GET() {
     adpEspn: null,
     adpYahoo: null,
     adpSleeper: p.adp_sleeper as number,
+    // Dense, tie-free overall rank — see the ADPPlayer.overallRank comment
+    // (types/index.ts) for why this exists instead of just showing
+    // adp_sleeper directly. Same sorted order the query already produced,
+    // just reindexed.
+    overallRank: i + 1,
     tier: Math.floor(i / 12) + 1, // 12 picks per tier — one per roster in a standard league
     injuryStatus: (p.injury_status as ADPPlayer['injuryStatus']) ?? null,
     lastUpdated: p.last_updated,

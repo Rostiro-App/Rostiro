@@ -236,7 +236,7 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
           playerId: r.player.playerId,
           name: r.player.name,
           position: r.player.position,
-          adp: r.player.adpConsensus,
+          adp: r.player.overallRank,
         })),
         mode,
       }),
@@ -370,7 +370,7 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
                       {rank ? `#${rank}` : '–'}
                     </span>
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-white">{p.name} <span className="text-xs font-normal" style={{ color: 'var(--t3)' }}>{p.position} · ADP {Math.round(p.adpConsensus)}</span></p>
+                      <p className="text-sm font-semibold text-white">{p.name} <span className="text-xs font-normal" style={{ color: 'var(--t3)' }}>{p.position} · ADP {p.overallRank}</span></p>
                       <p className="text-sm mt-0.5" style={{ color: 'var(--t2)' }}>{rec.reasoning}</p>
                     </div>
                   </div>
@@ -446,7 +446,7 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
                   {queue.includes(p.playerId) ? '★' : '☆'}
                 </button>
                 <span className="text-xs font-semibold flex-shrink-0 w-9" style={{ color: 'var(--t3)' }}>
-                  ADP {mode === 'savant' ? p.adpConsensus.toFixed(1) : Math.round(p.adpConsensus)}
+                  ADP {p.overallRank}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-white truncate">{p.name}</p>

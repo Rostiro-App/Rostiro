@@ -222,6 +222,16 @@ export interface ADPPlayer {
   adpEspn: number | null
   adpYahoo: number | null
   adpSleeper: number | null
+  // Real founder-reported bug (2026-07-05): Sleeper's search_rank (adpConsensus's
+  // source, see lib/sleeper.ts) is a coarse integer with frequent exact ties
+  // across positions — e.g. the top RB and top QB both landing on "1" — which
+  // reads as if ADP were computed per-position when displayed directly. This
+  // is a dense, tie-free 1..N reindex of the same overall sort, so exactly one
+  // player ever shows "1," full stop, regardless of position. Use this for
+  // display and for computeBestAvailable's ranking math; adpConsensus/adpSleeper
+  // remain the real underlying signal for anything that needs it (e.g. the
+  // pick-vs-ADP delta in app/api/draft/session/[id]/picks/route.ts).
+  overallRank: number
   tier: number | null
   injuryStatus: InjuryStatus
   lastUpdated: string

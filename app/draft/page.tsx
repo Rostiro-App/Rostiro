@@ -218,7 +218,7 @@ function RankingsTable({ players, mode }: { players: ADPPlayer[]; mode: string }
                 className="mono-data text-[11px] flex-shrink-0 w-7 text-right"
                 style={{ color: 'var(--t3)' }}
               >
-                {Math.round(p.adpConsensus)}
+                {p.overallRank}
               </span>
 
               <span
@@ -243,7 +243,7 @@ function RankingsTable({ players, mode }: { players: ADPPlayer[]; mode: string }
 
               {mode === 'savant' && (
                 <span className="mono-data text-[10.5px] flex-shrink-0" style={{ color: 'var(--t3)' }}>
-                  ADP {p.adpConsensus.toFixed(1)}
+                  RAW {p.adpConsensus}
                 </span>
               )}
             </button>

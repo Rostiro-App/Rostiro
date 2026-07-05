@@ -161,8 +161,12 @@ export function computeBestAvailable(
     return { player, isNeeded, strategyWeight }
   })
 
+  // overallRank, not adpConsensus — the latter (Sleeper's search_rank) has
+  // frequent exact ties across positions (e.g. the top RB and top QB both
+  // at "1"), which would otherwise leave tie-breaking to sort() stability
+  // rather than the actual overall order.
   const adjustedAdp = (r: RankedPlayer) =>
-    r.player.adpConsensus - (r.isNeeded ? NEED_ADP_BONUS : 0) - r.strategyWeight * STRATEGY_ADP_UNIT
+    r.player.overallRank - (r.isNeeded ? NEED_ADP_BONUS : 0) - r.strategyWeight * STRATEGY_ADP_UNIT
 
   return ranked.sort((a, b) => adjustedAdp(a) - adjustedAdp(b))
 }

@@ -190,7 +190,7 @@ export default function CommandPalette({
         id: `player:${p.playerId}`,
         section: 'Players',
         label: p.name,
-        hint: `${p.position} · ${p.nflTeam || 'FA'} · ADP ${Math.round(p.adpConsensus)}`,
+        hint: `${p.position} · ${p.nflTeam || 'FA'} · ADP ${p.overallRank}`,
         // T-89: player search is now decision intelligence, not just
         // navigation — opens the Player Intelligence Card in place rather
         // than bouncing to Draft Kit's search box.
