@@ -83,7 +83,7 @@ export default function LeaguesPage() {
   const leagues = status?.leagues ?? []
 
   return (
-    <div className="max-w-3xl mx-auto px-4 pt-6 pb-8 md:px-6 md:pt-8">
+    <div className="max-w-6xl mx-auto px-4 pt-6 pb-8 md:px-6 md:pt-8">
       <div className="mb-6 flex items-start justify-between gap-3">
         <div>
           <h1 className="text-[22px] font-semibold tracking-tight" style={{ color: 'var(--t1)' }}>Leagues</h1>
@@ -110,8 +110,15 @@ export default function LeaguesPage() {
         <p className="text-sm" style={{ color: 'var(--crit)' }}>{error}</p>
       )}
       {!loading && !error && leagues.length === 0 && <NoLeagues />}
+      {/* Found via a real user report (July 4, 2026): tiles were capped at
+          max-w-3xl (768px) regardless of actual screen width, reading as
+          small and hemmed-in on anything wider than a laptop. Widened the
+          container and the tiles' own content (ring, type scale, padding)
+          together — just widening the grid without the content inside it
+          growing to match would have left the same small card floating in
+          more empty space, not actually looking bigger. */}
       {!loading && !error && leagues.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {leagues.map((league) => (
             <LeagueCard key={league.id} league={league} rostiroState={status?.rostiroState ?? 'standard'} mode={mode} />
           ))}
@@ -140,34 +147,34 @@ function LeagueCard({
   const showFactors = mode !== 'focused'
 
   return (
-    <div className="glass card-hover rounded-[14px] p-4">
-      <div className="flex items-start gap-4">
+    <div className="glass card-hover rounded-[16px] p-6">
+      <div className="flex items-start gap-5">
         <HealthRing score={health.score} color={color} glow={STATUS_GLOW[health.status]} />
         <div className="min-w-0">
-          <p className="text-[13.5px] font-semibold truncate" style={{ color: 'var(--t1)' }}>{league.name}</p>
-          <div className="mono-data flex items-center gap-2 mt-1.5 text-[9px] tracking-[0.1em]">
-            <span className="px-1.5 py-px rounded" style={{ color: 'var(--t3)', border: '1px solid var(--hairline)' }}>
+          <p className="text-[17px] font-semibold truncate" style={{ color: 'var(--t1)' }}>{league.name}</p>
+          <div className="mono-data flex items-center gap-2 mt-2 text-[10px] tracking-[0.1em]">
+            <span className="px-1.5 py-0.5 rounded" style={{ color: 'var(--t3)', border: '1px solid var(--hairline)' }}>
               {PLATFORM_LABEL[league.platform] ?? league.platform.toUpperCase()}
             </span>
             <span style={{ color }}>{STATUS_LABEL[health.status]}</span>
           </div>
           {health.topFlag && (
-            <p className="text-[11.5px] mt-2" style={{ color: 'var(--t2)' }}>{health.topFlag}</p>
+            <p className="text-[13px] mt-2.5" style={{ color: 'var(--t2)' }}>{health.topFlag}</p>
           )}
           {/* T-109 follow-up: "NO DATA YET" alone doesn't say why — a real
               user reported an ESPN league showing nothing here with no
               explanation. Health/Pulse/Lineup are Sleeper-only today; say
               so honestly rather than leaving an unexplained blank. */}
           {health.status === 'unknown' && (
-            <p className="text-[11.5px] mt-2" style={{ color: 'var(--t3)' }}>
-              Rostiro's live health scoring, Pulse, and Start/Sit only run on Sleeper leagues today — {PLATFORM_LABEL[league.platform] ?? league.platform} support is coming.
+            <p className="text-[13px] mt-2.5" style={{ color: 'var(--t3)' }}>
+              Rostiro&apos;s live health scoring, Pulse, and Start/Sit only run on Sleeper leagues today — {PLATFORM_LABEL[league.platform] ?? league.platform} support is coming.
             </p>
           )}
         </div>
       </div>
 
       {showFactors && factors.length > 0 && (
-        <div className="mt-4 space-y-[7px]">
+        <div className="mt-5 space-y-2.5">
           {factors.map((factor) => (
             <FactorRow key={factor.key} factor={factor} />
           ))}
@@ -185,14 +192,14 @@ function FactorRow({ factor }: { factor: LeagueHealthFactor }) {
     : 'var(--crit)'
 
   return (
-    <div className="mono-data grid items-center gap-2 text-[9.5px]" style={{ gridTemplateColumns: '108px 1fr 30px' }}>
+    <div className="mono-data grid items-center gap-3 text-[11px]" style={{ gridTemplateColumns: '132px 1fr 34px' }}>
       <span style={{ color: 'var(--t3)' }}>
         {factor.label}
         <span className="ml-1" style={{ color: 'var(--t4)' }}>{factor.weight}%</span>
       </span>
       {factor.score !== null ? (
         <>
-          <div className="h-[3px] rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(90,150,210,.1)' }}>
+          <div className="h-[4px] rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(90,150,210,.1)' }}>
             <div
               className="h-full rounded-full transition-all duration-1000"
               style={{ width: `${factor.score}%`, backgroundColor: barColor }}
@@ -212,25 +219,25 @@ function FactorRow({ factor }: { factor: LeagueHealthFactor }) {
 }
 
 function HealthRing({ score, color, glow }: { score: number | null; color: string; glow: string }) {
-  const r = 23
+  const r = 30
   const circumference = 2 * Math.PI * r
   const filled = score !== null ? (circumference * score) / 100 : 0
 
   return (
-    <div className="relative flex-shrink-0" style={{ width: 56, height: 56 }}>
-      <svg width="56" height="56" viewBox="0 0 56 56" style={{ transform: 'rotate(-90deg)' }}>
-        <circle cx="28" cy="28" r={r} fill="none" stroke="rgba(90,150,210,.12)" strokeWidth="4" />
+    <div className="relative flex-shrink-0" style={{ width: 72, height: 72 }}>
+      <svg width="72" height="72" viewBox="0 0 72 72" style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx="36" cy="36" r={r} fill="none" stroke="rgba(90,150,210,.12)" strokeWidth="5" />
         {score !== null && (
           <circle
-            cx="28" cy="28" r={r} fill="none"
-            stroke={color} strokeWidth="4" strokeLinecap="round"
+            cx="36" cy="36" r={r} fill="none"
+            stroke={color} strokeWidth="5" strokeLinecap="round"
             strokeDasharray={`${filled} ${circumference - filled}`}
             style={{ filter: glow }}
           />
         )}
       </svg>
       <span
-        className="mono-data absolute inset-0 flex items-center justify-center text-[15px] font-bold"
+        className="mono-data absolute inset-0 flex items-center justify-center text-[19px] font-bold"
         style={{ color }}
       >
         {score !== null ? score : '—'}
@@ -241,9 +248,9 @@ function HealthRing({ score, color, glow }: { score: number | null; color: strin
 
 function SkeletonGrid() {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {[0, 1].map((i) => (
-        <div key={i} className="glass rounded-[14px] h-48 animate-pulse" />
+        <div key={i} className="glass rounded-[16px] h-60 animate-pulse" />
       ))}
     </div>
   )
