@@ -28,9 +28,20 @@ const STATE_OPTIONS: { key: RostiroState; label: string; color: string }[] = [
 
 const SCENARIOS: { key: string; label: string; desc: string }[] = [
   { key: '1', label: 'Pregame Lineup Panic', desc: 'P0 injury (real starter -> Doubtful), a weather_alert card, lock-countdown in 4 min.' },
-  { key: '2', label: 'Live Touchdown', desc: 'Real detectTouchdownSwings, team-level, routed to the Interrupt layer.' },
+  { key: '2', label: 'Live Touchdown (Pulse)', desc: 'Real detectTouchdownSwings, team-level, routed to the Interrupt layer.' },
   { key: '3', label: 'Tuesday Waiver Briefing', desc: 'Real-shaped waiver_alert with FAAB + League Health delta.' },
   { key: '4', label: 'Monday Night Film Room', desc: 'Forces Film Room + the existing demo recap path (real Claude call).' },
+]
+
+// T-111 follow-up: LIVE tab scenarios, all data-driven — each seeds real
+// rows and calls the real production functions (classifyDeltas,
+// detectAndSendLiveUnlockPush), never a hardcoded fake notification.
+const LIVE_SCENARIOS: { key: string; label: string; desc: string }[] = [
+  { key: '5', label: 'LIVE Unlocks', desc: 'Real kickoff seeded right now — watch the dock icon light up within ~20s, no forced state.' },
+  { key: '6', label: 'Touchdown (LIVE)', desc: 'Real classifyDeltas call — proves the classifier reads it as a touchdown. Open /live for the big-play takeover.' },
+  { key: '7', label: 'Interception', desc: 'Real negative-delta classification — muted amber pulse on /live, never a red alarm.' },
+  { key: '8', label: 'Lead change', desc: 'Real starter points seeded on both rosters — the matchup rail sums them, nothing hardcoded.' },
+  { key: '9', label: 'Player injury (not live)', desc: 'No live game seeded — proves it lands in Player updates, never as a live roster card.' },
 ]
 
 async function callSimulate(body: Record<string, unknown>) {
@@ -179,6 +190,25 @@ export default function SimulationPanel() {
                 style={{
                   border: `1px solid ${status?.activeScenario === s.key ? 'var(--signal)' : 'var(--hairline)'}`,
                   backgroundColor: status?.activeScenario === s.key ? 'var(--signal-dim)' : 'transparent',
+                }}
+              >
+                <p className="text-[11.5px] font-medium" style={{ color: 'var(--t1)' }}>{s.label}</p>
+                <p className="text-[10px] mt-0.5" style={{ color: 'var(--t3)' }}>{s.desc}</p>
+              </button>
+            ))}
+          </div>
+
+          <p className="mono-data text-[9px] tracking-[0.12em] mt-4 mb-2" style={{ color: 'var(--live)' }}>LIVE TAB — DATA-DRIVEN</p>
+          <div className="space-y-1.5">
+            {LIVE_SCENARIOS.map((s) => (
+              <button
+                key={s.key}
+                disabled={busy}
+                onClick={() => runAction({ action: 'run_scenario', scenario: s.key })}
+                className="w-full text-left px-2.5 py-2 rounded-lg disabled:opacity-50"
+                style={{
+                  border: `1px solid ${status?.activeScenario === s.key ? 'var(--live)' : 'var(--hairline)'}`,
+                  backgroundColor: status?.activeScenario === s.key ? 'rgba(67,192,119,.14)' : 'transparent',
                 }}
               >
                 <p className="text-[11.5px] font-medium" style={{ color: 'var(--t1)' }}>{s.label}</p>

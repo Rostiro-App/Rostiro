@@ -158,22 +158,43 @@ export async function buildLiveRoster(
       }
     }
 
-    // Matchup summary — Sleeper's own matchup `points` field is already the
-    // real live roster total (same field computeFilmRoomResult reads for
-    // the post-game version of this exact pairing), not something to
-    // re-sum from the points cache ourselves.
+    // Matchup summary — sums starters' points from the exact same
+    // live_matchup_points cache the player cards above already read, not a
+    // second, independently-timed fetch of Sleeper's own matchup.points.
+    // Found while building a test scenario for this: reading Sleeper's
+    // live matchup total directly (the original approach) meant the
+    // matchup rail and the per-player cards could show numbers computed
+    // at two different poll moments — same real drift risk a scenario
+    // couldn't even simulate, since Sleeper's own live response can't be
+    // faked. One cache, one source of truth, fixes both.
     const week = await currentNflWeek(admin)
     if (week !== null) {
       const weekMatchups = await getSleeperMatchups(league.league_id, week).catch(() => [])
       const mine = weekMatchups.find((m) => m.roster_id === myRoster.roster_id)
       if (mine && mine.matchup_id !== null) {
-        const opponent = weekMatchups.find((m) => m.roster_id !== myRoster.roster_id && m.matchup_id === mine.matchup_id)
-        matchups.push({
-          leagueId: league.id,
-          leagueName: league.league_name,
-          myScore: mine.points,
-          opponentScore: opponent?.points ?? 0,
-        })
+        const opponentRosterId = weekMatchups.find((m) => m.roster_id !== myRoster.roster_id && m.matchup_id === mine.matchup_id)?.roster_id
+        const opponentRoster = opponentRosterId !== undefined ? rosters.find((r) => r.roster_id === opponentRosterId) : undefined
+
+        const sumStarters = (starters: string[], points: Record<string, number>): number =>
+          starters.filter((id) => id && id !== '0').reduce((sum, id) => sum + (points[id] ?? 0), 0)
+
+        let opponentPoints: Record<string, number> = {}
+        if (opponentRoster) {
+          const { data: row } = await admin
+            .from('live_matchup_points')
+            .select('players_points')
+            .eq('league_id', league.league_id)
+            .eq('platform', 'sleeper')
+            .eq('week', week)
+            .eq('roster_id', String(opponentRoster.roster_id))
+            .maybeSingle()
+          opponentPoints = row?.players_points ?? {}
+        }
+
+        const myScore = sumStarters(myRoster.starters ?? [], myPoints)
+        const opponentScore = opponentRoster ? sumStarters(opponentRoster.starters ?? [], opponentPoints) : 0
+
+        matchups.push({ leagueId: league.id, leagueName: league.league_name, myScore, opponentScore })
       }
     }
   }

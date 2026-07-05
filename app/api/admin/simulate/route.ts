@@ -9,6 +9,13 @@
 import { createSSRClient, createAdminClient } from '@/lib/supabase'
 import { invalidateSimCache } from '@/lib/simTime'
 import { runScenario1, runScenario2, runScenario3, runScenario4, clearSimulation } from '@/lib/simScenarios'
+import {
+  runLiveUnlockScenario,
+  runTouchdownScenario,
+  runInterceptionScenario,
+  runLeadChangeScenario,
+  runNonLiveInjuryScenario,
+} from '@/lib/liveSimScenarios'
 import { NextResponse, type NextRequest } from 'next/server'
 import type { RostiroState } from '@/types'
 
@@ -73,9 +80,14 @@ export async function POST(request: NextRequest) {
           '2': runScenario2,
           '3': runScenario3,
           '4': runScenario4,
+          '5': runLiveUnlockScenario,
+          '6': runTouchdownScenario,
+          '7': runInterceptionScenario,
+          '8': runLeadChangeScenario,
+          '9': runNonLiveInjuryScenario,
         }
         const run = body.scenario ? scenarios[body.scenario] : undefined
-        if (!run) return NextResponse.json({ error: 'scenario must be one of 1, 2, 3, 4' }, { status: 400 })
+        if (!run) return NextResponse.json({ error: `scenario must be one of ${Object.keys(scenarios).join(', ')}` }, { status: 400 })
         const result = await run(admin)
         invalidateSimCache()
         return NextResponse.json(result)

@@ -24,16 +24,16 @@ import { getSleeperRosters } from '@/lib/sleeper'
 import { detectTouchdownSwings, type ScoreDelta } from '@/lib/engagementTriggers'
 import { createAdminClient } from '@/lib/supabase'
 
-type AdminClient = ReturnType<typeof createAdminClient>
+export type AdminClient = ReturnType<typeof createAdminClient>
 
-interface ConnectedLeague {
+export interface ConnectedLeague {
   id: string
   league_id: string
   league_name: string
   team_id: string | null
 }
 
-interface RealStarter {
+export interface RealStarter {
   playerId: string
   name: string
   position: string | null
@@ -41,7 +41,7 @@ interface RealStarter {
   injuryStatus: string | null
 }
 
-interface RestoreEntry {
+export interface RestoreEntry {
   table: string
   match: Record<string, unknown>
   column?: string
@@ -49,7 +49,11 @@ interface RestoreEntry {
   delete?: boolean
 }
 
-async function loadFounderLeagues(admin: AdminClient): Promise<{ userId: string; leagues: ConnectedLeague[] }> {
+// Exported (T-111 follow-up) so lib/liveSimScenarios.ts's richer,
+// data-driven scenarios share this exact same restore ledger — one
+// "Clear simulation" button that actually cleans up everything, not two
+// separate tracking systems.
+export async function loadFounderLeagues(admin: AdminClient): Promise<{ userId: string; leagues: ConnectedLeague[] }> {
   const { data: founder } = await admin.from('users').select('id').eq('email', process.env.ADMIN_EMAIL).maybeSingle()
   if (!founder) throw new Error('Admin account not found — check ADMIN_EMAIL matches a real signed-up user')
   const { data: leagues } = await admin
@@ -60,7 +64,7 @@ async function loadFounderLeagues(admin: AdminClient): Promise<{ userId: string;
   return { userId: founder.id as string, leagues: (leagues ?? []) as ConnectedLeague[] }
 }
 
-async function pickRealStarter(admin: AdminClient, league: ConnectedLeague): Promise<RealStarter | null> {
+export async function pickRealStarter(admin: AdminClient, league: ConnectedLeague): Promise<RealStarter | null> {
   const rosters = await getSleeperRosters(league.league_id).catch(() => [])
   const myRoster = rosters.find((r) => String(r.roster_id) === league.team_id)
   const starterIds = (myRoster?.starters ?? []).filter((id: string) => id && id !== '0')
@@ -85,13 +89,13 @@ async function pickRealStarter(admin: AdminClient, league: ConnectedLeague): Pro
   }
 }
 
-async function appendRestore(admin: AdminClient, entry: RestoreEntry) {
+export async function appendRestore(admin: AdminClient, entry: RestoreEntry) {
   const { data } = await admin.from('sim_state').select('restore_json').eq('id', 1).maybeSingle()
   const existing: RestoreEntry[] = Array.isArray(data?.restore_json) ? data.restore_json : []
   await admin.from('sim_state').update({ restore_json: [...existing, entry] }).eq('id', 1)
 }
 
-async function insertTrackedPulseItem(admin: AdminClient, row: Record<string, unknown>) {
+export async function insertTrackedPulseItem(admin: AdminClient, row: Record<string, unknown>) {
   const { data, error } = await admin.from('pulse_items').insert(row).select('id').single()
   if (error) throw new Error(error.message)
   await appendRestore(admin, { table: 'pulse_items', match: { id: data.id }, delete: true })
@@ -284,11 +288,21 @@ export async function clearSimulation(admin: AdminClient): Promise<void> {
   const { data } = await admin.from('sim_state').select('restore_json').eq('id', 1).maybeSingle()
   const restores: RestoreEntry[] = Array.isArray(data?.restore_json) ? data.restore_json : []
 
-  for (const r of restores) {
+  // Replay in reverse (last inserted, first deleted). Restore entries are
+  // appended in insert order, so a later entry can be a row with a foreign
+  // key pointing at an earlier one (e.g. live_scores.game_id ->
+  // nfl_schedule.game_id) — deleting in forward order hits a real FK
+  // violation ("still referenced from table live_scores") that this loop
+  // silently swallowed, leaving the parent row orphaned forever. Found by
+  // adding explicit error logging around a delete that worked fine in
+  // isolation but failed here specifically because of ordering.
+  for (const r of [...restores].reverse()) {
     if (r.delete) {
-      await admin.from(r.table).delete().match(r.match)
+      const { error } = await admin.from(r.table).delete().match(r.match)
+      if (error) console.error(`clearSimulation: delete ${r.table} ${JSON.stringify(r.match)} failed:`, error.message)
     } else if (r.column) {
-      await admin.from(r.table).update({ [r.column]: r.value }).match(r.match)
+      const { error } = await admin.from(r.table).update({ [r.column]: r.value }).match(r.match)
+      if (error) console.error(`clearSimulation: restore ${r.table}.${r.column} ${JSON.stringify(r.match)} failed:`, error.message)
     }
   }
 
