@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Mode } from '@/components/nav/AppShell'
 import { useFocusTrap } from '@/lib/useFocusTrap'
+import { openPlayerCard } from '@/lib/openPlayerCard'
 import type { ADPPlayer, PulseItem } from '@/types'
 
 interface Command {
@@ -195,7 +196,7 @@ export default function CommandPalette({
         // than bouncing to Draft Kit's search box.
         run: () => {
           close()
-          window.dispatchEvent(new CustomEvent('rostiro:open-player-card', { detail: { playerId: p.playerId } }))
+          openPlayerCard(p.playerId)
         },
       })
     }

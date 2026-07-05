@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from 'react'
 import { useMode, type Mode } from '@/components/nav/AppShell'
+import { openPlayerCard } from '@/lib/openPlayerCard'
 import type { Confidence, LeagueLineup, Player, StartSitRecommendation } from '@/types'
 
 const VERDICT_LABEL: Record<StartSitRecommendation['verdict'], string> = {
@@ -164,11 +165,17 @@ function LineupRow({
   isFirst: boolean
 }) {
   const isInjured = player?.injuryStatus && player.injuryStatus !== 'active'
+  const Row = player ? 'button' : 'div'
 
   return (
-    <div
-      className="flex items-center gap-3 px-4 py-2.5"
-      style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', borderTop: isFirst ? 'none' : '1px solid var(--hairline)' }}
+    <Row
+      type={player ? 'button' : undefined}
+      onClick={player ? () => openPlayerCard(player.id) : undefined}
+      className="w-full flex items-center gap-3 px-4 py-2.5 text-left"
+      style={{
+        backgroundColor: 'rgba(8, 15, 26, 0.6)',
+        borderTop: isFirst ? 'none' : '1px solid var(--hairline)',
+      }}
     >
       <span
         className="mono-data text-[10px] font-semibold flex-shrink-0 w-11 text-center px-1 py-0.5 rounded"
@@ -202,7 +209,7 @@ function LineupRow({
           {playerIdRaw ?? 'Empty'}
         </p>
       )}
-    </div>
+    </Row>
   )
 }
 
@@ -225,9 +232,9 @@ function StartSitCard({ rec, mode }: { rec: StartSitRecommendation; mode: Mode }
       </div>
 
       <div className="flex items-center gap-3 mb-3">
-        <PlayerChip name={rec.playerA.name} position={rec.playerA.position} label="Currently started" />
+        <PlayerChip playerId={rec.playerA.id} name={rec.playerA.name} position={rec.playerA.position} label="Currently started" />
         <span className="text-sm" style={{ color: 'var(--t3)' }}>vs</span>
-        <PlayerChip name={rec.playerB.name} position={rec.playerB.position} label="On bench" />
+        <PlayerChip playerId={rec.playerB.id} name={rec.playerB.name} position={rec.playerB.position} label="On bench" />
       </div>
 
       <p className="text-sm" style={{ color: 'var(--t2)' }}>{rec.reasoning}</p>
@@ -239,12 +246,12 @@ function StartSitCard({ rec, mode }: { rec: StartSitRecommendation; mode: Mode }
   )
 }
 
-function PlayerChip({ name, position, label }: { name: string; position: string; label: string }) {
+function PlayerChip({ playerId, name, position, label }: { playerId: string; name: string; position: string; label: string }) {
   return (
-    <div className="min-w-0">
+    <button type="button" onClick={() => openPlayerCard(playerId)} className="min-w-0 text-left">
       <p className="text-sm font-semibold text-white truncate">{name}</p>
       <p className="text-xs truncate" style={{ color: 'var(--t3)' }}>{position} · {label}</p>
-    </div>
+    </button>
   )
 }
 

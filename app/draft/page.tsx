@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useMode } from '@/components/nav/AppShell'
+import { openPlayerCard } from '@/lib/openPlayerCard'
 import type { ADPPlayer, NFLPosition, RostiroState } from '@/types'
 
 // T-104 / 6.13: matches the already-shipped STATE_CONFIG.draft amber
@@ -207,8 +208,10 @@ function RankingsTable({ players, mode }: { players: ADPPlayer[]; mode: string }
                 Tier {p.tier}
               </div>
             )}
-            <div
-              className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-[rgba(75,163,245,0.05)]"
+            <button
+              type="button"
+              onClick={() => openPlayerCard(p.playerId)}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-[rgba(75,163,245,0.05)]"
               style={{ borderTop: i === 0 ? 'none' : '1px solid rgba(90,150,210,.07)' }}
             >
               <span
@@ -243,7 +246,7 @@ function RankingsTable({ players, mode }: { players: ADPPlayer[]; mode: string }
                   ADP {p.adpConsensus.toFixed(1)}
                 </span>
               )}
-            </div>
+            </button>
           </div>
         )
       })}
