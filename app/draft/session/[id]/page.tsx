@@ -185,15 +185,27 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
     [picks]
   )
 
-  // Track newly-sniped queue targets (only alert once per player).
+  // Track newly-sniped queue targets (only alert once per player) — also
+  // covers a queued player YOU draft yourself, not just an opponent, since
+  // findSnipedQueueTargets just checks "is this queued id now drafted,
+  // period." Real bug found while reviewing this (July 6, 2026): the
+  // removal only ever called setQueue, never persisted to the server's
+  // queue_json — a refresh mid-draft would resurrect an already-drafted
+  // player back into the queue until this effect caught it again (and
+  // re-fired the "sniped" alert a second time, since seenSnipes is an
+  // in-memory ref that resets on reload). Now uses persistQueue so the
+  // removal actually sticks server-side too.
   useEffect(() => {
     const sniped = findSnipedQueueTargets(queue, draftedIds)
     const fresh = sniped.filter((id) => !seenSnipes.current.has(id))
     if (fresh.length > 0) {
       fresh.forEach((id) => seenSnipes.current.add(id))
       setFreshSnipes((prev) => [...prev, ...fresh])
-      setQueue((prev) => prev.filter((id) => !sniped.includes(id)))
+      persistQueue(queue.filter((id) => !sniped.includes(id)))
     }
+    // persistQueue is intentionally omitted — it's redefined every render,
+    // and isn't itself a reactive value this effect needs to resync on.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftedIds, queue])
 
   // Only force a full clear+refetch once every recommended candidate is
