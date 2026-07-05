@@ -168,6 +168,13 @@ export interface SleeperMatchup {
   roster_id: number
   matchup_id: number | null
   points: number
+  // T-111: confirmed present live on the real matchups endpoint (July 2026) —
+  // players_points is a per-player-id fantasy point map for the week,
+  // starters_points is the same values positionally ordered to match
+  // `starters`. Both null/empty pre-season; this is what LIVE reads to show
+  // "how many points does this player have right now."
+  players_points?: Record<string, number>
+  starters_points?: number[]
 }
 
 export async function getSleeperMatchups(leagueId: string, week: number): Promise<SleeperMatchup[]> {

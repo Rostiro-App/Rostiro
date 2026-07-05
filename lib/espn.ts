@@ -136,6 +136,63 @@ export async function getEspnMatchup(
   return espnFetch(leagueUrl(leagueId), credentials, params)
 }
 
+// T-111: LIVE tab's per-player live points. Confirmed shape against real
+// (not projected) box scores from a real league — a player stat entry
+// carries multiple statSourceId values (0 = actual, 1 = projection); only
+// statSourceId 0 for the requested week is real. appliedTotal there is
+// ESPN's own already-scored fantasy point total for that player, that week
+// — no separate math needed, unlike Sleeper's search_rank-style proxies.
+export interface EspnLivePlayerPoints {
+  playerId: string
+  points: number
+}
+
+export interface EspnLiveMatchup {
+  teamId: number
+  playerPoints: EspnLivePlayerPoints[]
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractEspnPlayerPoints(entries: any[], week: number): EspnLivePlayerPoints[] {
+  const points: EspnLivePlayerPoints[] = []
+  for (const entry of entries ?? []) {
+    const player = entry?.playerPoolEntry?.player
+    if (!player?.id) continue
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const actual = (player.stats ?? []).find((s: any) => s.statSourceId === 0 && s.scoringPeriodId === week)
+    if (!actual) continue
+    points.push({ playerId: String(player.id), points: actual.appliedTotal ?? 0 })
+  }
+  return points
+}
+
+export async function getEspnLivePoints(
+  leagueId: string,
+  credentials: EspnCredentials,
+  week: number
+): Promise<EspnLiveMatchup[]> {
+  const data = await espnFetch<{
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    schedule?: Array<{ matchupPeriodId?: number; home?: any; away?: any }>
+  }>(leagueUrl(leagueId), credentials, { view: 'mBoxscore', scoringPeriodId: String(week) })
+
+  // Found live (verified against a real league's real 2025 season): mBoxscore
+  // returns every matchup period for the whole season regardless of
+  // scoringPeriodId, which only narrows the per-player stat entries — not
+  // filtering to this week's matchups here would process ~20x the real
+  // data and could return duplicate team entries.
+  const results: EspnLiveMatchup[] = []
+  for (const matchup of data.schedule ?? []) {
+    if (matchup.matchupPeriodId !== week) continue
+    for (const side of [matchup.home, matchup.away]) {
+      if (!side) continue
+      const entries = side.rosterForCurrentScoringPeriod?.entries ?? []
+      results.push({ teamId: side.teamId, playerPoints: extractEspnPlayerPoints(entries, week) })
+    }
+  }
+  return results
+}
+
 export async function getEspnWaivers(
   leagueId: string,
   credentials: EspnCredentials,

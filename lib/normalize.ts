@@ -19,16 +19,28 @@ const SEASON = 2026
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function normalizeSleeperLeague(raw: any, myRosterId: number): League {
-  const settings = raw.league?.settings ?? raw.settings ?? {}
+  // T-111 bug found while verifying live event classification against a
+  // real league: Sleeper puts every scoring value (pass_td, rec, rush_yd,
+  // etc.) in its own top-level `scoring_settings` object, a sibling of
+  // `settings` — not inside `settings` itself. Every field below was
+  // silently reading from the wrong object and falling back to hardcoded
+  // defaults for every real Sleeper league, never the league's actual
+  // scoring. Confirmed directly: `scoring_settings.pass_int` is -1 on the
+  // real connected league; `settings.pass_int` doesn't exist at all.
+  const scoringSettings = raw.league?.scoring_settings ?? raw.scoring_settings ?? {}
   const scoring: ScoringSettings = {
-    ppr: (settings.rec ?? 0) as 0 | 0.5 | 1,
-    tePremium: settings.bonus_rec_te ?? 0,
-    qbTouchdownPoints: settings.pass_td ?? 4,
-    passingYardsPerPoint: settings.pass_yd ? 1 / settings.pass_yd : 1 / 25,
-    rushingYardsPerPoint: settings.rush_yd ? 1 / settings.rush_yd : 1 / 10,
-    receivingYardsPerPoint: settings.rec_yd ? 1 / settings.rec_yd : 1 / 10,
+    ppr: (scoringSettings.rec ?? 0) as 0 | 0.5 | 1,
+    tePremium: scoringSettings.bonus_rec_te ?? 0,
+    qbTouchdownPoints: scoringSettings.pass_td ?? 4,
+    passingYardsPerPoint: scoringSettings.pass_yd ? 1 / scoringSettings.pass_yd : 1 / 25,
+    rushingYardsPerPoint: scoringSettings.rush_yd ? 1 / scoringSettings.rush_yd : 1 / 10,
+    receivingYardsPerPoint: scoringSettings.rec_yd ? 1 / scoringSettings.rec_yd : 1 / 10,
     isSuperFlex: (raw.league?.roster_positions ?? raw.roster_positions ?? []).includes('SUPER_FLEX'),
-    isHalfPpr: (settings.rec ?? 0) === 0.5,
+    isHalfPpr: (scoringSettings.rec ?? 0) === 0.5,
+    rushTouchdownPoints: scoringSettings.rush_td ?? 6,
+    receivingTouchdownPoints: scoringSettings.rec_td ?? 6,
+    fumbleLostPoints: scoringSettings.fum_lost ?? -2,
+    interceptionThrownPoints: scoringSettings.pass_int ?? -2,
   }
 
   const leagueId = raw.league?.league_id ?? raw.league_id
@@ -113,6 +125,17 @@ export function normalizeYahooLeague(raw: any): League {
     receivingYardsPerPoint: getStat(11) ? 1 / getStat(11) : 1 / 10,
     isSuperFlex: false, // detect from roster positions
     isHalfPpr: ppr === 0.5,
+    // T-111: NOT verified against a real connected Yahoo league (none
+    // exists yet — same gap already true of this file's roster-position
+    // parsing above). Standard-scoring defaults rather than a guessed
+    // stat_id, so this degrades to a common real value instead of a wrong
+    // one. Replace with real getStat() lookups once a real league exists
+    // to verify the stat_ids against, same discipline already applied to
+    // Sleeper/ESPN above.
+    rushTouchdownPoints: 6,
+    receivingTouchdownPoints: 6,
+    fumbleLostPoints: -2,
+    interceptionThrownPoints: -2,
   }
 
   const myTeam = lg?.teams?.team?.[0] ?? {}
@@ -316,6 +339,16 @@ export function normalizeEspnLeague(raw: any): League {
     receivingYardsPerPoint: getScoringValue(42) ? 1 / getScoringValue(42) : 1 / 10,
     isSuperFlex: false,
     isHalfPpr: ppr === 0.5,
+    // T-111: confirmed live against real (statSourceId 0, not projected)
+    // box scores from a real league — stat 25 appeared at clean 6-point
+    // multiples matching real rushing TDs, 43 likewise for receiving TDs,
+    // 72 at clean -2 multiples matching fumbles lost, 20 likewise for INTs
+    // thrown. Cross-referenced against multiple real players/weeks, not a
+    // single coincidental match.
+    rushTouchdownPoints: getScoringValue(25) || 6,
+    receivingTouchdownPoints: getScoringValue(43) || 6,
+    fumbleLostPoints: getScoringValue(72) || -2,
+    interceptionThrownPoints: getScoringValue(20) || -2,
   }
 
   const teams = raw?.teams ?? []

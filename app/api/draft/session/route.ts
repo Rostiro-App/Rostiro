@@ -277,6 +277,10 @@ function scoringSettingsFromMockType(scoringType: 'std' | 'ppr' | 'half_ppr' | u
     receivingYardsPerPoint: 1 / 10,
     isSuperFlex: false,
     isHalfPpr: ppr === 0.5,
+    rushTouchdownPoints: 6,
+    receivingTouchdownPoints: 6,
+    fumbleLostPoints: -2,
+    interceptionThrownPoints: -2,
   }
 }
 

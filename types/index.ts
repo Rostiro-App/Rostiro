@@ -105,6 +105,15 @@ export interface ScoringSettings {
   receivingYardsPerPoint: number
   isSuperFlex: boolean
   isHalfPpr: boolean
+  // LIVE tab event classification (T-111): a live point delta is classified
+  // as touchdown/reception/yardage/negative by comparing its magnitude
+  // against these real, per-league values — never a guessed universal
+  // constant. Turnover values are typically negative (a league that doesn't
+  // penalize a stat at all has it at 0, not omitted).
+  rushTouchdownPoints: number
+  receivingTouchdownPoints: number
+  fumbleLostPoints: number
+  interceptionThrownPoints: number
 }
 
 export interface Matchup {
