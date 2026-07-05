@@ -181,6 +181,42 @@ async function buildLeagueItems(
     myPlayers = (data ?? []) as CachedPlayer[]
   }
 
+  // ─── Post-draft roster grade ─────────────────────────────────────────────
+  // Found missing from a real account audit (July 4, 2026) — PRD line 737
+  // promises "roster grade appears in Pulse even without a full Portfolio
+  // product at MVP," never actually built. Reuses Health Score rather than
+  // a new formula (confirmed with the founder for T-86, same call applies
+  // here). Fingerprint is stable (no date/value baked in) so this fires
+  // exactly once per league, right after its draft completes, and never
+  // resurfaces once dismissed — a one-time "look what you built" moment,
+  // not a recurring status card.
+  const draftJustCompleted = drafts.some((d) => d.status === 'complete')
+  if (draftJustCompleted && myPlayers.length > 0) {
+    const healthPlayers: HealthPlayer[] = myPlayers.map((p) => ({
+      playerId: p.player_id,
+      adp: p.adp_sleeper,
+      injuryStatus: p.injury_status,
+    }))
+    const grade = computeLeagueHealth({
+      myPlayers: healthPlayers,
+      starterIds,
+      bestFreeAgentAdp: null,
+      bestFreeAgentName: null,
+    })
+    if (grade.score !== null) {
+      items.push({
+        fingerprint: `roster_grade:${league.id}`,
+        type: 'roster_grade',
+        priority: 'info',
+        headline: `${league.league_name} — your roster grades ${Math.round(grade.score)}`,
+        reasoning: `Your draft is complete — Rostiro grades ${league.league_name}'s roster construction a ${Math.round(grade.score)}/100.${grade.topFlag ? ` ${grade.topFlag}.` : ''} Full breakdown on the Leagues page.`,
+        affectedLeagues: [affectedLeague],
+        deadline: null,
+        actionUrl: '/leagues',
+      })
+    }
+  }
+
   // ─── Injuries on my roster ───────────────────────────────────────────────
   for (const p of myPlayers) {
     if (!p.injury_status) continue

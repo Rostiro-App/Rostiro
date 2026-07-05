@@ -44,6 +44,9 @@ const TYPE_CONFIG: Record<PulseItemType, { color: string; label: string }> = {
   lineup_lock:       { color: 'var(--warn)',   label: 'LINEUP LOCK' },
   // Relief, not celebration or alarm — calm signal blue, deliberately quiet.
   mission_complete:  { color: 'var(--signal)', label: 'MISSION COMPLETE' },
+  // Pride/ownership (PRD line 737's "post-draft" emotional beat) — same
+  // green as a waiver win, a positive moment without being loud about it.
+  roster_grade:      { color: 'var(--live)',   label: 'ROSTER GRADE' },
 }
 
 type PulseAction = 'done' | 'dismiss' | 'snooze'
