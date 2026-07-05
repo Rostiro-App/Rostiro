@@ -17,11 +17,14 @@ import { currentNflWeek } from '@/lib/liveMatchupPoints'
 import { classifyDeltas, type ClassifiedLiveEvent } from '@/lib/liveEvents'
 import { detectAndSendLiveUnlockPush } from '@/lib/windowRecap'
 import { buildPulseItemsForUser, syncPulseItems } from '@/lib/pulse'
+import { detectLineupLockUrgency, detectMissionComplete, detectTouchdownSwings, type ScoreDelta } from '@/lib/engagementTriggers'
+import { toNflverseTeamCode } from '@/lib/liveScores'
 import {
   loadFounderLeagues,
   pickRealStarter,
   appendRestore,
   type AdminClient,
+  type ConnectedLeague,
 } from '@/lib/simScenarios'
 
 async function seedLiveGame(
@@ -326,5 +329,274 @@ export async function runNonLiveInjuryScenario(admin: AdminClient): Promise<{ ok
     note: itemRow
       ? `${starter.name} flagged questionable, real injury_alert pulse_item created (fingerprint ${fingerprint}) — no live game seeded, so it belongs in Player updates, never "Live now." Open /live or /pulse to see it now.`
       : `${starter.name} flagged questionable, but the real generator didn't produce an injury_alert for them — check whether they're actually a starter in this league or already had an open alert for a different status.`,
+  }
+}
+
+// ─── Scenario: Lineup-lock urgency (real P0 interrupt) ─────────────────────
+// T-93's engagementTriggers.ts has three real detectors, but only
+// detectTouchdownSwings was ever exercised by a sim scenario — this and the
+// mission-complete scenario below close that gap. Seeds a real nfl_schedule
+// row with kickoff ~12 real minutes out (inside detectLineupLockUrgency's
+// own 30-min window) for a real starter's team, flips that starter to
+// doubtful, then calls the REAL detectLineupLockUrgency — the same function
+// the lineup-lock cron calls — so this proves the P0 interrupt fires
+// end-to-end (engagement_log claim -> pulse_item insert -> push), not just
+// that the ingredients for it exist.
+export async function runLineupLockScenario(admin: AdminClient): Promise<{ ok: boolean; note: string }> {
+  const { userId, leagues } = await loadFounderLeagues(admin)
+  const league = leagues[0]
+  if (!league) return { ok: false, note: 'No connected Sleeper league to attach this scenario to.' }
+
+  const starter = await pickRealStarter(admin, league)
+  if (!starter || !starter.nflTeam) return { ok: false, note: 'No real starter with a resolvable NFL team found on this roster.' }
+
+  await appendRestore(admin, {
+    table: 'players_cache',
+    match: { player_id: starter.playerId, platform: 'sleeper' },
+    column: 'injury_status',
+    value: starter.injuryStatus,
+  })
+  await admin.from('players_cache').update({ injury_status: 'doubtful' }).eq('player_id', starter.playerId).eq('platform', 'sleeper')
+
+  // 'pre' status, 12 real minutes out — inside the detector's 30-min
+  // window, but far enough out that the panel's own round-trip can't
+  // accidentally race it past kickoff before the result renders.
+  await seedLiveGame(admin, `SIM-LOCK-${league.id}`, starter.nflTeam, 'SIM', 12, 'pre')
+
+  const todayEt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date())
+  await detectLineupLockUrgency(admin, todayEt)
+
+  const dedupeKey = `${league.id}:${todayEt}`
+  const { data: logRow } = await admin
+    .from('engagement_log')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('trigger_type', 'lineup_lock')
+    .eq('dedupe_key', dedupeKey)
+    .maybeSingle()
+  if (logRow) await appendRestore(admin, { table: 'engagement_log', match: { id: logRow.id }, delete: true })
+
+  const { data: itemRow } = await admin
+    .from('pulse_items')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('type', 'lineup_lock')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (itemRow) await appendRestore(admin, { table: 'pulse_items', match: { id: itemRow.id }, delete: true })
+
+  return {
+    ok: itemRow ? true : false,
+    note: itemRow
+      ? `${starter.name} flagged doubtful, kickoff seeded 12 min out — real detectLineupLockUrgency fired a P0 interrupt (engagement_log dedupe key ${dedupeKey}). Open the app to see it hold the single interrupt slot.`
+      : `${starter.name} flagged doubtful and kickoff seeded 12 min out, but the real detector didn't fire — check for an already-open lineup_lock for today (dedupe key ${dedupeKey}), or whether the starter's team resolved correctly against today's schedule.`,
+  }
+}
+
+// ─── Scenario: Mission complete (real end-of-day summary) ──────────────────
+// Seeds a real nfl_schedule + live_scores row already 'post' for a real
+// starter's team, then calls the REAL detectMissionComplete — the same
+// function the mission-complete cron calls — so this proves the "all your
+// games are final" summary only fires once every one of the user's
+// roster-relevant games today has actually finished, not on a timer.
+export async function runMissionCompleteScenario(admin: AdminClient): Promise<{ ok: boolean; note: string }> {
+  const { userId, leagues } = await loadFounderLeagues(admin)
+  const league = leagues[0]
+  if (!league) return { ok: false, note: 'No connected Sleeper league to attach this scenario to.' }
+
+  const starter = await pickRealStarter(admin, league)
+  if (!starter || !starter.nflTeam) return { ok: false, note: 'No real starter with a resolvable NFL team found on this roster.' }
+
+  // detectMissionComplete compares the roster's Sleeper team codes (already
+  // converted through toNflverseTeamCode on its side) against
+  // nfl_schedule.home_team/away_team, which nflverse ingestion always
+  // writes in nflverse convention (e.g. Rams = "LA", not Sleeper's "LAR") —
+  // converting here too, rather than writing the raw Sleeper code, so this
+  // scenario can't silently no-op if pickRealStarter happens to land on
+  // one of the two teams whose codes actually differ between the two
+  // conventions (same class of bug T-81 already caught once for real).
+  const nflverseTeam = toNflverseTeamCode(starter.nflTeam)
+
+  // -180 real minutes and 'post' — a kickoff far enough in the past that
+  // the game reads as long-finished, same ET calendar day for any
+  // reasonable test time.
+  await seedLiveGame(admin, `SIM-MISSION-${league.id}`, nflverseTeam, 'SIM', -180, 'post')
+
+  const todayEt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date())
+  await detectMissionComplete(admin, todayEt)
+
+  const { data: logRow } = await admin
+    .from('engagement_log')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('trigger_type', 'mission_complete')
+    .eq('dedupe_key', todayEt)
+    .maybeSingle()
+  if (logRow) await appendRestore(admin, { table: 'engagement_log', match: { id: logRow.id }, delete: true })
+
+  const { data: itemRow } = await admin
+    .from('pulse_items')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('type', 'mission_complete')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (itemRow) await appendRestore(admin, { table: 'pulse_items', match: { id: itemRow.id }, delete: true })
+
+  return {
+    ok: itemRow ? true : false,
+    note: itemRow
+      ? `${starter.nflTeam} game seeded as final — real detectMissionComplete confirmed every roster-relevant game today is 'post' and fired the calm Action-layer summary card. Open /pulse to see it.`
+      : `${starter.nflTeam} game seeded as final, but the real detector didn't fire — check for another real or simulated game today involving one of this roster's teams that isn't 'post' yet (allDone requires every relevant game finished), or an already-open mission_complete for today.`,
+  }
+}
+
+// ─── Scenario: Cross-league touchdown dedup (real multi-league grouping) ───
+// detectTouchdownSwings groups affected leagues by user (PRD 6.12: "one push
+// per user naming every affected league, never one push per league"), but
+// every prior scenario in this suite only ever used leagues[0] — there was
+// no way to actually exercise that grouping logic until a second real
+// league existed. Finds an NFL team genuinely rostered (any roster slot,
+// not just a starter — matching detectTouchdownSwings' own `myRoster.players`
+// check) in two or more of the founder's connected leagues, fires one
+// synthetic ScoreDelta for that team through the REAL detector, and checks
+// the resulting pulse item names every affected league in a single card,
+// not one card per league.
+export async function runCrossLeagueTouchdownScenario(admin: AdminClient): Promise<{ ok: boolean; note: string }> {
+  const { userId, leagues } = await loadFounderLeagues(admin)
+  if (leagues.length < 2) {
+    return { ok: false, note: `Need at least 2 connected Sleeper leagues to test cross-league dedup — only ${leagues.length} found.` }
+  }
+
+  const teamsByLeague: { league: ConnectedLeague; teams: Set<string> }[] = []
+  for (const league of leagues) {
+    const rosters = await getSleeperRosters(league.league_id).catch(() => [])
+    const myRoster = rosters.find((r) => String(r.roster_id) === league.team_id)
+    const playerIds = (myRoster?.players ?? []).filter((id: string) => id && id !== '0')
+    if (playerIds.length === 0) {
+      teamsByLeague.push({ league, teams: new Set() })
+      continue
+    }
+    const { data: rows } = await admin.from('players_cache').select('nfl_team').eq('platform', 'sleeper').in('player_id', playerIds)
+    const teams = new Set(((rows ?? []) as { nfl_team: string | null }[]).map((r) => r.nfl_team).filter((t): t is string => !!t))
+    teamsByLeague.push({ league, teams })
+  }
+
+  const leaguesByTeam = new Map<string, ConnectedLeague[]>()
+  for (const { league, teams } of teamsByLeague) {
+    for (const team of teams) {
+      leaguesByTeam.set(team, [...(leaguesByTeam.get(team) ?? []), league])
+    }
+  }
+  const shared = [...leaguesByTeam.entries()].find(([, ls]) => ls.length >= 2)
+  if (!shared) {
+    return {
+      ok: false,
+      note: `None of your ${leagues.length} connected leagues share a rostered NFL team — cross-league dedup needs the same real team rostered (any slot) in two leagues to test. Roster a player from the same team in both to enable this.`,
+    }
+  }
+  const [team, affectedLeagues] = shared
+
+  const gameId = `SIM-XLEAGUE-TD-${team}-${Date.now()}`
+  const delta: ScoreDelta = { gameId, homeTeam: team, awayTeam: 'SIM', prevHomeScore: 0, prevAwayScore: 0, newHomeScore: 6, newAwayScore: 0 }
+  await detectTouchdownSwings(admin, [delta])
+
+  const dedupeKey = `${gameId}:6-0`
+  const { data: logRow } = await admin
+    .from('engagement_log')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('trigger_type', 'touchdown_swing')
+    .eq('dedupe_key', dedupeKey)
+    .maybeSingle()
+  if (logRow) await appendRestore(admin, { table: 'engagement_log', match: { id: logRow.id }, delete: true })
+
+  const { data: itemRow } = await admin
+    .from('pulse_items')
+    .select('id, affected_leagues_json')
+    .eq('user_id', userId)
+    .eq('type', 'touchdown_swing')
+    .ilike('headline', `${team} scores%`)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (itemRow) await appendRestore(admin, { table: 'pulse_items', match: { id: itemRow.id }, delete: true })
+
+  const namedLeagueCount = Array.isArray(itemRow?.affected_leagues_json) ? itemRow.affected_leagues_json.length : 0
+  const ok = !!itemRow && namedLeagueCount >= 2
+
+  return {
+    ok,
+    note: ok
+      ? `${team} scored — real detectTouchdownSwings fired ONE pulse item naming all ${namedLeagueCount} affected leagues (${affectedLeagues.map((l) => l.league_name).join(', ')}), proving cross-league dedup instead of one card per league.`
+      : `${team} scored across ${affectedLeagues.length} of your leagues, but the resulting item named only ${namedLeagueCount} league(s) — real cross-league grouping in detectTouchdownSwings may not be working as intended. Check byUser grouping there.`,
+  }
+}
+
+// ─── Scenario: Lineup-lock, empty starter slot (real, opportunistic) ───────
+// detectLineupLockUrgency fires on either an injury flag (Scenario 11) or
+// an empty starter slot (bye week, unfilled bench-to-starter swap) — but an
+// empty slot isn't something this suite can fabricate the way injury_status
+// can be flipped: Sleeper's public API has no write endpoint for lineups,
+// and building one just to manufacture a synthetic gap would mean mutating
+// a real roster during a real, live season — a categorically bigger risk
+// than anything else this suite touches. So this scenario is read-only and
+// opportunistic: it looks across your connected rosters for one that
+// ALREADY has a genuine empty starter slot right now, seeds only the
+// kickoff window for that roster's earliest-kickoff team, and calls the
+// real detector — proving the branch fires when the condition is real,
+// rather than asserting it against fabricated data.
+export async function runEmptySlotLineupLockScenario(admin: AdminClient): Promise<{ ok: boolean; note: string }> {
+  const { userId, leagues } = await loadFounderLeagues(admin)
+  if (leagues.length === 0) return { ok: false, note: 'No connected Sleeper league to attach this scenario to.' }
+
+  for (const league of leagues) {
+    const rosters = await getSleeperRosters(league.league_id).catch(() => [])
+    const myRoster = rosters.find((r) => String(r.roster_id) === league.team_id)
+    if (!myRoster?.starters?.length) continue
+    const emptySlots = myRoster.starters.filter((id: string) => id === '0').length
+    if (emptySlots === 0) continue
+
+    const filledStarterIds = myRoster.starters.filter((id: string) => id !== '0')
+    const starter = await firstStarterWithTeam(admin, filledStarterIds)
+    if (!starter) continue
+
+    await seedLiveGame(admin, `SIM-EMPTYSLOT-${league.id}`, starter.nflTeam, 'SIM', 12, 'pre')
+    const todayEt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date())
+    await detectLineupLockUrgency(admin, todayEt)
+
+    const dedupeKey = `${league.id}:${todayEt}`
+    const { data: logRow } = await admin
+      .from('engagement_log')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('trigger_type', 'lineup_lock')
+      .eq('dedupe_key', dedupeKey)
+      .maybeSingle()
+    if (logRow) await appendRestore(admin, { table: 'engagement_log', match: { id: logRow.id }, delete: true })
+
+    const { data: itemRow } = await admin
+      .from('pulse_items')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('type', 'lineup_lock')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (itemRow) await appendRestore(admin, { table: 'pulse_items', match: { id: itemRow.id }, delete: true })
+
+    return {
+      ok: !!itemRow,
+      note: itemRow
+        ? `${league.league_name} has ${emptySlots} genuinely empty starter slot(s) right now — kickoff seeded 12 min out on ${starter.nflTeam}, real detectLineupLockUrgency fired on the empty-slot branch (no injury involved).`
+        : `${league.league_name} has ${emptySlots} empty starter slot(s) and kickoff was seeded, but the real detector didn't fire — check dedupe key ${dedupeKey} for an already-open alert today.`,
+    }
+  }
+
+  return {
+    ok: false,
+    note: `None of your ${leagues.length} connected league(s) currently have a real empty starter slot, so this branch can't be exercised right now — it can't be fabricated (no Sleeper write endpoint for lineups exists, and building one just for this would risk touching a real live roster). To test it for real: bench a starter to leave a slot open, or wait for a natural bye-week gap, then re-run this scenario.`,
   }
 }

@@ -241,7 +241,7 @@ export async function detectLineupLockUrgency(admin: AdminClient, todayEt: strin
     const starters = (starterRows ?? []) as { player_id: string; name: string; nfl_team: string | null; injury_status: string | null }[]
 
     const kickoffs = starters
-      .map((s) => (s.nfl_team ? kickoffByTeam.get(s.nfl_team) : undefined))
+      .map((s) => (s.nfl_team ? kickoffByTeam.get(toNflverseTeamCode(s.nfl_team)) : undefined))
       .filter((k): k is number => k !== undefined)
     if (kickoffs.length === 0) continue
     const earliestKickoff = Math.min(...kickoffs)

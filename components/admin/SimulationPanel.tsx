@@ -16,7 +16,19 @@ interface SimStatus {
   simTimestamp: string | null
   forcedState: RostiroState | null
   activeScenario: string | null
+  currentPlan: string | null
 }
+
+// Real users.plan values (types/index.ts) — the aspirational T-85/T-112
+// model (Free/Pro/Founder Season Pass/Founding 500) isn't in the schema or
+// Stripe yet, so testing gating means exercising what production code
+// actually reads today, not the future label.
+const PLAN_OPTIONS: { key: string; label: string }[] = [
+  { key: 'free', label: 'Free' },
+  { key: 'starter', label: 'Starter' },
+  { key: 'pro', label: 'Pro' },
+  { key: 'commissioner', label: 'Founder' },
+]
 
 const STATE_OPTIONS: { key: RostiroState; label: string; color: string }[] = [
   { key: 'draft', label: 'Draft', color: '#EF9F27' },
@@ -43,6 +55,10 @@ const LIVE_SCENARIOS: { key: string; label: string; desc: string }[] = [
   { key: '8', label: 'Lead change', desc: 'Real starter points seeded on both rosters — the matchup rail sums them, nothing hardcoded.' },
   { key: '9', label: 'Player injury (not live)', desc: 'No live game seeded — proves it lands in Player updates, never as a live roster card.' },
   { key: '10', label: 'Big play (no score)', desc: '+4.5 pts — classifier must say big_play; takeover reads BIG PLAY, never TOUCHDOWN.' },
+  { key: '11', label: 'Lineup-lock urgency', desc: 'Real detectLineupLockUrgency — starter flagged doubtful, kickoff 12 min out, real P0 interrupt.' },
+  { key: '12', label: 'Mission complete', desc: 'Real detectMissionComplete — roster-relevant game seeded final, fires the calm end-of-day summary.' },
+  { key: '13', label: 'Cross-league touchdown dedup', desc: 'Real detectTouchdownSwings across 2+ leagues sharing a team — one card naming every league, not one per league.' },
+  { key: '14', label: 'Lineup-lock (empty slot)', desc: 'Opportunistic, read-only — fires only if a connected roster genuinely has an empty starter slot right now.' },
 ]
 
 async function callSimulate(body: Record<string, unknown>) {
@@ -159,6 +175,27 @@ export default function SimulationPanel() {
             >
               Auto (clear)
             </button>
+          </div>
+
+          <p className="mono-data text-[9px] tracking-[0.12em] mt-4 mb-2" style={{ color: 'var(--t3)' }}>
+            FORCE PLAN{status?.currentPlan ? ` · currently ${status.currentPlan}` : ''}
+          </p>
+          <div className="grid grid-cols-2 gap-1.5">
+            {PLAN_OPTIONS.map((p) => (
+              <button
+                key={p.key}
+                disabled={busy}
+                onClick={() => runAction({ action: 'force_plan', plan: p.key }, `Plan forced to ${p.label} — real users.plan updated, restorable via Clear simulation.`)}
+                className="text-[11px] font-medium px-2 py-1.5 rounded-lg text-left disabled:opacity-50"
+                style={{
+                  color: status?.currentPlan === p.key ? 'var(--signal)' : 'var(--t2)',
+                  border: `1px solid ${status?.currentPlan === p.key ? 'var(--signal)' : 'var(--hairline)'}`,
+                  backgroundColor: status?.currentPlan === p.key ? 'var(--signal-dim)' : 'transparent',
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
           </div>
 
           <p className="mono-data text-[9px] tracking-[0.12em] mt-4 mb-2" style={{ color: 'var(--t3)' }}>TIME OVERRIDE</p>
