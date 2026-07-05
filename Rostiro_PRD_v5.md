@@ -925,6 +925,38 @@ Always visible in the header/nav:
 | **League Sync** | The core centralization point — one sync per league per platform, shared across every user in that league, on a schedule plus event-driven triggers where the platform allows them. |
 | **Analytics** | Deferred until it exists; when added, respect the same cost-controls and cache-first rules as everything else — no per-event third-party calls in the hot path. |
 
+### 10.4 Secrets & Credential Management (v5.6 — new)
+
+> Added after a real incident (July 2026): OneSignal's REST API key silently expired to a deprecated v1 format, and push notifications failed for an unknown period before anyone noticed — the credential-management version of 10.1's Resilience principle. This section exists so a key rotation is never a one-place fix that quietly misses a second place the same value lives.
+
+**Every secret lives in exactly two places, always**: `.env.local` (local dev — git-ignored, never committed) and Vercel's **Project → Settings → Environment Variables** (production + preview deployments). A key rotated in only one of these two places is a key that's half-rotated — the app keeps working wherever the old value is still cached and silently fails wherever it isn't, exactly like the OneSignal incident above. **Vercel requires a redeploy to pick up a changed environment variable** — saving the dashboard value alone does nothing until the next deploy runs.
+
+**The one exception**: `DEMO_MODE` and `DEMO_ROSTER_TEAMS` are local-only by design and must never be set in Vercel — they exist to demo features against fake data on a local machine, and would corrupt real user-facing behavior if they ever reached production.
+
+| Variable | What it's for | Rotate/restore from |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Project URL | Supabase dashboard → Project Settings → API |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public client key (RLS-scoped, safe to expose) | Same |
+| `SUPABASE_SERVICE_ROLE_KEY` | Bypasses RLS — server-only, never expose client-side | Same |
+| `ENCRYPTION_KEY` | Encrypts stored OAuth tokens | Generated once at setup. **Never rotate once real data exists** — changing it makes every already-encrypted row unreadable, with no recovery path |
+| `YAHOO_CLIENT_ID` / `YAHOO_CLIENT_SECRET` / `YAHOO_REDIRECT_URI` | Yahoo OAuth | Yahoo Developer dashboard |
+| `ANTHROPIC_API_KEY` | Claude API | Anthropic Console → API Keys |
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Billing (not yet live) | Stripe dashboard → Developers → API keys / Webhooks |
+| `ONESIGNAL_APP_ID` / `NEXT_PUBLIC_ONESIGNAL_APP_ID` | Push app identity (same value, one public copy for the client SDK) | OneSignal dashboard → Settings → Keys & IDs |
+| `ONESIGNAL_REST_API_KEY` | Push send auth | Same dashboard. **Must be the current `os_v2_app_...` format** — a legacy-format key fails silently at send time, not at setup time, which is exactly how the July incident went unnoticed for as long as it did |
+| `RESEND_API_KEY` / `RESEND_FROM_EMAIL` | Transactional email (not yet live) | Resend dashboard → API Keys |
+| `NEXT_PUBLIC_APP_URL` | Not a secret — the deployed URL, used in links/redirects | N/A |
+| `CRON_SECRET` | Gates every `/api/cron/*` route's Bearer check | Self-generated random string, not issued by any dashboard. Vercel automatically sends this exact value as the Authorization header for its own scheduled Cron invocations when the variable is named `CRON_SECRET` |
+| `ADMIN_EMAIL` | Gates `/api/admin/simulate` and the Simulation Panel to one real account | Not a dashboard value — must exactly match a real row in `public.users.email` |
+| `DEMO_MODE` / `DEMO_ROSTER_TEAMS` | Local-only fake-data overrides for design review | `.env.local` only — never Vercel |
+
+**Restoration checklist, when a key needs regenerating:**
+1. Regenerate in the source dashboard (Supabase / Anthropic / OneSignal / Stripe / Resend / Yahoo).
+2. Update `.env.local` — verify locally against the specific `lib/*.ts` wrapper before touching Vercel (e.g. `verifyOneSignalCredentials()` for OneSignal).
+3. Update the same variable in Vercel → Settings → Environment Variables — confirm it's set for the right environment(s) (Production and Preview, typically both).
+4. Trigger a redeploy. A saved Vercel env var does nothing until the next deploy picks it up.
+5. Re-verify against the deployed URL, not just localhost — a key can be valid locally and still missing or stale in Vercel if step 3 or 4 was skipped.
+
 ---
 
 ## 11. Technical Architecture
