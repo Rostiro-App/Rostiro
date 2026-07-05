@@ -76,12 +76,13 @@ export async function buildLiveRoster(
   if (sleeperLeagues.length === 0) return { liveRoster: [], matchups: [] }
 
   const { data: liveGames } = await admin.from('live_scores').select('game_id, home_score, away_score, period, display_clock').eq('status_state', 'in')
-  if (!liveGames || liveGames.length === 0) return { liveRoster: [], matchups: [] }
 
-  const { data: scheduleRows } = await admin
-    .from('nfl_schedule')
-    .select('game_id, home_team, away_team')
-    .in('game_id', liveGames.map((g: { game_id: string }) => g.game_id))
+  const { data: scheduleRows } = liveGames && liveGames.length > 0
+    ? await admin
+        .from('nfl_schedule')
+        .select('game_id, home_team, away_team')
+        .in('game_id', liveGames.map((g: { game_id: string }) => g.game_id))
+    : { data: [] }
   const scheduleByGameId = new Map(
     ((scheduleRows ?? []) as { game_id: string; home_team: string; away_team: string }[]).map((r) => [r.game_id, r])
   )
@@ -89,7 +90,7 @@ export async function buildLiveRoster(
   // Real NFL team (nflverse code) -> its live game context, for every team
   // currently playing.
   const liveTeamContext = new Map<string, LiveGameContext>()
-  for (const g of liveGames as { game_id: string; home_score: number; away_score: number; period: number; display_clock: string }[]) {
+  for (const g of (liveGames ?? []) as { game_id: string; home_score: number; away_score: number; period: number; display_clock: string }[]) {
     const sched = scheduleByGameId.get(g.game_id)
     if (!sched) continue
     const ctx: LiveGameContext = {
@@ -103,8 +104,16 @@ export async function buildLiveRoster(
     liveTeamContext.set(sched.home_team, ctx)
     liveTeamContext.set(sched.away_team, ctx)
   }
-  if (liveTeamContext.size === 0) return { liveRoster: [], matchups: [] }
-
+  // Deliberately no early-exit here when liveTeamContext is empty (e.g.
+  // between a user's early and late windows on the same Sunday, or a
+  // finished early game with a still-open live_window) — the roster list
+  // below naturally comes back empty in that case (every player fails the
+  // `if (!game) continue` check), but the matchup rail must still compute:
+  // it reflects real points already accrued from a finished window, which
+  // are just as real between windows as they are while something's mid-
+  // play. Found while building the "stay open between windows" behavior —
+  // the old gate returned empty matchups too, which would have blanked a
+  // real, correct score the moment the literal live game ended.
   const playersById = new Map<string, LiveRosterPlayer>()
   const matchups: LiveMatchupSummary[] = []
 

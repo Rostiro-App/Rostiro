@@ -232,6 +232,25 @@ body {
 }
 .ticker-slide-in { animation: ticker-slide-in 0.7s var(--ease-os); }
 
+/* T-111 follow-up: the LIVE nav icon's own unlock moment — plays once per
+   ET day, the first time a client notices this user's personal LIVE
+   window actually open (lib/useLiveUnlockTransition.ts), distinct from
+   the continuous .breathe loop that follows it. */
+@keyframes live-unlock-flash {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(226,75,74,0); }
+  35% { transform: scale(1.4); box-shadow: 0 0 28px 8px rgba(226,75,74,.6); }
+  100% { transform: scale(1); box-shadow: 0 0 18px rgba(226,75,74,.25); }
+}
+.live-unlock-flash { animation: live-unlock-flash 2.2s var(--ease-os); }
+
+/* /live's own full-screen reveal the first moment it opens, rather than
+   an instant content swap from the locked screen. */
+@keyframes live-reveal {
+  0% { opacity: 0; transform: scale(0.94); }
+  100% { opacity: 1; transform: none; }
+}
+.live-reveal { animation: live-reveal 0.6s var(--ease-os); }
+
 /* iOS safe area support for bottom nav */
 @supports (padding: env(safe-area-inset-bottom)) {
   .pb-safe {

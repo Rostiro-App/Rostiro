@@ -1,10 +1,14 @@
 'use client'
 
 // T-111: shared by Sidebar and BottomNav so LIVE's dock icon lights up
-// exactly when Game Day State is active — reuses the existing
-// rostiroState computation (lib/rostiroState.ts) already returned by
-// /api/system/status. Zero new detection logic, just a new consequence
-// of a state that already gets computed.
+// exactly when this user's own LIVE window is open (lib/liveWindow.ts,
+// returned as liveUnlocked by /api/system/status) — not the day-wide
+// rostiroState. The two used to disagree: rostiroState is "some game is
+// happening across the whole league," which isn't the same thing as "one
+// of THIS user's rostered players is in a relevant window," and the icon
+// lighting up on the former while /live itself gated on the latter (via
+// buildLiveRoster) was a real, confusing desync, not just a polling-phase
+// lag — both now read the same per-user window.
 
 import { useEffect, useState } from 'react'
 
@@ -25,10 +29,10 @@ export function useLiveUnlocked(): boolean {
     function poll() {
       fetch('/api/system/status')
         .then((res) => (res.ok ? res.json() : null))
-        .then((data: { rostiroState?: string } | null) => {
+        .then((data: { liveUnlocked?: boolean } | null) => {
           if (cancelled || !data) return
           setUnlocked((current) => {
-            const next = data.rostiroState === 'game_day'
+            const next = data.liveUnlocked === true
             return next === current ? current : next
           })
         })

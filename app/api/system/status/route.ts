@@ -15,6 +15,7 @@ import { createSSRClient } from '@/lib/supabase'
 import { getSleeperDrafts, getSleeperRosters } from '@/lib/sleeper'
 import { computeLeagueHealth, type HealthPlayer } from '@/lib/healthScore'
 import { getRostiroState } from '@/lib/rostiroState'
+import { computeLiveWindow } from '@/lib/liveWindow'
 import { toNflverseTeamCode } from '@/lib/liveScores'
 import { isFeatureEnabled } from '@/lib/featureFlags'
 import { simNow } from '@/lib/simTime'
@@ -262,6 +263,14 @@ export async function GET() {
   }))
   const rostiroState = await getRostiroState(supabase, draftIncompleteFlags, leagueWaiverConfigs).catch(() => 'standard' as const)
 
+  // T-111 follow-up: the LIVE nav icon's own unlock signal — a per-user
+  // window (this user's rostered games specifically), not the day-wide
+  // rostiroState above. Computed here, not derived from rostiroState
+  // client-side, so the icon and the /live page it links to always agree
+  // on the same underlying window instead of two independently-timed
+  // approximations of "is it live."
+  const liveWindow = await computeLiveWindow(supabase, user.id).catch(() => ({ isOpen: false, windowEndsAt: null, nextKickoff: null }))
+
   // T-90: live scores, gated behind the same flag as the T-81 cron — an
   // instant kill switch that also stops this route from doing the extra
   // queries below when the feature is off (PRD 10.1).
@@ -358,6 +367,8 @@ export async function GET() {
     liveScores,
     scoresGated,
     plan,
+    liveUnlocked: liveWindow.isOpen,
+    liveNextKickoff: liveWindow.nextKickoff,
   }
 
   return NextResponse.json(status)

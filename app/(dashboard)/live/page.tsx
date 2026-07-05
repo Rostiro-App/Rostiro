@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useWakeLock } from '@/lib/useWakeLock'
 import { useIdleDim } from '@/lib/useIdleDim'
+import { useLiveUnlockTransition } from '@/lib/useLiveUnlockTransition'
 
 interface LiveGameContext {
   homeTeam: string
@@ -64,13 +65,32 @@ interface StatLine {
   value: number
 }
 
+interface NextKickoff {
+  kickoffAt: string
+  homeTeam: string
+  awayTeam: string
+  label: string
+}
+
 interface LiveStatus {
   unlocked: boolean
+  windowEndsAt: string | null
+  nextKickoff: NextKickoff | null
   liveRoster: LiveRosterPlayer[]
   matchups: LiveMatchupSummary[]
   updates: LiveUpdateItem[]
   recentEvents: RecentEvent[]
   windowRecap: WindowRecap | null
+}
+
+function formatCountdown(targetIso: string, now: number): string {
+  const diffMs = new Date(targetIso).getTime() - now
+  if (diffMs <= 0) return 'any moment now'
+  const totalMinutes = Math.floor(diffMs / 60_000)
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  if (hours === 0) return `${minutes}m`
+  return `${hours}h ${minutes}m`
 }
 
 const POLL_MS_ACTIVE = 15_000
@@ -87,6 +107,17 @@ export default function LivePage() {
   const [bigPlay, setBigPlay] = useState<{ player: LiveRosterPlayer; event: RecentEvent } | null>(null)
   const shownEventKeys = useRef(new Set<string>())
   const [statSheet, setStatSheet] = useState<{ player: LiveRosterPlayer; loading: boolean; lines: StatLine[] } | null>(null)
+  const justUnlocked = useLiveUnlockTransition(status?.unlocked === true)
+  const [clockNow, setClockNow] = useState(() => Date.now())
+
+  // Ticks the locked-screen countdown once a second — independent of the
+  // 15-45s status poll, which would otherwise make "2h 14m" visibly jump
+  // in large, sporadic steps instead of counting down smoothly.
+  useEffect(() => {
+    if (status?.unlocked || !status?.nextKickoff) return
+    const interval = setInterval(() => setClockNow(Date.now()), 1000)
+    return () => clearInterval(interval)
+  }, [status?.unlocked, status?.nextKickoff])
 
   function openStatSheet(player: LiveRosterPlayer) {
     setStatSheet({ player, loading: true, lines: [] })
@@ -179,6 +210,7 @@ export default function LivePage() {
   }
 
   if (!status || !status.unlocked) {
+    const next = status?.nextKickoff
     return (
       <div className="max-w-md mx-auto px-4 pt-24 pb-16 text-center">
         <div
@@ -188,9 +220,20 @@ export default function LivePage() {
           ⚡
         </div>
         <h1 className="text-lg font-semibold text-white mt-5">LIVE opens when your players do</h1>
-        <p className="text-sm mt-2" style={{ color: 'var(--t3)' }}>
-          No rostered player is in a live game right now. Check back once kickoff is close.
-        </p>
+        {next ? (
+          <>
+            <p className="mono-data text-2xl font-bold mt-4" style={{ color: 'var(--t1)' }}>
+              {formatCountdown(next.kickoffAt, clockNow)}
+            </p>
+            <p className="text-sm mt-1.5" style={{ color: 'var(--t3)' }}>
+              until {next.label} — {next.awayTeam} @ {next.homeTeam}
+            </p>
+          </>
+        ) : (
+          <p className="text-sm mt-2" style={{ color: 'var(--t3)' }}>
+            No rostered player is in a live game right now. Check back once kickoff is close.
+          </p>
+        )}
       </div>
     )
   }
@@ -208,7 +251,7 @@ export default function LivePage() {
 
   return (
     <div
-      className="max-w-4xl mx-auto px-4 pt-6 pb-16 md:px-6 md:pt-8 relative"
+      className={`max-w-4xl mx-auto px-4 pt-6 pb-16 md:px-6 md:pt-8 relative ${justUnlocked ? 'live-reveal' : ''}`}
       style={{ filter: idle ? 'brightness(0.4)' : 'none', transition: 'filter 1.2s' }}
       onClick={idle ? wake : undefined}
     >
@@ -249,6 +292,16 @@ export default function LivePage() {
       )}
 
       <p className="mono-data text-[10px] tracking-widest uppercase mb-2" style={{ color: 'var(--t3)' }}>Live now</p>
+      {gameGroups.size === 0 ? (
+        <div className="rounded-xl p-4 mb-6 text-center" style={{ border: '1px solid var(--hairline)', backgroundColor: 'rgba(8,15,26,0.4)' }}>
+          <p className="text-sm" style={{ color: 'var(--t3)' }}>
+            No one&rsquo;s live right now — you&rsquo;re between windows today.
+            {status.nextKickoff && (
+              <> Next kickoff in {formatCountdown(status.nextKickoff.kickoffAt, clockNow)} ({status.nextKickoff.label}).</>
+            )}
+          </p>
+        </div>
+      ) : (
       <div className="grid gap-3 md:grid-cols-2 mb-6">
         {[...gameGroups.values()].map(({ game, players }) => (
           <div key={`${game.homeTeam}-${game.awayTeam}`} className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--hairline)' }}>
@@ -318,6 +371,7 @@ export default function LivePage() {
           </div>
         ))}
       </div>
+      )}
 
       {status.updates.length > 0 && (
         <>

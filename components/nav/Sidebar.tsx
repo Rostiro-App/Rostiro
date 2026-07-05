@@ -7,6 +7,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useLiveUnlocked } from '@/lib/useLiveUnlocked'
+import { useLiveUnlockTransition } from '@/lib/useLiveUnlockTransition'
 
 const NAV_ITEMS = [
   {
@@ -108,6 +109,7 @@ function dockItemStyle(isActive: boolean): React.CSSProperties {
 export default function Sidebar() {
   const pathname = usePathname()
   const liveUnlocked = useLiveUnlocked()
+  const liveUnlocking = useLiveUnlockTransition(liveUnlocked)
   const liveActive = pathname === '/live' || pathname.startsWith('/live/')
 
   return (
@@ -158,11 +160,11 @@ export default function Sidebar() {
           <Link
             href="/live"
             aria-label="LIVE"
-            className="flex items-center justify-center w-9 h-9 rounded-[10px] transition-all"
+            className={`flex items-center justify-center w-9 h-9 rounded-[10px] transition-all ${liveUnlocking ? 'live-unlock-flash' : ''}`}
             style={
               liveActive
                 ? { color: '#E24B4A', backgroundColor: 'rgba(226,75,74,0.14)', boxShadow: '0 0 18px rgba(226,75,74,.25)' }
-                : { color: '#E24B4A', backgroundColor: 'rgba(226,75,74,0.08)', animation: 'rostiro-breathe 2.4s ease-in-out infinite' }
+                : { color: '#E24B4A', backgroundColor: 'rgba(226,75,74,0.08)', animation: liveUnlocking ? undefined : 'rostiro-breathe 2.4s ease-in-out infinite' }
             }
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

@@ -6,6 +6,7 @@
 import { createAdminClient, createSSRClient } from '@/lib/supabase'
 import { buildLiveRoster } from '@/lib/liveRoster'
 import { buildUpdatesDigest } from '@/lib/liveUpdatesDigest'
+import { computeLiveWindow } from '@/lib/liveWindow'
 import { NextResponse } from 'next/server'
 
 // Long enough to survive realistic click-to-check latency (switch to the
@@ -26,6 +27,14 @@ export async function GET() {
 
   const { liveRoster, matchups } = await buildLiveRoster(admin, user.id).catch(() => ({ liveRoster: [], matchups: [] }))
   const livePlayerIds = new Set(liveRoster.map((p) => p.playerId))
+
+  // Whether the tab is "open" is a day-wide window for this user's own
+  // rostered games (pregame ramp through GAME_DURATION_HOURS after the
+  // last of them) — not "is a player literally live this instant." That
+  // second, moment-to-moment signal only decides what's inside the open
+  // tab (an empty "Live now" between two of a user's own windows is a
+  // real, correct state — not locked).
+  const liveWindow = await computeLiveWindow(admin, user.id).catch(() => ({ isOpen: false, windowEndsAt: null, nextKickoff: null }))
 
   const updates = await buildUpdatesDigest(admin, user.id, livePlayerIds).catch(() => [])
 
@@ -52,7 +61,9 @@ export async function GET() {
     .limit(1)
 
   return NextResponse.json({
-    unlocked: liveRoster.length > 0,
+    unlocked: liveWindow.isOpen,
+    windowEndsAt: liveWindow.windowEndsAt,
+    nextKickoff: liveWindow.nextKickoff,
     liveRoster,
     matchups,
     updates,

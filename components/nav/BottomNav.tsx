@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import { useLiveUnlocked } from '@/lib/useLiveUnlocked'
+import { useLiveUnlockTransition } from '@/lib/useLiveUnlockTransition'
 
 const NAV_ITEMS = [
   {
@@ -56,6 +57,7 @@ export default function BottomNav() {
   const pathname = usePathname()
   const [moreOpen, setMoreOpen] = useState(false)
   const liveUnlocked = useLiveUnlocked()
+  const liveUnlocking = useLiveUnlockTransition(liveUnlocked)
   const liveActive = pathname === '/live' || pathname.startsWith('/live/')
 
   const moreActive = MORE_ITEMS.some(
@@ -94,10 +96,13 @@ export default function BottomNav() {
         {liveUnlocked ? (
           <Link
             href="/live"
-            className="flex-1 flex flex-col items-center justify-center gap-0.5 transition-all"
+            className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-all ${liveUnlocking ? 'live-unlock-flash' : ''}`}
             style={{ color: '#E24B4A' }}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              style={liveActive || liveUnlocking ? undefined : { animation: 'rostiro-breathe 2.4s ease-in-out infinite' }}
+            >
               <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
             </svg>
             <span className="text-[10px] font-medium leading-none" style={{ color: liveActive ? '#E24B4A' : 'var(--t3)' }}>LIVE</span>

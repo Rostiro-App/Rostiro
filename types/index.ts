@@ -422,6 +422,10 @@ export interface SystemStatus {
   // T-110: nothing in the UI showed plan at all — surfaced so System Bar
   // can show a real "you paid for this" indicator.
   plan: UserPlan
+  // T-111 follow-up: the LIVE nav icon's own per-user unlock signal —
+  // see lib/liveWindow.ts. Distinct from rostiroState, which is day-wide.
+  liveUnlocked: boolean
+  liveNextKickoff: { kickoffAt: string; homeTeam: string; awayTeam: string; label: string } | null
 }
 
 // ─── Error Classes ─────────────────────────────────────────────────────────────

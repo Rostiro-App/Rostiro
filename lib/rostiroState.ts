@@ -24,13 +24,16 @@ const ET_TZ = 'America/New_York'
 // How long after the last kickoff of the day a game is assumed still live.
 // A single game runs ~3.25-3.5h; this pads for late games / OT rather than
 // flipping out of Game Day while people are still mid-game.
-const GAME_DURATION_HOURS = 4
+// Exported (T-111 follow-up) so lib/liveWindow.ts's per-user LIVE-tab
+// window uses the exact same span as the system-wide Game Day state,
+// rather than a second, independently-tuned constant.
+export const GAME_DURATION_HOURS = 4
 
 // T-97: how long before the day's earliest kickoff Game Day (pregame ramp)
 // activates. Covers the real 11:45am-Sunday "did I set my lineup" scramble
 // (PRD 7, 6.10 v5.5 note) ahead of a 1pm ET slate, rather than requiring a
 // game to have actually started.
-const PREGAME_RAMP_HOURS = 3
+export const PREGAME_RAMP_HOURS = 3
 
 // Film Room: Monday evening through Tuesday early afternoon.
 // Waiver Day: Tuesday afternoon through Wednesday midday.
