@@ -58,3 +58,38 @@ create policy "Service role can manage live events" on public.live_events
 
 grant select on public.live_events to authenticated;
 grant select, insert, update, delete on public.live_events to service_role;
+
+-- Adds window_recap to the existing pulse_items type list (migration_player_intel.sql
+-- already added player_news/opportunity_surge).
+alter table public.pulse_items drop constraint if exists pulse_items_type_check;
+alter table public.pulse_items add constraint pulse_items_type_check check (type in (
+  'lineup_decision', 'injury_alert', 'weather_alert', 'waiver_alert', 'trade_opportunity',
+  'opponent_intel', 'deadline_reminder', 'exposure_flag',
+  'touchdown_swing', 'lineup_lock', 'mission_complete',
+  'roster_grade', 'player_news', 'opportunity_surge', 'window_recap'
+));
+
+-- Dedupe ledger for window recaps — one per (user, window) — same pattern
+-- as engagement_log, kept separate since window_recap isn't a Game Day
+-- Engagement System trigger (T-93) and engagement_log's own check
+-- constraint is scoped to those three specifically.
+create table if not exists public.window_recap_log (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references public.users(id) on delete cascade,
+  window_key text not null,
+  sent_at    timestamptz not null default now(),
+  unique (user_id, window_key)
+);
+
+alter table public.window_recap_log enable row level security;
+
+drop policy if exists "Users can read own window recap log" on public.window_recap_log;
+create policy "Users can read own window recap log" on public.window_recap_log
+  for select using (auth.uid() = user_id);
+
+drop policy if exists "Service role can manage window recap log" on public.window_recap_log;
+create policy "Service role can manage window recap log" on public.window_recap_log
+  for all using (auth.role() = 'service_role');
+
+grant select on public.window_recap_log to authenticated;
+grant select, insert, update, delete on public.window_recap_log to service_role;

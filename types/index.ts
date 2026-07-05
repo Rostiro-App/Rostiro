@@ -43,6 +43,11 @@ export type PulseItemType =
   // blocked above on "data pipelines that don't exist yet" — real NFL
   // depth_chart_order (lib/opportunitySurge.ts) closed that gap.
   | 'opportunity_surge'
+  // T-111 (July 5, 2026): LIVE tab's window recap — fires once per real
+  // kickoff-cluster window (not a hardcoded 1pm/4pm clock) as its games
+  // finish, narrating already-computed scores/events. Logged copy of
+  // whatever LIVE showed in full, for anyone who wasn't looking right then.
+  | 'window_recap'
 
 export type DraftStatus = 'setup' | 'active' | 'complete'
 

@@ -53,6 +53,11 @@ const TYPE_CONFIG: Record<PulseItemType, { color: string; label: string }> = {
   // T-99: the positive mirror to injury_alert — same green family as a
   // waiver win/roster grade, since it's an opportunity, not a warning.
   opportunity_surge: { color: 'var(--live)',   label: 'OPPORTUNITY' },
+  // T-111: LIVE tab's window recap, logged here for anyone who wasn't
+  // looking at LIVE when it fired — signal-blue like the Copilot Signal
+  // narration voice, since it's the same "AI explains what already
+  // happened" register, not an alert.
+  window_recap:      { color: 'var(--signal)', label: 'RECAP' },
 }
 
 type PulseAction = 'done' | 'dismiss' | 'snooze'

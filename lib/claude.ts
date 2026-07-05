@@ -352,3 +352,47 @@ export async function generateOpportunitySurgeContext(input: OpportunitySurgeCon
   }
   return textBlock.text.trim()
 }
+
+interface WindowRecapInput {
+  leagueResults: { leagueName: string; myScore: number; opponentScore: number }[]
+  playerHighlights: { name: string; eventType: 'touchdown' | 'reception' | 'yardage' | 'negative'; points: number }[]
+  hasMoreWindowsToday: boolean
+  mode: Mode
+}
+
+// T-111: LIVE tab's window recap — the scores, matchup deltas, and player
+// events are all already computed deterministically (lib/windowRecap.ts)
+// before this is ever called; Claude only narrates them, same split as
+// every other reasoning function in this file. The one instruction that
+// matters most: if there's a later window still to come today, say so —
+// never imply a matchup is decided when the games that would decide it
+// haven't happened yet.
+export async function generateWindowRecap(input: WindowRecapInput): Promise<string> {
+  const leagueLines = input.leagueResults
+    .map((l) => `${l.leagueName}: you ${l.myScore >= l.opponentScore ? 'lead' : 'trail'} ${l.myScore}-${l.opponentScore}`)
+    .join('; ')
+  const highlightLines = input.playerHighlights
+    .map((h) => `${h.name} (${h.eventType}, ${h.points >= 0 ? '+' : ''}${h.points.toFixed(1)} pts)`)
+    .join(', ')
+
+  const message = await createMessage({
+    model: MODEL,
+    max_tokens: 200,
+    thinking: { type: 'disabled' },
+    output_config: { effort: 'low' },
+    system:
+      `You write a short, factual recap of a completed window of NFL games for a fantasy manager. Use only the league scores and player events given to you — never invent stats, plays, or outcomes not provided. ${input.hasMoreWindowsToday ? 'Later games today still affect these matchups — never imply a matchup is decided or final.' : 'This is the last window today — these are the final matchup results.'} Two to three sentences. ${toneInstruction(input.mode)}`,
+    messages: [
+      {
+        role: 'user',
+        content: `Matchup status: ${leagueLines || 'no active matchups'}. Notable player events this window: ${highlightLines || 'none'}. Write the recap.`,
+      },
+    ],
+  })
+
+  const recapTextBlock = message.content.find((b) => b.type === 'text')
+  if (!recapTextBlock || recapTextBlock.type !== 'text') {
+    throw new ClaudeAPIError('Claude returned no text content')
+  }
+  return recapTextBlock.text.trim()
+}

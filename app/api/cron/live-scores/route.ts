@@ -11,6 +11,7 @@ import { isFeatureEnabled } from '@/lib/featureFlags'
 import { detectLineupLockUrgency, detectMissionComplete, detectTouchdownSwings, type ScoreDelta } from '@/lib/engagementTriggers'
 import { pollAllLiveMatchupPoints } from '@/lib/liveMatchupPoints'
 import { classifyDeltas } from '@/lib/liveEvents'
+import { detectAndSendWindowRecaps } from '@/lib/windowRecap'
 import { NextResponse, type NextRequest } from 'next/server'
 
 const GAME_DURATION_HOURS = 4 // matches lib/rostiroState.ts's window
@@ -47,6 +48,15 @@ export async function GET(request: NextRequest) {
   // the score sync itself.
   await detectLineupLockUrgency(admin, todayEt).catch(() => {})
   await detectMissionComplete(admin, todayEt).catch(() => {})
+  // T-111: same "reads already-persisted state" posture — a window recap
+  // fires the moment a wave of games goes final, which is exactly when no
+  // game is currently mid-window (the gap before the next wave kicks off).
+  let windowRecapsSent = 0
+  try {
+    windowRecapsSent = await detectAndSendWindowRecaps(admin)
+  } catch {
+    // Best-effort — never fails the score sync over this.
+  }
 
   // Cheap early-exit: only fetch if at least one of today's games is within
   // its live window right now (kickoff <= now <= kickoff + 4h). Otherwise
@@ -129,5 +139,5 @@ export async function GET(request: NextRequest) {
     // Best-effort — never fails the score sync over this.
   }
 
-  return NextResponse.json({ synced: scores.length, gamesInWindow: inWindow.length, liveEventsRecorded })
+  return NextResponse.json({ synced: scores.length, gamesInWindow: inWindow.length, liveEventsRecorded, windowRecapsSent })
 }
