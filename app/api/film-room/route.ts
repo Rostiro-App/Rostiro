@@ -9,6 +9,7 @@ import { createSSRClient, createAdminClient } from '@/lib/supabase'
 import { getSleeperMatchups, computeFilmRoomResult, getSleeperRosters, SEASON } from '@/lib/sleeper'
 import { computeTopUsageSignal, type RosterUsageRow, type UsageSignal } from '@/lib/filmRoomSignals'
 import { generateFilmRoomRecap } from '@/lib/claude'
+import { getForcedState } from '@/lib/simTime'
 import { NextResponse, type NextRequest } from 'next/server'
 import type { Mode } from '@/components/nav/AppShell'
 
@@ -41,11 +42,14 @@ export async function GET(request: NextRequest) {
   const rows = leagues ?? []
   if (rows.length === 0) return NextResponse.json({ results: [] })
 
-  // DEMO MODE — local testing only (.env.local, git-ignored, never
-  // deployed). No connected league anywhere has a real completed week yet
-  // (every one is pre-season/pre-draft) — this is the only way to see the
-  // real card render against something other than an empty state today.
-  if (process.env.DEMO_MODE === 'true') {
+  // DEMO MODE — local-only env var, or the Dev-only Simulation Suite's
+  // Scenario 4 (Monday Night Film Room) forcing this exact state. Both
+  // exist for the identical reason: no connected league anywhere has a
+  // real completed week yet (every one is pre-season/pre-draft) — this is
+  // the only way to see the real card render against something other than
+  // an empty state today.
+  const simulatingFilmRoom = (await getForcedState().catch(() => null)) === 'film_room'
+  if (process.env.DEMO_MODE === 'true' || simulatingFilmRoom) {
     const demoSignal: UsageSignal = { playerId: 'demo', name: 'Backup RB', position: 'RB', direction: 'buy_low', deltaPct: 22 }
     const results: FilmRoomLeagueResult[] = await Promise.all(
       rows.map(async (l) => {
