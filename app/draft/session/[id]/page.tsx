@@ -42,8 +42,12 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
   const [error, setError] = useState<string | null>(null)
   const [positionFilter, setPositionFilter] = useState<NFLPosition | 'ALL'>('ALL')
 
-  const recommendedForPick = useRef<number | null>(null)
+  const recommendedForPick = useRef<string | null>(null)
   const recommendedPlayerIds = useRef<Set<string>>(new Set())
+  // Which currently-queued player IDs got there via Copilot, not a manual
+  // star — used to prune stale suggestions a fresher signal has moved on
+  // from, without ever touching something the user deliberately picked.
+  const copilotQueuedIds = useRef<Set<string>>(new Set())
   const seenSnipes = useRef<Set<string>>(new Set())
   const [freshSnipes, setFreshSnipes] = useState<string[]>([])
   const pollRef = useRef<() => void>(() => {})
@@ -246,8 +250,15 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
   useEffect(() => {
     if (picksLeft === null || picksLeft > PREFETCH_THRESHOLD || bestAvailable.length === 0) return
     const targetPick = currentPickNumber + picksLeft
-    if (recommendedForPick.current === targetPick) return
-    recommendedForPick.current = targetPick
+    // Keyed on strategy too, not just the target pick — founder feedback
+    // (July 6, 2026): changing the strategy dropdown mid-window didn't
+    // refetch Copilot's reasoning at all, only the deterministic board
+    // reordered. A player fell in the same "next pick" slot regardless of
+    // strategy, so the old pick-only key silently reused stale reasoning
+    // generated under the previous strategy.
+    const key = `${targetPick}:${strategy}`
+    if (recommendedForPick.current === key) return
+    recommendedForPick.current = key
 
     const candidates = bestAvailable.slice(0, 5)
     recommendedPlayerIds.current = new Set(candidates.map((r) => r.player.playerId))
@@ -260,11 +271,17 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
         pickNumber: targetPick,
         strategy,
         rosterSoFar: myPicks.map((p) => ({ name: p.playerName, position: p.position })),
+        // isNeeded/strategyWeight are the exact signals computeBestAvailable
+        // already used to rank these candidates — passed through so Claude
+        // explains the real reason a player is here, rather than
+        // reconstructing a plausible-sounding guess from ADP alone.
         candidates: candidates.map((r) => ({
           playerId: r.player.playerId,
           name: r.player.name,
           position: r.player.position,
           adp: r.player.overallRank,
+          isNeeded: r.isNeeded,
+          strategyWeight: r.strategyWeight,
         })),
         mode,
       }),
@@ -277,7 +294,7 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
         // Silent — the deterministic best-available board still works without Claude's reasoning
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [picksLeft, currentPickNumber, bestAvailable])
+  }, [picksLeft, currentPickNumber, bestAvailable, strategy])
 
   function persistQueue(next: string[]) {
     setQueue(next)
@@ -292,6 +309,11 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
 
   function toggleQueue(playerId: string) {
     const next = queue.includes(playerId) ? queue.filter((id) => id !== playerId) : [...queue, playerId]
+    // A manual star (add) means the user has personally reviewed and wants
+    // this pick regardless of what Copilot decides next — un-mark it as
+    // copilot-sourced so the pruning effect below never touches it. (On
+    // remove it's leaving the queue either way, so this is harmless there too.)
+    copilotQueuedIds.current.delete(playerId)
     persistQueue(next)
   }
 
@@ -304,14 +326,27 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
   // excludes anything already queued (rendered separately in "My Queue"),
   // so starring a player now visibly moves them out of the noise instead of
   // just toggling an icon in place.
+  //
+  // Follow-up, same day: a Copilot suggestion from round 2 (e.g. a RB pick)
+  // could still be sitting in the queue in round 8 once roster needs had
+  // completely changed, because auto-queuing only ever added, never
+  // reconsidered. Now: every time a FRESH recommendation cycle lands, any
+  // player this effect itself previously auto-added but which Copilot no
+  // longer recommends gets pruned — never a manually-starred player, since
+  // toggleQueue above always un-marks those as copilot-sourced on add.
   useEffect(() => {
     if (recommendations.length === 0) return
     // Deferred rather than called directly in the effect body — same
     // react-hooks/set-state-in-effect avoidance used elsewhere in this app
     // (e.g. lib/useLiveUnlockTransition.ts).
     const t = window.setTimeout(() => {
-      const newIds = recommendations.map((r) => r.playerId).filter((id) => !queue.includes(id))
-      if (newIds.length > 0) persistQueue([...queue, ...newIds])
+      const freshIds = recommendations.map((r) => r.playerId)
+      const freshSet = new Set(freshIds)
+      const stale = [...copilotQueuedIds.current].filter((id) => !freshSet.has(id))
+      const withoutStale = stale.length > 0 ? queue.filter((id) => !stale.includes(id)) : queue
+      const newIds = freshIds.filter((id) => !withoutStale.includes(id))
+      copilotQueuedIds.current = new Set(freshIds)
+      if (stale.length > 0 || newIds.length > 0) persistQueue([...withoutStale, ...newIds])
     }, 0)
     return () => window.clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps

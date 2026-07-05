@@ -9,7 +9,16 @@ import type { DraftStrategy, Platform } from '@/types'
 import { STRATEGY_LABELS, STRATEGY_DESCRIPTIONS } from '@/lib/draftBoard'
 
 type SupportedPlatform = Extract<Platform, 'sleeper' | 'yahoo'>
-const STRATEGIES: DraftStrategy[] = ['balanced', 'zero_rb', 'hero_rb', 'hero_wr']
+const STRATEGIES: DraftStrategy[] = [
+  'balanced',
+  'zero_rb',
+  'zero_wr',
+  'hero_rb',
+  'hero_wr',
+  'robust_rb',
+  'late_qb',
+  'te_premium',
+]
 
 interface ConnectedLeagueOption {
   id: string

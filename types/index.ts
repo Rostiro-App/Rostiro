@@ -167,8 +167,19 @@ export interface DraftPick {
 }
 
 // A stated draft philosophy — see lib/draftBoard.ts for the round-by-round
-// position weighting each one applies to Draft Copilot's rankings.
-export type DraftStrategy = 'balanced' | 'zero_rb' | 'hero_rb' | 'hero_wr'
+// position weighting each one applies to Draft Copilot's rankings. Kept in
+// sync with the zod enums in app/api/draft/session/route.ts and
+// app/api/draft/session/[id]/route.ts, and the STRATEGIES array in
+// app/draft/join/page.tsx.
+export type DraftStrategy =
+  | 'balanced'
+  | 'zero_rb'
+  | 'zero_wr'
+  | 'hero_rb'
+  | 'hero_wr'
+  | 'robust_rb'
+  | 'late_qb'
+  | 'te_premium'
 
 export interface DraftSettings {
   platform: Platform

@@ -13,7 +13,10 @@ import { z } from 'zod'
 const Body = z.object({
   round: z.number().int().positive(),
   pickNumber: z.number().int().positive(),
-  strategy: z.enum(['balanced', 'zero_rb', 'hero_rb', 'hero_wr']).default('balanced'),
+  // Must match DraftStrategy (types/index.ts) exactly.
+  strategy: z
+    .enum(['balanced', 'zero_rb', 'zero_wr', 'hero_rb', 'hero_wr', 'robust_rb', 'late_qb', 'te_premium'])
+    .default('balanced'),
   rosterSoFar: z.array(z.object({ name: z.string(), position: z.string() })),
   candidates: z
     .array(
@@ -22,6 +25,8 @@ const Body = z.object({
         name: z.string(),
         position: z.string(),
         adp: z.number(),
+        isNeeded: z.boolean(),
+        strategyWeight: z.number(),
       })
     )
     .min(1)

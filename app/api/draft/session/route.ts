@@ -21,7 +21,10 @@ import { z } from 'zod'
 import { YahooAPIError } from '@/types'
 import type { DraftSettings, DraftStrategy, ScoringSettings } from '@/types'
 
-const StrategyField = z.enum(['balanced', 'zero_rb', 'hero_rb', 'hero_wr']).default('balanced')
+// Must match DraftStrategy (types/index.ts) exactly.
+const StrategyField = z
+  .enum(['balanced', 'zero_rb', 'zero_wr', 'hero_rb', 'hero_wr', 'robust_rb', 'late_qb', 'te_premium'])
+  .default('balanced')
 
 // Not z.discriminatedUnion: Zod throws "Duplicate discriminator value" at
 // parse time if two branches share a discriminant value (verified directly

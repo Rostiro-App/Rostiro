@@ -16,15 +16,23 @@ import type { ADPPlayer, DraftPick, DraftStrategy, NFLPosition } from '@/types'
 export const STRATEGY_LABELS: Record<DraftStrategy, string> = {
   balanced: 'Balanced (BPA)',
   zero_rb: 'Zero-RB',
+  zero_wr: 'Zero-WR',
   hero_rb: 'Hero-RB',
   hero_wr: 'Hero-WR',
+  robust_rb: 'Robust RB',
+  late_qb: 'Late-Round QB',
+  te_premium: 'TE Premium',
 }
 
 export const STRATEGY_DESCRIPTIONS: Record<DraftStrategy, string> = {
   balanced: 'Best player available, weighted by roster need only.',
   zero_rb: 'Avoid RB early, stack WR depth, catch up on RB from the mid-rounds on.',
+  zero_wr: 'Avoid WR early, stack RB depth, catch up on WR from the mid-rounds on.',
   hero_rb: 'Take one elite RB early, then pivot hard to WR before circling back for RB depth.',
   hero_wr: 'Take one elite WR early, then prioritize RB before circling back for WR depth.',
+  robust_rb: 'Commit to RB across the first three rounds, building a two- or three-deep RB core before WR.',
+  late_qb: 'Punt QB entirely until the double-digit rounds — the position is deep enough to wait, so bank the early picks on RB/WR/TE.',
+  te_premium: 'Prioritize an elite pass-catching TE in the first three rounds, then leave the position alone until the very late, replacement-level rounds.',
 }
 
 interface StrategyRule {
@@ -41,6 +49,11 @@ const STRATEGY_RULES: Record<DraftStrategy, StrategyRule[]> = {
     { position: 'WR', roundStart: 1, roundEnd: 5, weight: 1 },
     { position: 'RB', roundStart: 5, roundEnd: 8, weight: 1 },
   ],
+  zero_wr: [
+    { position: 'WR', roundStart: 1, roundEnd: 4, weight: -2 },
+    { position: 'RB', roundStart: 1, roundEnd: 5, weight: 1 },
+    { position: 'WR', roundStart: 5, roundEnd: 8, weight: 1 },
+  ],
   hero_rb: [
     { position: 'RB', roundStart: 1, roundEnd: 1, weight: 2 },
     { position: 'RB', roundStart: 2, roundEnd: 5, weight: -2 },
@@ -51,6 +64,19 @@ const STRATEGY_RULES: Record<DraftStrategy, StrategyRule[]> = {
     { position: 'WR', roundStart: 1, roundEnd: 1, weight: 2 },
     { position: 'WR', roundStart: 2, roundEnd: 4, weight: -1 },
     { position: 'RB', roundStart: 2, roundEnd: 5, weight: 2 },
+  ],
+  robust_rb: [
+    { position: 'RB', roundStart: 1, roundEnd: 3, weight: 2 },
+    { position: 'WR', roundStart: 1, roundEnd: 3, weight: -1 },
+    { position: 'RB', roundStart: 4, roundEnd: 6, weight: 1 },
+  ],
+  late_qb: [
+    { position: 'QB', roundStart: 1, roundEnd: 9, weight: -2 },
+    { position: 'QB', roundStart: 10, roundEnd: 20, weight: 1 },
+  ],
+  te_premium: [
+    { position: 'TE', roundStart: 1, roundEnd: 3, weight: 2 },
+    { position: 'TE', roundStart: 4, roundEnd: 8, weight: -1 },
   ],
 }
 

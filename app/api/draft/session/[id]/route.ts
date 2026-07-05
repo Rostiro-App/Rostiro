@@ -36,7 +36,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 // independently from different parts of the live board UI.
 const PatchBody = z.object({
   queue: z.array(z.string()).optional(),
-  strategy: z.enum(['balanced', 'zero_rb', 'hero_rb', 'hero_wr']).optional(),
+  // Must match DraftStrategy (types/index.ts) exactly.
+  strategy: z.enum(['balanced', 'zero_rb', 'zero_wr', 'hero_rb', 'hero_wr', 'robust_rb', 'late_qb', 'te_premium']).optional(),
 })
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
