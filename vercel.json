@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/live-scores",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/news",
+      "schedule": "*/15 * * * *"
     }
   ]
 }
