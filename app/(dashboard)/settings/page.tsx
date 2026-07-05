@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { setGlobalMode, useMode, type Mode } from '@/components/nav/AppShell'
+import { bigAnimationsEnabled, setBigAnimationsEnabled } from '@/lib/animationPrefs'
 
 interface SettingsData {
   email: string
@@ -57,6 +58,25 @@ export default function SettingsPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteInput, setDeleteInput] = useState('')
   const [deleting, setDeleting] = useState(false)
+  // Per-device presentation preference (lib/animationPrefs.ts) — adjusted
+  // during render (React's documented pattern, same as /live's keep-awake
+  // toggle) rather than in an effect or a useState initializer, avoiding
+  // both a hydration mismatch and the set-state-in-effect lint rule.
+  const [animationsOn, setAnimationsOn] = useState(true)
+  const [readAnimPref, setReadAnimPref] = useState(false)
+  if (!readAnimPref && typeof window !== 'undefined') {
+    setReadAnimPref(true)
+    const stored = bigAnimationsEnabled()
+    if (stored !== animationsOn) setAnimationsOn(stored)
+  }
+
+  function toggleAnimations() {
+    setAnimationsOn((current) => {
+      const next = !current
+      setBigAnimationsEnabled(next)
+      return next
+    })
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -353,6 +373,42 @@ export default function SettingsPage() {
                     height: 16,
                     left: data.pushEnabled ? 21 : 3,
                     backgroundColor: data.pushEnabled ? '#FFFFFF' : 'var(--t2)',
+                  }}
+                />
+              </button>
+            </div>
+          </Section>
+
+          {/* ─── Game Day animations (T-111 follow-up) ─────────────────── */}
+          <Section
+            title="Game Day animations"
+            subtitle="Full-screen moments on the LIVE tab. Stored per device."
+          >
+            <div className="flex items-center justify-between py-1">
+              <div>
+                <p className="text-sm text-white">Big-play takeovers</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--t3)' }}>
+                  Touchdown and big-play full-screen animations, plus the LIVE-opens reveal.
+                </p>
+              </div>
+              <button
+                role="switch"
+                aria-checked={animationsOn}
+                onClick={toggleAnimations}
+                className="relative rounded-full transition-all flex-shrink-0"
+                style={{
+                  width: 40,
+                  height: 22,
+                  backgroundColor: animationsOn ? 'var(--cta)' : 'var(--hairline)',
+                }}
+              >
+                <span
+                  className="absolute top-[3px] rounded-full transition-all"
+                  style={{
+                    width: 16,
+                    height: 16,
+                    left: animationsOn ? 21 : 3,
+                    backgroundColor: animationsOn ? '#FFFFFF' : 'var(--t2)',
                   }}
                 />
               </button>

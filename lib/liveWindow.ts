@@ -4,12 +4,10 @@
 // This is per-user: does *this* user have a rostered player (Sleeper,
 // starter or bench — matching buildLiveRoster's own inclusion rule) in
 // any of today's games, and if so, treat the whole day's slate as one
-// continuous window (pregame ramp before the earliest of their games
+// continuous window (10 minutes before the earliest of their games
 // through GAME_DURATION_HOURS after the latest) rather than flipping
 // open/closed every time a single game goes to halftime or finishes
-// between windows. Reuses rostiroState's exact ramp/duration constants
-// so a user's personal window and the system-wide one feel like the same
-// clock, not two independently-tuned ones.
+// between windows.
 //
 // Deliberately not limited to Sunday — Thursday Night, international
 // games, Black Friday, Christmas, and Monday Night Football all produce
@@ -17,7 +15,14 @@
 // rostered player in it.
 
 import { getSleeperRosters } from '@/lib/sleeper'
-import { PREGAME_RAMP_HOURS, GAME_DURATION_HOURS } from '@/lib/rostiroState'
+import { GAME_DURATION_HOURS } from '@/lib/rostiroState'
+
+// Founder decision (July 5, 2026): LIVE opens 10 minutes before kickoff,
+// NOT rostiroState's 3h PREGAME_RAMP_HOURS — that ramp exists for the
+// "did I set my lineup" panic window (a Pulse/System Bar concern), while
+// LIVE has nothing to show until the game is about to start. Two
+// different concerns, deliberately two different constants.
+const LIVE_PREGAME_RAMP_MINUTES = 10
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 // Same SupabaseClient type lib/pulse.ts already uses for this exact dual
@@ -106,7 +111,7 @@ export async function computeLiveWindow(admin: SupabaseClient, userId: string): 
   for (const kickoffs of groups.values()) {
     const earliest = Math.min(...kickoffs.map((k) => k.getTime()))
     const latest = Math.max(...kickoffs.map((k) => k.getTime()))
-    const windowStart = earliest - PREGAME_RAMP_HOURS * 60 * 60 * 1000
+    const windowStart = earliest - LIVE_PREGAME_RAMP_MINUTES * 60 * 1000
     const windowEnd = latest + GAME_DURATION_HOURS * 60 * 60 * 1000
     if (now.getTime() >= windowStart && now.getTime() <= windowEnd) {
       return { isOpen: true, windowEndsAt: new Date(windowEnd).toISOString(), nextKickoff: null }

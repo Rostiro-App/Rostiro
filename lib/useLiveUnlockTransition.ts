@@ -10,7 +10,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-const SWEEP_DURATION_MS = 2200
+// Long enough for /live's full-screen "LIVE IS OPEN" overlay to actually
+// land (founder: the original subtle reveal "could be missed") — the nav
+// icon flash just plays within the same window.
+const SWEEP_DURATION_MS = 3200
 
 function todayEt(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date())

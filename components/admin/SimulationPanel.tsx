@@ -42,6 +42,7 @@ const LIVE_SCENARIOS: { key: string; label: string; desc: string }[] = [
   { key: '7', label: 'Interception', desc: 'Real negative-delta classification — muted amber pulse on /live, never a red alarm.' },
   { key: '8', label: 'Lead change', desc: 'Real starter points seeded on both rosters — the matchup rail sums them, nothing hardcoded.' },
   { key: '9', label: 'Player injury (not live)', desc: 'No live game seeded — proves it lands in Player updates, never as a live roster card.' },
+  { key: '10', label: 'Big play (no score)', desc: '+4.5 pts — classifier must say big_play; takeover reads BIG PLAY, never TOUCHDOWN.' },
 ]
 
 async function callSimulate(body: Record<string, unknown>) {

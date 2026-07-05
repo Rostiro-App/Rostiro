@@ -18,7 +18,7 @@ import type { ScoringSettings } from '@/types'
 
 type AdminClient = ReturnType<typeof createAdminClient>
 
-export type LiveEventType = 'touchdown' | 'reception' | 'yardage' | 'negative'
+export type LiveEventType = 'touchdown' | 'big_play' | 'reception' | 'yardage' | 'negative'
 
 export interface ClassifiedLiveEvent extends PlayerPointDelta {
   eventType: LiveEventType
@@ -31,12 +31,30 @@ export interface ClassifiedLiveEvent extends PlayerPointDelta {
 // get bucketed as merely "big yardage."
 const TD_SLACK = 0.75
 
-export function classifyPointDelta(delta: number, scoring: ScoringSettings): LiveEventType | null {
+// A single-poll jump this large without reaching TD magnitude is a real
+// chunk play (e.g. a 35+ yard catch in PPR: 1 + 3.5 = 4.5) — founder-
+// flagged that these deserve the same takeover treatment as a TD, with
+// honest "BIG PLAY" copy instead of pretending magnitude alone proves a
+// score. In points, not yards, so it scales with the league's own
+// yards-per-point settings like everything else here.
+const BIG_PLAY_MIN_POINTS = 3.5
+
+export function classifyPointDelta(delta: number, scoring: ScoringSettings, position?: string | null): LiveEventType | null {
   if (delta === 0) return null
   if (delta < 0) return 'negative'
 
-  const tdThreshold = Math.min(scoring.rushTouchdownPoints, scoring.receivingTouchdownPoints, scoring.qbTouchdownPoints) - TD_SLACK
+  // Position-aware TD threshold: only a QB's delta is measured against the
+  // (usually lower, e.g. 4pt) passing-TD value. Without this, a 4-pt-pass-TD
+  // league dragged the threshold to ~3.25 for EVERYONE, so a WR's +4.5
+  // chunk play got overclaimed as "TOUCHDOWN" — the exact dishonesty the
+  // big_play tier exists to avoid. Unknown position keeps the conservative
+  // (lowest) threshold rather than risking calling a real QB TD a big play.
+  const tdThreshold =
+    position && position !== 'QB'
+      ? Math.min(scoring.rushTouchdownPoints, scoring.receivingTouchdownPoints) - TD_SLACK
+      : Math.min(scoring.rushTouchdownPoints, scoring.receivingTouchdownPoints, scoring.qbTouchdownPoints) - TD_SLACK
   if (delta >= tdThreshold) return 'touchdown'
+  if (delta >= BIG_PLAY_MIN_POINTS) return 'big_play'
 
   if (scoring.ppr > 0 && Math.abs(delta - scoring.ppr) < 0.25) return 'reception'
 
@@ -81,6 +99,18 @@ async function fetchLeagueScoring(
 export async function classifyDeltas(admin: AdminClient, deltas: PlayerPointDelta[]): Promise<ClassifiedLiveEvent[]> {
   if (deltas.length === 0) return []
 
+  // Positions in one batched lookup — needed for the position-aware TD
+  // threshold above (a 4-pt passing TD league must not lower the bar for
+  // non-QBs).
+  const playerIds = [...new Set(deltas.map((d) => d.playerId))]
+  const { data: positionRows } = await admin
+    .from('players_cache')
+    .select('player_id, platform, position')
+    .in('player_id', playerIds)
+  const positionByKey = new Map(
+    ((positionRows ?? []) as { player_id: string; platform: string; position: string | null }[]).map((p) => [`${p.platform}:${p.player_id}`, p.position])
+  )
+
   const scoringByLeague = new Map<string, ScoringSettings | null>()
   const classified: ClassifiedLiveEvent[] = []
 
@@ -92,7 +122,7 @@ export async function classifyDeltas(admin: AdminClient, deltas: PlayerPointDelt
     if (!scoring) continue
 
     const delta = d.newPoints - d.prevPoints
-    const eventType = classifyPointDelta(delta, scoring)
+    const eventType = classifyPointDelta(delta, scoring, positionByKey.get(`${d.platform}:${d.playerId}`) ?? null)
     if (!eventType) continue
 
     classified.push({ ...d, eventType, delta })

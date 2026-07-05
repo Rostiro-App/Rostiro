@@ -149,6 +149,46 @@ export async function runTouchdownScenario(admin: AdminClient): Promise<{ ok: bo
   return { ok: true, note: `${starter.name} +${classified[0].delta.toFixed(1)} pts, classified as "${classified[0].eventType}" by the real classifier. Open /live to see the big-play takeover.` }
 }
 
+// ─── Scenario: Big play (large non-scoring jump) ───────────────────────────
+// A +4.5 delta — above BIG_PLAY_MIN_POINTS, below TD magnitude — proving
+// the classifier reads it as 'big_play' and the takeover says "BIG PLAY",
+// never "TOUCHDOWN", for a jump that doesn't prove a score.
+export async function runBigPlayScenario(admin: AdminClient): Promise<{ ok: boolean; note: string }> {
+  const { leagues } = await loadFounderLeagues(admin)
+  const league = leagues[0]
+  if (!league) return { ok: false, note: 'No connected Sleeper league to attach this scenario to.' }
+
+  // Non-QB on purpose — a QB's +4.5 in a 4-pt-passing-TD league IS a
+  // touchdown by the position-aware threshold, which would make this
+  // scenario "fail" while the classifier is being exactly right.
+  const rosters = await getSleeperRosters(league.league_id).catch(() => [])
+  const myRoster = rosters.find((r) => String(r.roster_id) === league.team_id)
+  const starterIds = (myRoster?.starters ?? []).filter((id: string) => id && id !== '0')
+  const { data: rows } = starterIds.length
+    ? await admin.from('players_cache').select('player_id, name, nfl_team, position').eq('platform', 'sleeper').neq('position', 'QB').in('player_id', starterIds)
+    : { data: [] }
+  const starter = ((rows ?? []) as { player_id: string; name: string; nfl_team: string | null }[]).find((r) => r.nfl_team)
+  if (!starter?.nfl_team) return { ok: false, note: 'No real non-QB starter with a resolvable NFL team found on this roster.' }
+
+  const week = await currentNflWeek(admin)
+  if (week === null) return { ok: false, note: 'Could not resolve a current NFL week.' }
+
+  await seedLiveGame(admin, `SIM-BIGPLAY-${league.id}`, starter.nfl_team, 'SIM', -10, 'in')
+
+  const before = 6.2
+  const after = before + 4.5
+  await seedMatchupPoints(admin, league.league_id, week, league.team_id!, { [starter.player_id]: before })
+  const classified = await classifyDeltas(admin, [{ leagueRowId: league.id, platform: 'sleeper', playerId: starter.player_id, prevPoints: before, newPoints: after }])
+  if (classified.length === 0 || classified[0].eventType !== 'big_play') {
+    return { ok: false, note: `Real classifier returned "${classified[0]?.eventType ?? 'nothing'}" instead of big_play — check thresholds against this league's real TD values.` }
+  }
+
+  await insertTrackedLiveEvent(admin, classified[0])
+  await seedMatchupPoints(admin, league.league_id, week, league.team_id!, { [starter.player_id]: after })
+
+  return { ok: true, note: `${starter.name} +${classified[0].delta.toFixed(1)} pts, classified as "big_play" — the takeover should say BIG PLAY, not TOUCHDOWN.` }
+}
+
 // ─── Scenario: Interception (negative event) ───────────────────────────────
 export async function runInterceptionScenario(admin: AdminClient): Promise<{ ok: boolean; note: string }> {
   const { leagues } = await loadFounderLeagues(admin)

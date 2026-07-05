@@ -12,6 +12,7 @@ import { runScenario1, runScenario2, runScenario3, runScenario4, clearSimulation
 import {
   runLiveUnlockScenario,
   runTouchdownScenario,
+  runBigPlayScenario,
   runInterceptionScenario,
   runLeadChangeScenario,
   runNonLiveInjuryScenario,
@@ -85,6 +86,7 @@ export async function POST(request: NextRequest) {
           '7': runInterceptionScenario,
           '8': runLeadChangeScenario,
           '9': runNonLiveInjuryScenario,
+          '10': runBigPlayScenario,
         }
         const run = body.scenario ? scenarios[body.scenario] : undefined
         if (!run) return NextResponse.json({ error: `scenario must be one of ${Object.keys(scenarios).join(', ')}` }, { status: 400 })

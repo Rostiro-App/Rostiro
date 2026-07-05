@@ -11,6 +11,7 @@ import Link from 'next/link'
 import { useWakeLock } from '@/lib/useWakeLock'
 import { useIdleDim } from '@/lib/useIdleDim'
 import { useLiveUnlockTransition } from '@/lib/useLiveUnlockTransition'
+import { bigAnimationsEnabled } from '@/lib/animationPrefs'
 
 interface LiveGameContext {
   homeTeam: string
@@ -48,7 +49,7 @@ interface LiveUpdateItem {
 
 interface RecentEvent {
   player_id: string
-  event_type: 'touchdown' | 'reception' | 'yardage' | 'negative'
+  event_type: 'touchdown' | 'big_play' | 'reception' | 'yardage' | 'negative'
   delta: number
   created_at: string
 }
@@ -168,17 +169,19 @@ export default function LivePage() {
           if (cancelled) return
           setStatus(data)
 
-          // Fire the big-play takeover for a touchdown we haven't shown yet —
-          // one at a time, never stacked, same rule as the Interrupt layer.
-          const freshTouchdown = data.recentEvents.find((e) => {
+          // Fire the takeover for a touchdown OR big play we haven't shown
+          // yet — one at a time, never stacked, same rule as the Interrupt
+          // layer. Skipped entirely when the user has turned big
+          // animations off in Settings.
+          const freshTakeover = data.recentEvents.find((e) => {
             const key = `${e.player_id}:${e.created_at}`
-            if (e.event_type !== 'touchdown' || shownEventKeys.current.has(key)) return false
+            if ((e.event_type !== 'touchdown' && e.event_type !== 'big_play') || shownEventKeys.current.has(key)) return false
             shownEventKeys.current.add(key)
             return true
           })
-          if (freshTouchdown) {
-            const player = data.liveRoster.find((p) => p.playerId === freshTouchdown.player_id)
-            if (player) setBigPlay({ player, event: freshTouchdown })
+          if (freshTakeover && bigAnimationsEnabled()) {
+            const player = data.liveRoster.find((p) => p.playerId === freshTakeover.player_id)
+            if (player) setBigPlay({ player, event: freshTakeover })
           }
         })
         .catch(() => {})
@@ -197,7 +200,9 @@ export default function LivePage() {
 
   useEffect(() => {
     if (!bigPlay) return
-    const t = setTimeout(() => setBigPlay(null), 3400)
+    // Founder feedback: 3.4s read as too quick for the moment — long
+    // enough now to register from across the room, still tap-to-dismiss.
+    const t = setTimeout(() => setBigPlay(null), 5500)
     return () => clearTimeout(t)
   }, [bigPlay])
 
@@ -314,11 +319,13 @@ export default function LivePage() {
               const eventLabel = recentEvent
                 ? recentEvent.event_type === 'touchdown'
                   ? 'TD'
-                  : recentEvent.event_type === 'reception'
-                    ? 'REC'
-                    : recentEvent.event_type === 'negative'
-                      ? 'INT/FUM'
-                      : 'YDS'
+                  : recentEvent.event_type === 'big_play'
+                    ? 'BIG PLAY'
+                    : recentEvent.event_type === 'reception'
+                      ? 'REC'
+                      : recentEvent.event_type === 'negative'
+                        ? 'INT/FUM'
+                        : 'YDS'
                 : null
               return (
                 <button
@@ -428,10 +435,35 @@ export default function LivePage() {
             className="w-32 h-32 rounded-full object-cover"
             style={{ border: '2px solid var(--live)', boxShadow: '0 0 60px rgba(67,192,119,.5)' }}
           />
-          <p className="mono-data text-xs font-bold tracking-widest mt-4" style={{ color: 'var(--live)' }}>TOUCHDOWN</p>
-          <p className="text-xl font-bold text-white mt-1.5">{bigPlay.player.name}</p>
+          {/* The label always names what triggered this — "TOUCHDOWN" only
+              when the classifier read TD magnitude, "BIG PLAY" for a large
+              non-scoring jump (founder: "+6.6 in green could've been a
+              66-yard catch — how does the user know?"). */}
+          <p className="mono-data text-2xl font-extrabold tracking-[0.25em] mt-5" style={{ color: 'var(--live)', textShadow: '0 0 30px rgba(67,192,119,.6)' }}>
+            {bigPlay.event.event_type === 'touchdown' ? 'TOUCHDOWN' : 'BIG PLAY'}
+          </p>
+          <p className="text-xl font-bold text-white mt-2">{bigPlay.player.name}</p>
           <p className="mono-data text-2xl font-extrabold mt-2.5" style={{ color: 'var(--live)' }}>
             +{bigPlay.event.delta.toFixed(1)} PTS
+          </p>
+        </div>
+      )}
+
+      {justUnlocked && bigAnimationsEnabled() && (
+        // The unmissable version of "LIVE just opened" (founder feedback:
+        // the container fade alone was too subtle) — a full-screen moment
+        // in Game Day's own accent, once per ET day, skippable by tap and
+        // by the Settings animations toggle.
+        <div
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center panel-enter"
+          style={{ background: 'radial-gradient(circle at 50% 42%, rgba(226,75,74,.18), rgba(5,9,16,.96) 70%)' }}
+        >
+          <span className="w-3 h-3 rounded-full breathe" style={{ backgroundColor: '#E24B4A', boxShadow: '0 0 40px rgba(226,75,74,.8)' }} />
+          <p className="mono-data text-3xl font-extrabold tracking-[0.3em] mt-6" style={{ color: '#E24B4A', textShadow: '0 0 40px rgba(226,75,74,.55)' }}>
+            LIVE IS OPEN
+          </p>
+          <p className="text-sm mt-3" style={{ color: 'var(--t2)' }}>
+            Your players are taking the field.
           </p>
         </div>
       )}
