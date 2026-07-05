@@ -275,3 +275,80 @@ export async function generateFilmRoomRecap(input: FilmRoomRecapInput): Promise<
   }
   return textBlock.text.trim()
 }
+
+interface PlayerNewsContextInput {
+  playerName: string
+  playerPosition: string
+  headline: string
+  summary: string | null
+  mode: Mode
+}
+
+// T-95 follow-up: generated once per (player x news item) and cached in
+// player_context_cache (lib/pulse.ts), reused for every user who rosters
+// that player — never a per-user call. Explicitly allowed to decline: a
+// real ESPN item this session matched a rostered player purely through an
+// off-field lifestyle story (a wedding announcement) with zero fantasy
+// implication — rather than manufacturing relevance, Claude is instructed
+// to say so, and the caller treats null as "don't surface this."
+export async function generatePlayerNewsContext(input: PlayerNewsContextInput): Promise<string | null> {
+  const message = await createMessage({
+    model: MODEL,
+    max_tokens: 150,
+    thinking: { type: 'disabled' },
+    output_config: { effort: 'low' },
+    system:
+      `You write one short, factual sentence explaining why a piece of NFL news matters for a fantasy football manager who rosters the player mentioned. Use only the headline and summary given to you — never invent stats, injuries, or context not provided. If the news has no real fantasy implication (a lifestyle story, an award, an off-field event with no bearing on availability, role, or workload), respond with exactly the single word NONE and nothing else. ${toneInstruction(input.mode)}`,
+    messages: [
+      {
+        role: 'user',
+        content: `Player: ${input.playerName} (${input.playerPosition}). Headline: "${input.headline}"${input.summary ? `\nSummary: "${input.summary}"` : ''}\n\nWrite one sentence on why this matters for a manager who rosters this player, or respond NONE if it doesn't.`,
+      },
+    ],
+  })
+
+  const textBlock = message.content.find((b) => b.type === 'text')
+  if (!textBlock || textBlock.type !== 'text') {
+    throw new ClaudeAPIError('Claude returned no text content')
+  }
+  const text = textBlock.text.trim()
+  if (/^none\.?$/i.test(text)) return null
+  return text
+}
+
+interface OpportunitySurgeContextInput {
+  outgoingName: string
+  outgoingStatus: string
+  beneficiaryName: string
+  beneficiaryPosition: string
+  nflTeam: string
+  mode: Mode
+}
+
+// T-99: the outgoing/beneficiary pairing itself is fully deterministic
+// (lib/opportunitySurge.ts, real NFL depth chart data) — Claude only
+// writes the one sentence explaining why it matters, same split as every
+// other reasoning function in this file. Cached once per event, same as
+// generatePlayerNewsContext above.
+export async function generateOpportunitySurgeContext(input: OpportunitySurgeContextInput): Promise<string> {
+  const message = await createMessage({
+    model: MODEL,
+    max_tokens: 150,
+    thinking: { type: 'disabled' },
+    output_config: { effort: 'low' },
+    system:
+      `You write one short, factual sentence explaining a fantasy football opportunity: a starter is sidelined and a teammate is next in line for their role. Use only the names, status, position, and team given to you — never invent snap counts, stats, or timelines not provided. ${toneInstruction(input.mode)}`,
+    messages: [
+      {
+        role: 'user',
+        content: `${input.outgoingName} is listed as ${input.outgoingStatus} for the ${input.nflTeam}. ${input.beneficiaryName} (${input.beneficiaryPosition}) is next on the team's real depth chart at that spot. Write one sentence on why this makes ${input.beneficiaryName} worth a look.`,
+      },
+    ],
+  })
+
+  const textBlock = message.content.find((b) => b.type === 'text')
+  if (!textBlock || textBlock.type !== 'text') {
+    throw new ClaudeAPIError('Claude returned no text content')
+  }
+  return textBlock.text.trim()
+}
