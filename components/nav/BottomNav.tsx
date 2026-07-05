@@ -8,6 +8,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
+import { useLiveUnlocked } from '@/lib/useLiveUnlocked'
 
 const NAV_ITEMS = [
   {
@@ -54,6 +55,8 @@ const MORE_ITEMS = [
 export default function BottomNav() {
   const pathname = usePathname()
   const [moreOpen, setMoreOpen] = useState(false)
+  const liveUnlocked = useLiveUnlocked()
+  const liveActive = pathname === '/live' || pathname.startsWith('/live/')
 
   const moreActive = MORE_ITEMS.some(
     (item) => pathname === item.href || pathname.startsWith(item.href + '/')
@@ -85,6 +88,28 @@ export default function BottomNav() {
             </Link>
           )
         })}
+        {/* T-111: dimmed/untappable outside Game Day State, same rule as
+            the desktop Sidebar's icon — reuses rostiroState, no new
+            detection. */}
+        {liveUnlocked ? (
+          <Link
+            href="/live"
+            className="flex-1 flex flex-col items-center justify-center gap-0.5 transition-all"
+            style={{ color: '#E24B4A' }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+            </svg>
+            <span className="text-[10px] font-medium leading-none" style={{ color: liveActive ? '#E24B4A' : 'var(--t3)' }}>LIVE</span>
+          </Link>
+        ) : (
+          <span className="flex-1 flex flex-col items-center justify-center gap-0.5" style={{ color: 'var(--t4)', opacity: 0.4 }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+            </svg>
+            <span className="text-[10px] font-medium leading-none">LIVE</span>
+          </span>
+        )}
         <button
           type="button"
           onClick={() => setMoreOpen(true)}
