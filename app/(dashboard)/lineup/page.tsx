@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from 'react'
 import { useMode, type Mode } from '@/components/nav/AppShell'
-import type { Confidence, StartSitRecommendation } from '@/types'
+import type { Confidence, LeagueLineup, Player, StartSitRecommendation } from '@/types'
 
 const VERDICT_LABEL: Record<StartSitRecommendation['verdict'], string> = {
   start_a: 'Start current',
@@ -32,6 +32,7 @@ const CONFIDENCE_LABEL: Record<Confidence, string> = {
 export default function LineupPage() {
   const mode = useMode()
   const [recs, setRecs] = useState<StartSitRecommendation[]>([])
+  const [lineups, setLineups] = useState<LeagueLineup[]>([])
   const [leagueCount, setLeagueCount] = useState(0)
   const [totalLeagueCount, setTotalLeagueCount] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -61,9 +62,10 @@ export default function LineupPage() {
         if (!res.ok) throw new Error('Failed to load lineup recommendations')
         return res.json()
       })
-      .then((data: { recommendations: StartSitRecommendation[]; leagueCount: number }) => {
+      .then((data: { recommendations: StartSitRecommendation[]; lineups?: LeagueLineup[]; leagueCount: number }) => {
         if (cancelled) return
         setRecs(data.recommendations)
+        setLineups(data.lineups ?? [])
         setLeagueCount(data.leagueCount)
       })
       .catch((err: Error) => {
@@ -81,12 +83,12 @@ export default function LineupPage() {
   }, [mode])
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pt-6 pb-8 md:px-6 md:pt-8">
+    <div className="max-w-4xl mx-auto px-4 pt-6 pb-8 md:px-6 md:pt-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white tracking-tight">Lineups</h1>
         <p className="text-sm mt-0.5" style={{ color: 'var(--t2)' }}>
           {leagueCount > 0
-            ? `Start/sit calls across ${leagueCount} ${leagueCount === 1 ? 'league' : 'leagues'} · Sleeper`
+            ? `Your lineup across ${leagueCount} ${leagueCount === 1 ? 'league' : 'leagues'} · Sleeper`
             : 'No leagues connected yet'}
         </p>
       </div>
@@ -94,13 +96,111 @@ export default function LineupPage() {
       {loading && <LoadingState />}
       {!loading && error && <ErrorState message={error} />}
       {!loading && !error && leagueCount === 0 && <NoLeaguesState totalLeagueCount={totalLeagueCount} />}
-      {!loading && !error && leagueCount > 0 && recs.length === 0 && <AllClearState />}
-      {!loading && !error && recs.length > 0 && (
-        <div className="space-y-3">
-          {recs.map((rec, i) => (
-            <StartSitCard key={i} rec={rec} mode={mode} />
+
+      {/* Found via a real user report (July 4, 2026): this page previously
+          showed nothing at all once the lineup was already optimal — a
+          "Lineups" page with no lineup ever visible on it. The actual
+          roster is now the primary content; recommended swaps (if any)
+          follow as a secondary, clearly-separated section per league. */}
+      {!loading && !error && lineups.map((lineup) => {
+        const leagueRecs = recs.filter((r) => r.leagueId === lineup.leagueId)
+        return (
+          <div key={lineup.leagueId} className="mb-8">
+            <h2 className="text-sm font-semibold text-white mb-3">{lineup.leagueName}</h2>
+            <LineupGrid lineup={lineup} />
+
+            <div className="mt-4">
+              {leagueRecs.length === 0 ? (
+                <p className="text-sm" style={{ color: 'var(--t3)' }}>
+                  Your lineup looks right — no bench player has a clear ADP edge over your current starters.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {leagueRecs.map((rec, i) => (
+                    <StartSitCard key={i} rec={rec} mode={mode} />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function LineupGrid({ lineup }: { lineup: LeagueLineup }) {
+  return (
+    <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--hairline)' }}>
+      {lineup.slots.map((slot, i) => (
+        <LineupRow key={i} slotLabel={slot.slotLabel} player={slot.player} playerIdRaw={slot.playerIdRaw} isFirst={i === 0} />
+      ))}
+      {lineup.bench.length > 0 && (
+        <>
+          <div
+            className="px-4 py-1.5 mono-data text-[10px] font-semibold tracking-widest uppercase"
+            style={{ backgroundColor: 'rgba(6, 11, 19, 0.55)', color: 'var(--t3)', borderTop: '1px solid var(--hairline)' }}
+          >
+            Bench
+          </div>
+          {lineup.bench.map((p) => (
+            <LineupRow key={p.id} slotLabel="BN" player={p} playerIdRaw={p.id} isFirst={false} />
           ))}
-        </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function LineupRow({
+  slotLabel,
+  player,
+  playerIdRaw,
+  isFirst,
+}: {
+  slotLabel: string
+  player: Player | null
+  playerIdRaw: string | null
+  isFirst: boolean
+}) {
+  const isInjured = player?.injuryStatus && player.injuryStatus !== 'active'
+
+  return (
+    <div
+      className="flex items-center gap-3 px-4 py-2.5"
+      style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', borderTop: isFirst ? 'none' : '1px solid var(--hairline)' }}
+    >
+      <span
+        className="mono-data text-[10px] font-semibold flex-shrink-0 w-11 text-center px-1 py-0.5 rounded"
+        style={{ color: 'var(--t3)', border: '1px solid var(--hairline)' }}
+      >
+        {slotLabel}
+      </span>
+      {player ? (
+        <>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-white truncate">{player.name}</p>
+            <p className="text-xs truncate" style={{ color: 'var(--t3)' }}>
+              {player.position} · {player.nflTeam || 'FA'}
+            </p>
+          </div>
+          {isInjured && (
+            <span
+              className="mono-data text-[10px] font-semibold tracking-wider uppercase flex-shrink-0"
+              style={{ color: 'var(--crit)' }}
+            >
+              {player.injuryStatus}
+            </span>
+          )}
+        </>
+      ) : (
+        // Real gap found live (July 4, 2026): a rostered player id with no
+        // players_cache row (a kicker outside the ADP-ranked cache, a DEF
+        // keyed by team abbreviation) — show the raw id honestly rather
+        // than silently dropping the slot from the lineup.
+        <p className="text-sm truncate" style={{ color: 'var(--t3)' }}>
+          {playerIdRaw ?? 'Empty'}
+        </p>
       )}
     </div>
   )
@@ -193,13 +293,3 @@ function NoLeaguesState({ totalLeagueCount }: { totalLeagueCount: number }) {
   )
 }
 
-function AllClearState() {
-  return (
-    <div className="rounded-xl p-6 text-center" style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', border: '1px solid var(--hairline)' }}>
-      <p className="text-sm font-medium text-white">Your lineup looks right.</p>
-      <p className="text-sm mt-1" style={{ color: 'var(--t2)' }}>
-        No bench player has a clear ADP edge over your current starters.
-      </p>
-    </div>
-  )
-}

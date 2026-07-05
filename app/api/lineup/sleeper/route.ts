@@ -15,9 +15,10 @@ import { createSSRClient, createAdminClient } from '@/lib/supabase'
 import { getSleeperRosters } from '@/lib/sleeper'
 import { generateStartSitReasoning } from '@/lib/claude'
 import { checkAndIncrementUsage, isFreePlan } from '@/lib/usageLimits'
+import { NFL_TEAM_NAMES } from '@/lib/nflTeams'
 import { NextResponse, type NextRequest } from 'next/server'
 import type { Mode } from '@/components/nav/AppShell'
-import type { Confidence, NFLPosition, Platform, Player, StartSitRecommendation } from '@/types'
+import type { Confidence, LeagueLineup, LineupSlot, NFLPosition, Platform, Player, StartSitRecommendation } from '@/types'
 
 const WEEKLY_FREE_LIMIT = 3
 
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
 
   const { data: leagues, error: leaguesError } = await supabase
     .from('connected_leagues')
-    .select('id, league_id, league_name, team_id')
+    .select('id, league_id, league_name, team_id, roster_slots_json')
     .eq('user_id', user.id)
     .eq('platform', 'sleeper')
 
@@ -56,13 +57,19 @@ export async function GET(request: NextRequest) {
   }
 
   if (!leagues || leagues.length === 0) {
-    return NextResponse.json({ recommendations: [], leagueCount: 0 })
+    return NextResponse.json({ recommendations: [], lineups: [], leagueCount: 0 })
   }
 
   const admin = createAdminClient()
   const free = await isFreePlan(admin, user.id)
 
   const recommendations: StartSitRecommendation[] = []
+  // Found via a real user report (July 4, 2026): a page called "Lineups"
+  // showed nothing but a recommendation card, and rendered no lineup at
+  // all once the lineup was already optimal ("looks right" with zero
+  // roster visible). Added alongside the existing recommendation logic,
+  // not replacing it — see buildLeagueLineup below.
+  const lineups: LeagueLineup[] = []
 
   for (const league of leagues) {
     try {
@@ -71,9 +78,80 @@ export async function GET(request: NextRequest) {
     } catch {
       continue
     }
+
+    try {
+      const lineup = await buildLeagueLineup(supabase, league)
+      if (lineup) lineups.push(lineup)
+    } catch {
+      continue
+    }
   }
 
-  return NextResponse.json({ recommendations, leagueCount: leagues.length })
+  return NextResponse.json({ recommendations, lineups, leagueCount: leagues.length })
+}
+
+// Verified live against a real roster (July 4, 2026): Sleeper's `starters`
+// array is positionally ordered to match the league's own roster slot
+// order (starter slots only — connected_leagues.roster_slots_json minus
+// 'BN' entries), confirmed by cross-checking every starter's real cached
+// position against its expected slot. A player id with no players_cache
+// row (seen live: a kicker outside the ADP-ranked cache, and DEF entries
+// keyed by team abbreviation like "TEN") falls back to showing the raw id
+// rather than silently dropping the slot.
+async function buildLeagueLineup(
+  supabase: Awaited<ReturnType<typeof createSSRClient>>,
+  league: { id: string; league_id: string; league_name: string; team_id: string | null; roster_slots_json: string[] | null }
+): Promise<LeagueLineup | null> {
+  if (!league.team_id || !league.roster_slots_json) return null
+
+  const rosters = await getSleeperRosters(league.league_id)
+  const myRoster = rosters.find((r) => String(r.roster_id) === league.team_id)
+  if (!myRoster) return null
+
+  const starterIds = (myRoster.starters ?? []).filter((id) => id && id !== '0')
+  const allIds = myRoster.players ?? []
+  const benchIds = allIds.filter((id) => !starterIds.includes(id))
+
+  const { data: cached } = await supabase
+    .from('players_cache')
+    .select('player_id, name, position, nfl_team, injury_status, adp_sleeper')
+    .eq('platform', 'sleeper')
+    .in('player_id', [...starterIds, ...benchIds])
+  const byId = new Map((cached ?? []).map((p) => [p.player_id, p as CachedPlayer]))
+
+  const starterSlotLabels = league.roster_slots_json.filter((s) => s !== 'BN')
+  const slots: LineupSlot[] = starterSlotLabels.map((slotLabel, i) => {
+    const playerId = starterIds[i] ?? null
+    return {
+      slotLabel,
+      player: playerId ? resolvePlayer(playerId, byId) : null,
+      playerIdRaw: playerId,
+    }
+  })
+
+  const bench: Player[] = benchIds
+    .map((id) => resolvePlayer(id, byId))
+    .filter((p): p is Player => !!p)
+
+  return { leagueId: league.id, leagueName: league.league_name, slots, bench }
+}
+
+// Sleeper keys DEF rosters by team abbreviation (e.g. "TEN"), not a
+// players_cache row — resolved via a static team-name map rather than
+// falling back to a bare, meaningless id (found live, July 4, 2026: every
+// single roster hits this once, for its one DEF slot, not an edge case).
+// A player genuinely missing from players_cache (e.g. a kicker with no
+// ADP rank, also seen live) still falls back to the raw id — rarer, and
+// resolving it would need a second network call this route doesn't make.
+function resolvePlayer(id: string, byId: Map<string, CachedPlayer>): Player | null {
+  const cached = byId.get(id)
+  if (cached) return toPlayer(cached)
+
+  const teamName = NFL_TEAM_NAMES[id]
+  if (teamName) {
+    return toPlayer({ player_id: id, name: `${teamName} D/ST`, position: 'DEF', nfl_team: id, injury_status: null, adp_sleeper: null })
+  }
+  return null
 }
 
 function toPlayer(p: CachedPlayer): Player {

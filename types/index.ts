@@ -30,6 +30,11 @@ export type PulseItemType =
   | 'touchdown_swing'
   | 'lineup_lock'
   | 'mission_complete'
+  // T-95 follow-up (July 4, 2026): PRD line 737 promises "roster grade
+  // appears in Pulse" post-draft even without the full Portfolio product —
+  // never actually built. One-time per league, fingerprinted so it never
+  // resurfaces once dismissed.
+  | 'roster_grade'
 
 export type DraftStatus = 'setup' | 'active' | 'complete'
 
@@ -272,6 +277,19 @@ export interface StartSitRecommendation {
   verdict: 'start_a' | 'start_b' | 'lean_a' | 'lean_b' | 'toss_up'
   confidence: Confidence
   reasoning: string
+}
+
+export interface LineupSlot {
+  slotLabel: string
+  player: Player | null
+  playerIdRaw: string | null
+}
+
+export interface LeagueLineup {
+  leagueId: string
+  leagueName: string
+  slots: LineupSlot[]
+  bench: Player[]
 }
 
 export interface TradeAnalysis {
