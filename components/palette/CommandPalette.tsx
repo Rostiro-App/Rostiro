@@ -190,7 +190,13 @@ export default function CommandPalette({
         section: 'Players',
         label: p.name,
         hint: `${p.position} · ${p.nflTeam || 'FA'} · ADP ${Math.round(p.adpConsensus)}`,
-        run: () => go(`/draft?q=${encodeURIComponent(p.name)}`),
+        // T-89: player search is now decision intelligence, not just
+        // navigation — opens the Player Intelligence Card in place rather
+        // than bouncing to Draft Kit's search box.
+        run: () => {
+          close()
+          window.dispatchEvent(new CustomEvent('rostiro:open-player-card', { detail: { playerId: p.playerId } }))
+        },
       })
     }
   }

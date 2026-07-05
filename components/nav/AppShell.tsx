@@ -6,6 +6,7 @@ import BottomNav from './BottomNav'
 import SystemBar from './SystemBar'
 import TickerBar from './TickerBar'
 import CommandPalette from '@/components/palette/CommandPalette'
+import PlayerIntelligenceCard from '@/components/players/PlayerIntelligenceCard'
 import InterruptStack from '@/components/InterruptStack'
 import BootSequence from '@/components/BootSequence'
 
@@ -95,6 +96,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {/* T-70: ⌘K palette + mobile FAB — listens for the system bar's
             'rostiro:open-command-palette' event and the keyboard shortcut. */}
         <CommandPalette mode={mode} onModeChange={handleModeChange} />
+
+        {/* T-89: Player Intelligence Card — opened via the
+            'rostiro:open-player-card' event, same decoupling as the palette
+            above. */}
+        <PlayerIntelligenceCard />
 
         {/* T-106: the Interrupt layer (PRD 7.1) — visible on every
             authenticated page, not just Pulse. */}
