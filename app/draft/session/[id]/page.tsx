@@ -1,10 +1,14 @@
 'use client'
 
-// T-64.1: Draft Copilot live companion. Polls picks every 10s (matching
-// Sleeper's own recommended cadence); best-available, turn countdown, run
-// detection, and snipe detection are all computed locally from that poll —
-// no extra API calls per view. Claude is only called once, pre-fetched a few
-// picks before the manager's turn, per PRD 6.3.1.
+// T-64.1: Draft Copilot live companion. Polls picks every 3s — bumped down
+// from 5s (and a since-corrected comment claiming 10s) after founder
+// feedback live, mid-draft (July 4, 2026): a bot-heavy fast draft moves
+// quicker than a 5s poll can visibly track. Still well inside Sleeper's own
+// "stay under 1,000 req/min" ceiling (3s = 20 req/min). Best-available,
+// turn countdown, run detection, and snipe detection are all computed
+// locally from that poll — no extra API calls per view. Claude is only
+// called once, pre-fetched a few picks before the manager's turn, per PRD
+// 6.3.1.
 
 import { use, useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -20,7 +24,7 @@ import { useMode } from '@/components/nav/AppShell'
 import type { ADPPlayer, DraftPick, DraftSettings, DraftStrategy, NFLPosition, Platform } from '@/types'
 import type { DraftPickRecommendation } from '@/lib/claude'
 
-const POLL_INTERVAL_MS = 5_000
+const POLL_INTERVAL_MS = 3_000
 const PREFETCH_THRESHOLD = 3
 const NEEDED_POSITIONS: NFLPosition[] = ['QB', 'RB', 'WR', 'TE', 'K']
 
@@ -155,6 +159,16 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
 
   const positionRun: PositionRun | null = useMemo(() => detectPositionRun(picks), [picks])
 
+  // Founder feedback, live mid-draft (July 4, 2026): the page showed the
+  // user's own recommendations and roster, but nothing about what other
+  // teams were actually doing — "we don't see the intel we should be
+  // seeing from other teams' picks." Most recent first, capped at 10 —
+  // this is a glance-at feed, not a full draft log.
+  const recentPicks = useMemo(
+    () => [...picks].sort((a, b) => b.pickNumber - a.pickNumber).slice(0, 10),
+    [picks]
+  )
+
   // Track newly-sniped queue targets (only alert once per player).
   useEffect(() => {
     const sniped = findSnipedQueueTargets(queue, draftedIds)
@@ -166,15 +180,21 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
     }
   }, [draftedIds, queue])
 
-  // If the board shifts enough before the manager's turn that a recommended
-  // player is no longer available, the old recommendation set is stale —
-  // clear it and let the effect below re-fetch against the current board
-  // instead of silently rendering nothing (the bug that showed up live:
-  // recommendations were fetched once and never revisited).
+  // Only force a full clear+refetch once every recommended candidate is
+  // gone — a single sniped player still leaves 4 valid ones, which the
+  // render below already filters out via draftedIds.has(rec.playerId), no
+  // API call needed. Found live, mid-draft (July 4, 2026): this used to
+  // fire on *any* single snipe (.some), which meant every bot pick that
+  // happened to touch one of the 5 shown candidates cleared the whole
+  // panel and fired a brand new Claude call — in a bot-heavy fast draft
+  // that's a lot of calls in a short window, real cost, and exactly what
+  // was hitting the recommend route's own rate limit (T-76) and reading
+  // as recommendations "vanishing" with no visible error (the fetch's
+  // catch is deliberately silent).
   useEffect(() => {
     if (recommendedPlayerIds.current.size === 0) return
-    const anyDrafted = [...recommendedPlayerIds.current].some((id) => draftedIds.has(id))
-    if (anyDrafted) {
+    const allDrafted = [...recommendedPlayerIds.current].every((id) => draftedIds.has(id))
+    if (allDrafted) {
       recommendedForPick.current = null
       recommendedPlayerIds.current = new Set()
       setRecommendations([])
@@ -254,8 +274,16 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
   const poolByPlayerId = new Map(pool.map((p) => [p.playerId, p]))
   const showPanicPanel = picksLeft !== null && picksLeft <= PREFETCH_THRESHOLD
 
+  // Founder feedback, live mid-draft (July 4, 2026): "My roster" trailed
+  // below a long, unbounded best-available list, meaning it was only
+  // reachable by scrolling past everything else — a real cost during a
+  // timed pick. Restructured into a cockpit layout: a bounded-height,
+  // internally-scrolling board on the left, roster pinned in a sidebar on
+  // the right (lg+) so it's visible the whole time without scrolling to
+  // find it. Below lg, there's genuinely not enough width for two columns
+  // side by side — falls back to stacked, same as before.
   return (
-    <div className="max-w-2xl mx-auto px-4 pt-6 pb-16 md:px-6 md:pt-8">
+    <div className="max-w-6xl mx-auto px-4 pt-6 pb-4 md:px-6 md:pt-8 h-full flex flex-col min-h-0">
       <TurnHeader
         round={currentRound}
         pickNumber={currentPickNumber}
@@ -280,6 +308,9 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
           onDismiss={() => setFreshSnipes([])}
         />
       )}
+
+      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4">
+      <div className="min-h-0 flex flex-col">
 
       {showPanicPanel && (
         // T-104 / 6.13: Draft State's accent — matches the already-shipped
@@ -334,7 +365,7 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-2 mb-3">
+      <div className="flex items-center justify-between gap-2 mb-3 flex-shrink-0">
         <div className="flex gap-1.5 overflow-x-auto pb-1">
           {(['ALL', ...NEEDED_POSITIONS] as const).map((pos) => (
             <button
@@ -366,8 +397,11 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
       {/* T-105 / PRD 3: Focused gets a shorter, quieter list — 5 rows, no
           strategy-weight indicators (a Balanced/Savant supporting stat).
           Savant adds decimal ADP precision, matching the same distinction
-          already drawn on the Draft Kit rankings table. */}
-      <div className="rounded-xl overflow-hidden mb-4" style={{ border: '1px solid var(--hairline)' }}>
+          already drawn on the Draft Kit rankings table.
+          Bounded + internally scrolling (not mb-4 unbounded) — this is the
+          one region genuinely long enough to need its own scroll; nothing
+          else on the page should have to compete with it for space. */}
+      <div className="rounded-xl overflow-y-auto flex-1 min-h-0" style={{ border: '1px solid var(--hairline)' }}>
         {filteredBestAvailable.slice(0, mode === 'focused' ? 5 : 20).map((r, i) => {
           const p = r.player
           const prevTier = i > 0 ? filteredBestAvailable[i - 1].player.tier : null
@@ -420,24 +454,75 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
         })}
       </div>
 
-      <h2 className="text-sm font-semibold text-white mb-2">My roster ({myPicks.length})</h2>
-      <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--hairline)' }}>
-        {myPicks.length === 0 ? (
-          <div className="px-4 py-3" style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)' }}>
-            <p className="text-sm" style={{ color: 'var(--t2)' }}>No picks yet.</p>
+      </div>
+
+      {/* Sidebar — pinned beside the board (lg+) instead of trailing below
+          it, so both are visible the whole draft without scrolling to
+          find them. */}
+      <div className="min-h-0 flex flex-col gap-4">
+        <div className="flex flex-col min-h-0" style={{ flex: '0 1 auto' }}>
+          <h2 className="text-sm font-semibold text-white mb-2 flex-shrink-0">Recent picks</h2>
+          <div className="rounded-xl overflow-y-auto max-h-[260px]" style={{ border: '1px solid var(--hairline)' }}>
+            {recentPicks.length === 0 ? (
+              <div className="px-4 py-3" style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)' }}>
+                <p className="text-sm" style={{ color: 'var(--t2)' }}>No picks yet.</p>
+              </div>
+            ) : (
+              recentPicks.map((p, i) => (
+                <div
+                  key={p.pickNumber}
+                  className="flex items-center justify-between gap-2 px-4 py-2"
+                  style={{
+                    backgroundColor: p.isMyPick ? 'var(--signal-dim)' : 'rgba(8, 15, 26, 0.6)',
+                    borderTop: i === 0 ? 'none' : '1px solid var(--hairline)',
+                  }}
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate" style={{ color: p.isMyPick ? 'var(--signal)' : 'white' }}>
+                      {p.playerName} <span className="text-xs font-normal" style={{ color: 'var(--t3)' }}>{p.position}</span>
+                    </p>
+                    <p className="mono-data text-[10px] mt-0.5" style={{ color: 'var(--t3)' }}>
+                      PICK {p.pickNumber} · {p.isMyPick ? 'YOU' : `TEAM ${p.pickedByTeamId}`}
+                    </p>
+                  </div>
+                  {p.adpDelta !== null && Math.abs(p.adpDelta) >= 3 && (
+                    <span
+                      className="mono-data text-xs font-semibold flex-shrink-0"
+                      style={{ color: p.adpDelta > 0 ? 'var(--live)' : 'var(--crit)' }}
+                      title={p.adpDelta > 0 ? 'Picked later than ADP — value' : 'Picked earlier than ADP — a reach'}
+                    >
+                      {p.adpDelta > 0 ? '+' : ''}{Math.round(p.adpDelta)}
+                    </span>
+                  )}
+                </div>
+              ))
+            )}
           </div>
-        ) : (
-          myPicks.map((p, i) => (
-            <div
-              key={p.playerId}
-              className="flex items-center justify-between px-4 py-2.5"
-              style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', borderTop: i === 0 ? 'none' : '1px solid var(--hairline)' }}
-            >
-              <p className="text-sm font-medium text-white">{p.playerName}</p>
-              <span className="text-xs" style={{ color: 'var(--t3)' }}>{p.position} · Round {p.round}</span>
-            </div>
-          ))
-        )}
+        </div>
+
+        <div className="flex flex-col min-h-0 flex-1">
+          <h2 className="text-sm font-semibold text-white mb-2 flex-shrink-0">My roster ({myPicks.length})</h2>
+          <div className="rounded-xl overflow-y-auto" style={{ border: '1px solid var(--hairline)' }}>
+            {myPicks.length === 0 ? (
+              <div className="px-4 py-3" style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)' }}>
+                <p className="text-sm" style={{ color: 'var(--t2)' }}>No picks yet.</p>
+              </div>
+            ) : (
+              myPicks.map((p, i) => (
+                <div
+                  key={p.playerId}
+                  className="flex items-center justify-between px-4 py-2.5"
+                  style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', borderTop: i === 0 ? 'none' : '1px solid var(--hairline)' }}
+                >
+                  <p className="text-sm font-medium text-white">{p.playerName}</p>
+                  <span className="text-xs" style={{ color: 'var(--t3)' }}>{p.position} · Round {p.round}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
       </div>
     </div>
   )
