@@ -17,6 +17,7 @@ import { computeLeagueHealth, type HealthPlayer } from '@/lib/healthScore'
 import { getRostiroState } from '@/lib/rostiroState'
 import { toNflverseTeamCode } from '@/lib/liveScores'
 import { isFeatureEnabled } from '@/lib/featureFlags'
+import { simNow } from '@/lib/simTime'
 import { NextResponse } from 'next/server'
 import type { LeagueHealth, LiveGameScore, RelevantPlayer, SystemDeadline, SystemStatus, SystemStatusLeague, UserPlan } from '@/types'
 
@@ -65,6 +66,12 @@ export async function GET() {
   const supabase = await createSSRClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // Dev-only Simulation Suite: resolved once, reused for every "what's
+  // today" computation below (deadline countdown, live scores) so the
+  // whole response is internally consistent with whichever day is being
+  // simulated. Real Date() when no simulation is active — see lib/simTime.ts.
+  const simDate = await simNow()
 
   // T-110: surfaced in the System Bar so a paid plan is actually visible
   // somewhere — previously nothing in the UI showed it at all. Also reused
@@ -125,7 +132,7 @@ export async function GET() {
   // first. Separate from the live-scores block's own schedule fetch below —
   // that one's gated behind the live_scores flag and this isn't (the
   // countdown itself doesn't reveal scores, so it stays ungated).
-  const todayEtForDeadline = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date())
+  const todayEtForDeadline = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(simDate)
   const { data: todaysGamesForDeadline } = await supabase
     .from('nfl_schedule')
     .select('home_team, away_team, kickoff_at')
@@ -151,7 +158,7 @@ export async function GET() {
       ])
 
       // Nearest scheduled-but-not-finished draft in this league.
-      const now = Date.now()
+      const now = simDate.getTime()
       for (const draft of drafts) {
         if (draft.status === 'pre_draft' && draft.start_time && draft.start_time > now) {
           deadlines.push({
@@ -261,7 +268,7 @@ export async function GET() {
   let liveScores: LiveGameScore[] = []
   let scoresGated = false
   if (await isFeatureEnabled('live_scores').catch(() => false)) {
-    const todayEt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date())
+    const todayEt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(simDate)
     const { data: todaysGames } = await supabase
       .from('nfl_schedule')
       .select('game_id, home_team, away_team, kickoff_at')

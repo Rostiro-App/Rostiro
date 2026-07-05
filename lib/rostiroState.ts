@@ -14,6 +14,7 @@
 // a small change, not a rewrite.
 
 import { isFeatureEnabled } from '@/lib/featureFlags'
+import { simNow, getForcedState } from '@/lib/simTime'
 import type { RostiroState } from '@/types'
 
 export type { RostiroState }
@@ -179,7 +180,14 @@ export async function getRostiroState(
     return 'standard'
   }
 
-  const now = new Date()
+  // Dev-only Simulation Suite: a direct state override skips the calendar
+  // math below entirely — never reachable in production, since sim_state
+  // only ever has an active row when someone's actively driving the admin
+  // panel (see lib/simTime.ts).
+  const forced = await getForcedState().catch(() => null)
+  if (forced) return forced
+
+  const now = await simNow()
   const { dateKey } = partsInEastern(now)
 
   const { data, error } = await supabaseAdmin
