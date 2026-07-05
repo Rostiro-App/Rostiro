@@ -37,6 +37,20 @@ async function seedLiveGame(
 ): Promise<void> {
   const todayEt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date())
 
+  // nfl_schedule stores team codes in nflverse convention (its own
+  // migration comment: "stored as nflverse provides them"), but every
+  // caller here passes a Sleeper-sourced code (players_cache.nfl_team) —
+  // identical for 31 of 32 teams, but the Rams differ (Sleeper "LAR" vs
+  // nflverse "LA"). Converting here, once, at the shared write boundary,
+  // means every scenario's seeded row is byte-for-byte what a real
+  // nflverse-ingested row would contain — so computeLiveWindow and
+  // detectLineupLockUrgency (both of which correctly compare against a
+  // roster's team converted to nflverse convention) actually match it,
+  // instead of a Rams-rostered starter silently producing a row nothing
+  // else agrees with.
+  const nflverseHome = toNflverseTeamCode(homeTeam)
+  const nflverseAway = toNflverseTeamCode(awayTeam)
+
   // A real NFL team plays at most once on a given date, but different
   // scenarios in this suite each resolve a starter independently and often
   // land on the exact same real team (pickRealStarter/firstStarterWithTeam
@@ -54,7 +68,7 @@ async function seedLiveGame(
     .eq('game_date', todayEt)
     .neq('game_id', gameId)
     .like('game_id', 'SIM-%')
-    .or(`home_team.eq.${homeTeam},away_team.eq.${homeTeam}`)
+    .or(`home_team.eq.${nflverseHome},away_team.eq.${nflverseHome}`)
   const staleIds = ((stale ?? []) as { game_id: string }[]).map((r) => r.game_id)
   if (staleIds.length > 0) {
     await admin.from('live_scores').delete().in('game_id', staleIds)
@@ -67,7 +81,7 @@ async function seedLiveGame(
   }).format(kickoffAt)
 
   const { error: scheduleError } = await admin.from('nfl_schedule').upsert(
-    { game_id: gameId, season: 2026, game_type: 'REG', week: 1, game_date: todayEt, game_time_et: gameTimeEt, home_team: homeTeam, away_team: awayTeam },
+    { game_id: gameId, season: 2026, game_type: 'REG', week: 1, game_date: todayEt, game_time_et: gameTimeEt, home_team: nflverseHome, away_team: nflverseAway },
     { onConflict: 'game_id' }
   )
   if (scheduleError) throw new Error(`nfl_schedule seed failed: ${scheduleError.message}`)
@@ -433,20 +447,11 @@ export async function runMissionCompleteScenario(admin: AdminClient): Promise<{ 
   const starter = await pickRealStarter(admin, league)
   if (!starter || !starter.nflTeam) return { ok: false, note: 'No real starter with a resolvable NFL team found on this roster.' }
 
-  // detectMissionComplete compares the roster's Sleeper team codes (already
-  // converted through toNflverseTeamCode on its side) against
-  // nfl_schedule.home_team/away_team, which nflverse ingestion always
-  // writes in nflverse convention (e.g. Rams = "LA", not Sleeper's "LAR") —
-  // converting here too, rather than writing the raw Sleeper code, so this
-  // scenario can't silently no-op if pickRealStarter happens to land on
-  // one of the two teams whose codes actually differ between the two
-  // conventions (same class of bug T-81 already caught once for real).
-  const nflverseTeam = toNflverseTeamCode(starter.nflTeam)
-
   // -180 real minutes and 'post' — a kickoff far enough in the past that
   // the game reads as long-finished, same ET calendar day for any
-  // reasonable test time.
-  await seedLiveGame(admin, `SIM-MISSION-${league.id}`, nflverseTeam, 'SIM', -180, 'post')
+  // reasonable test time. (seedLiveGame itself converts to nflverse
+  // team-code convention now, so no separate conversion is needed here.)
+  await seedLiveGame(admin, `SIM-MISSION-${league.id}`, starter.nflTeam, 'SIM', -180, 'post')
 
   const todayEt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date())
   await detectMissionComplete(admin, todayEt)

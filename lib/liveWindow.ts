@@ -16,6 +16,7 @@
 
 import { getSleeperRosters } from '@/lib/sleeper'
 import { GAME_DURATION_HOURS } from '@/lib/rostiroState'
+import { toNflverseTeamCode } from '@/lib/liveScores'
 
 // Founder decision (July 5, 2026): LIVE opens 10 minutes before kickoff,
 // NOT rostiroState's 3h PREGAME_RAMP_HOURS — that ramp exists for the
@@ -77,7 +78,13 @@ export async function computeLiveWindow(admin: SupabaseClient, userId: string): 
       .eq('platform', 'sleeper')
       .in('player_id', playerIds)
       .not('nfl_team', 'is', null)
-    for (const row of (cached ?? []) as { nfl_team: string }[]) teamSet.add(row.nfl_team)
+    // players_cache.nfl_team is Sleeper convention; nfl_schedule.home_team/
+    // away_team (checked below) is nflverse convention — identical for 31
+    // of 32 teams, but the Rams differ (Sleeper "LAR" vs nflverse "LA").
+    // Converting here so a Rams-rostered player's game isn't silently
+    // excluded from the window calculation (same class of gap T-90 already
+    // fixed once for detectTouchdownSwings).
+    for (const row of (cached ?? []) as { nfl_team: string }[]) teamSet.add(toNflverseTeamCode(row.nfl_team))
   }
   if (teamSet.size === 0) return { isOpen: false, windowEndsAt: null, nextKickoff: null }
 
