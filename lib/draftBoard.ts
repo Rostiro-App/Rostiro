@@ -156,6 +156,30 @@ export interface RankedPlayer {
   player: ADPPlayer
   isNeeded: boolean
   strategyWeight: number // same scale as getStrategyWeight — 0 when strategy is 'balanced' or no rule applies
+  // Separate from strategyWeight on purpose — see getFormatWeight below.
+  // Kept distinct so Claude's reasoning (lib/claude.ts) never misattributes
+  // a format-driven adjustment to "the stated strategy" when the user
+  // picked Balanced, which has zero position rules of its own.
+  formatWeight: number
+}
+
+// Real bug found live during a real draft (July 6, 2026), pick 1 overall,
+// Balanced strategy, standard single-QB league: Drake Maye showed as the
+// #4 overall recommendation. Root cause confirmed against the actual
+// session's settings_json (isSuperFlex: false) and a direct query against
+// players_cache: Sleeper's search_rank (the ADP proxy — no dedicated ADP
+// endpoint exists, see lib/sleeper.ts) reflects search popularity across
+// ALL of Sleeper, including the large superflex/2QB dynasty population
+// that platform serves — which inflates QB rank sharply versus true
+// single-QB draft value, where even an elite QB1 rarely goes before
+// rounds 3-5. This isn't a sorting bug; it's the underlying data source
+// not knowing which format it's being used for. Fixed with a format-aware
+// baseline, applied under whatever strategy is chosen (so it stacks
+// sensibly with e.g. Late-Round QB, and actually does something for
+// Balanced, which had zero position rules of its own before this).
+function getFormatWeight(position: NFLPosition, round: number, isSuperFlex: boolean): number {
+  if (isSuperFlex || position !== 'QB') return 0
+  return round <= 3 ? -2 : 0
 }
 
 // A flat need-before-filled partition (the original design) can't let a
@@ -175,7 +199,8 @@ export function computeBestAvailable(
   rosterNeeds: Partial<Record<NFLPosition, number>>,
   rosterCounts: Partial<Record<NFLPosition, number>>,
   strategy: DraftStrategy = 'balanced',
-  round = 1
+  round = 1,
+  isSuperFlex = false
 ): RankedPlayer[] {
   const available = pool.filter((p) => !draftedPlayerIds.has(p.playerId))
 
@@ -184,7 +209,8 @@ export function computeBestAvailable(
     const have = rosterCounts[player.position] ?? 0
     const isNeeded = have < need
     const strategyWeight = getStrategyWeight(strategy, player.position, round)
-    return { player, isNeeded, strategyWeight }
+    const formatWeight = getFormatWeight(player.position, round, isSuperFlex)
+    return { player, isNeeded, strategyWeight, formatWeight }
   })
 
   // overallRank, not adpConsensus — the latter (Sleeper's search_rank) has
@@ -192,7 +218,7 @@ export function computeBestAvailable(
   // at "1"), which would otherwise leave tie-breaking to sort() stability
   // rather than the actual overall order.
   const adjustedAdp = (r: RankedPlayer) =>
-    r.player.overallRank - (r.isNeeded ? NEED_ADP_BONUS : 0) - r.strategyWeight * STRATEGY_ADP_UNIT
+    r.player.overallRank - (r.isNeeded ? NEED_ADP_BONUS : 0) - (r.strategyWeight + r.formatWeight) * STRATEGY_ADP_UNIT
 
   return ranked.sort((a, b) => adjustedAdp(a) - adjustedAdp(b))
 }

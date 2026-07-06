@@ -27,6 +27,7 @@ const Body = z.object({
         adp: z.number(),
         isNeeded: z.boolean(),
         strategyWeight: z.number(),
+        formatWeight: z.number(),
       })
     )
     .min(1)

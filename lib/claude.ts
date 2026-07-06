@@ -146,6 +146,12 @@ interface DraftRecommendationCandidate {
   // guess from ADP and a one-line strategy description alone.
   isNeeded: boolean
   strategyWeight: number
+  // Separate from strategyWeight — a real single-QB-league ADP correction
+  // (Sleeper's search_rank proxy skews QB up sharply because it reflects
+  // Sleeper-wide search popularity, including its large superflex/2QB
+  // dynasty population), not something "the stated strategy" did. Kept
+  // distinct so Claude never misattributes it.
+  formatWeight: number
 }
 
 export interface DraftPickRecommendation {
@@ -190,22 +196,26 @@ export async function generateDraftPickRecommendations(
   input: DraftRecommendationsInput
 ): Promise<DraftPickRecommendation[]> {
   const isBalanced = input.strategy === 'balanced'
-  // Per-candidate need/strategy notes, not just ADP — this is what makes
-  // the reasoning "why THIS pick, THIS round, under YOUR strategy" instead
-  // of a generic "good value" blurb that happens to name-drop the
-  // strategy. Suppressed for 'balanced' since every weight is 0 there
-  // (STRATEGY_RULES.balanced = []) — nothing to report.
+  // Per-candidate need/strategy/format notes, not just ADP — this is what
+  // makes the reasoning "why THIS pick, THIS round, under YOUR strategy and
+  // YOUR league's format" instead of a generic "good value" blurb that
+  // happens to name-drop the strategy. The format note is independent of
+  // strategy (applies even when Balanced, which has no rules of its own)
+  // and is deliberately worded so Claude attributes it to the league
+  // format, never to "the stated strategy."
   const candidateList = input.candidates
     .map((c) => {
       const needNote = c.isNeeded ? 'fills an open roster need' : 'not currently a roster need'
-      if (isBalanced) return `- ${c.name} (${c.position}, ADP ${Math.round(c.adp)}, id: ${c.playerId}) — ${needNote}`
-      const weightNote =
-        c.strategyWeight > 0
+      const formatNote = c.formatWeight < 0 ? 'single-QB league format reduces early QB value here, independent of strategy' : null
+      const weightNote = isBalanced
+        ? null
+        : c.strategyWeight > 0
           ? `boosted +${c.strategyWeight} this round by the stated strategy`
           : c.strategyWeight < 0
             ? `deprioritized ${c.strategyWeight} this round by the stated strategy`
             : 'strategy-neutral this round'
-      return `- ${c.name} (${c.position}, ADP ${Math.round(c.adp)}, id: ${c.playerId}) — ${needNote}; ${weightNote}`
+      const notes = [needNote, weightNote, formatNote].filter((n): n is string => n !== null).join('; ')
+      return `- ${c.name} (${c.position}, ADP ${Math.round(c.adp)}, id: ${c.playerId}) — ${notes}`
     })
     .join('\n')
   const rosterList = input.rosterSoFar.length > 0
@@ -225,11 +235,11 @@ export async function generateDraftPickRecommendations(
       format: { type: 'json_schema', schema: RECOMMENDATION_SCHEMA },
     },
     system:
-      `You write short, factual fantasy football draft pick explanations. Use only the ADP numbers, positions, roster, need/strategy notes, and strategy given to you. Never invent stats, injuries, or team needs that were not provided. Ground each explanation in the exact need/strategy note given for that candidate — don't reconstruct a different-sounding rationale. One to two sentences per player. ${toneInstruction(input.mode)}`,
+      `You write short, factual fantasy football draft pick explanations. Use only the ADP numbers, positions, roster, and need/strategy/format notes given to you. Never invent stats, injuries, or team needs that were not provided. Ground each explanation in the exact notes given for that candidate — don't reconstruct a different-sounding rationale, and never attribute a "single-QB league format" note to the drafter's chosen strategy; they are separate things. One to two sentences per player. ${toneInstruction(input.mode)}`,
     messages: [
       {
         role: 'user',
-        content: `It is round ${input.round}, pick ${input.pickNumber} of a live snake draft. The manager's roster so far: ${rosterList}.${strategyContext ? ` ${strategyContext}.` : ''} Here are the best available candidates for their next pick, each with its actual roster-need and draft-strategy signal already computed:\n${candidateList}\n\nFor each candidate, explain in 1-2 sentences why they might be the pick — use their ADP relative to the other candidates, and the exact need/strategy note given for them${strategyContext ? ' (tie it explicitly back to the stated strategy, e.g. why a deprioritized position is still worth considering, or why a boosted one is a strong fit right now)' : ''}.`,
+        content: `It is round ${input.round}, pick ${input.pickNumber} of a live snake draft. The manager's roster so far: ${rosterList}.${strategyContext ? ` ${strategyContext}.` : ''} Here are the best available candidates for their next pick, each with its actual roster-need, draft-strategy, and league-format signal already computed:\n${candidateList}\n\nFor each candidate, explain in 1-2 sentences why they might be the pick — use their ADP relative to the other candidates, and the exact notes given for them${strategyContext ? ' (tie strategy notes explicitly back to the stated strategy, e.g. why a deprioritized position is still worth considering, or why a boosted one is a strong fit right now)' : ''}. If a candidate has a format note (e.g. single-QB league reducing early QB value), explain that as a league-format fact, not a strategy choice.`,
       },
     ],
   })

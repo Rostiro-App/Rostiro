@@ -126,10 +126,11 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
 
   const currentRound = settings ? Math.ceil(currentPickNumber / settings.teamCount) : 1
   const strategy: DraftStrategy = settings?.strategy ?? 'balanced'
+  const isSuperFlex = settings?.scoringSettings?.isSuperFlex ?? false
 
   const bestAvailable = useMemo(
-    () => computeBestAvailable(pool, draftedIds, rosterNeeds, rosterCounts, strategy, currentRound),
-    [pool, draftedIds, rosterNeeds, rosterCounts, strategy, currentRound]
+    () => computeBestAvailable(pool, draftedIds, rosterNeeds, rosterCounts, strategy, currentRound, isSuperFlex),
+    [pool, draftedIds, rosterNeeds, rosterCounts, strategy, currentRound, isSuperFlex]
   )
 
   const queueSet = useMemo(() => new Set(queue), [queue])
@@ -276,10 +277,13 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
         pickNumber: targetPick,
         strategy,
         rosterSoFar: myPicks.map((p) => ({ name: p.playerName, position: p.position })),
-        // isNeeded/strategyWeight are the exact signals computeBestAvailable
-        // already used to rank these candidates — passed through so Claude
-        // explains the real reason a player is here, rather than
-        // reconstructing a plausible-sounding guess from ADP alone.
+        // isNeeded/strategyWeight/formatWeight are the exact signals
+        // computeBestAvailable already used to rank these candidates —
+        // passed through so Claude explains the real reason a player is
+        // here, rather than reconstructing a plausible-sounding guess from
+        // ADP alone. formatWeight is kept separate from strategyWeight so
+        // a single-QB-league adjustment never gets misattributed to "the
+        // stated strategy" (see lib/draftBoard.ts's getFormatWeight).
         candidates: candidates.map((r) => ({
           playerId: r.player.playerId,
           name: r.player.name,
@@ -287,6 +291,7 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
           adp: r.player.overallRank,
           isNeeded: r.isNeeded,
           strategyWeight: r.strategyWeight,
+          formatWeight: r.formatWeight,
         })),
         mode,
       }),
@@ -631,16 +636,22 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
                   <p className="text-sm font-medium text-white truncate">{p.name}</p>
                   <p className="text-xs truncate" style={{ color: 'var(--t3)' }}>{p.position} · {p.nflTeam || 'FA'}</p>
                 </div>
-                {mode !== 'focused' && r.strategyWeight !== 0 && (
+                {mode !== 'focused' && (r.strategyWeight !== 0 || r.formatWeight !== 0) && (
                   <span
                     className="flex-shrink-0 text-xs font-semibold px-1.5 py-0.5 rounded"
                     style={{
-                      backgroundColor: r.strategyWeight > 0 ? 'rgba(67,192,119,.1)' : 'rgba(232,80,74,.1)',
-                      color: r.strategyWeight > 0 ? 'var(--live)' : 'var(--crit)',
+                      backgroundColor: r.strategyWeight + r.formatWeight > 0 ? 'rgba(67,192,119,.1)' : 'rgba(232,80,74,.1)',
+                      color: r.strategyWeight + r.formatWeight > 0 ? 'var(--live)' : 'var(--crit)',
                     }}
-                    title={`${STRATEGY_LABELS[strategy]} is ${r.strategyWeight > 0 ? 'boosting' : 'suppressing'} this pick`}
+                    title={
+                      r.formatWeight !== 0 && r.strategyWeight !== 0
+                        ? `${STRATEGY_LABELS[strategy]} and your single-QB league format are both adjusting this pick`
+                        : r.formatWeight !== 0
+                          ? 'Your single-QB league format is suppressing early QB value'
+                          : `${STRATEGY_LABELS[strategy]} is ${r.strategyWeight > 0 ? 'boosting' : 'suppressing'} this pick`
+                    }
                   >
-                    {r.strategyWeight > 0 ? '↑' : '↓'}
+                    {r.strategyWeight + r.formatWeight > 0 ? '↑' : '↓'}
                   </span>
                 )}
               </div>
