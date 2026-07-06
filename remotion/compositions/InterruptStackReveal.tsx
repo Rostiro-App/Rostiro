@@ -2,6 +2,8 @@ import { AbsoluteFill, interpolate, useCurrentFrame } from 'remotion'
 import { loadFont } from '@remotion/google-fonts/Inter'
 import { COLORS } from '../tokens'
 import { AppFrame } from '../components/AppFrame'
+import { PulseHeader } from '../components/PulseHeader'
+import { PulseCardMock } from '../components/PulseCardMock'
 import { Callout } from '../components/Callout'
 import { cameraStyle } from '../components/camera'
 
@@ -11,9 +13,9 @@ const { fontFamily } = loadFont()
 // the real app shell during Game Day: one persistent slot, not a
 // notification pile. A touchdown_swing event takes the slot, names exactly
 // what happened, holds for the real 7-second AUTO_DISMISS_MS window, then
-// clears itself on its own, unforced. The camera pushes in on the card as
-// it lands, then pulls back out to the full dashboard once it clears,
-// visually completing the idea that the app returns to normal.
+// clears itself on its own, unforced. Rebuilt 2026-07-06 with the real
+// dock icons, System Bar, and PulseHeader/PulseCardMock anatomy after
+// founder review found the first pass approximated all three.
 
 const FPS = 30
 const ENTER_AT = 2 * FPS
@@ -23,9 +25,24 @@ const LEAVE_AT = ENTER_AT + ENTER_FRAMES + HOLD_SECONDS * FPS
 const LEAVE_FRAMES = 10
 
 const RESTING_CARDS = [
-  { tag: 'IMPORTANT', color: COLORS.warn, text: 'Claim Jaylen Warren in League 2. Waiver cutoff 3:00 PM.' },
-  { tag: 'REVIEW', color: COLORS.signal, text: 'Trade pending: your Kupp for their Ekeler. Lean accept.' },
-  { tag: 'WATCH', color: COLORS.textMuted, text: 'Joe Mixon is questionable. Pivot ready: Zach Moss.' },
+  {
+    headline: 'Claim Jaylen Warren in League 2',
+    league: 'Gridiron Co.',
+    platform: 'Yahoo',
+    tag: 'IMPORTANT',
+    tagColor: COLORS.warn,
+    priorityColor: COLORS.warn,
+    reasoning: 'Waiver cutoff 3:00 PM today. $100 of $100 FAAB left.',
+  },
+  {
+    headline: 'Trade pending: your Kupp for their Ekeler',
+    league: 'Dynasty Kings',
+    platform: 'Sleeper',
+    tag: 'REVIEW',
+    tagColor: COLORS.signal,
+    priorityColor: COLORS.signal,
+    reasoning: 'Lean accept, it fixes your RB2 gap.',
+  },
 ]
 
 export const InterruptStackReveal: React.FC = () => {
@@ -54,36 +71,32 @@ export const InterruptStackReveal: React.FC = () => {
     <AbsoluteFill style={{ overflow: 'hidden' }}>
       <div style={{ width: '100%', height: '100%', ...camera }}>
         <AppFrame state="game_day">
-          <div style={{ position: 'relative', width: '100%', height: '100%', fontFamily, padding: '44px 48px' }}>
-            <span style={{ color: COLORS.crit, fontSize: 20, letterSpacing: 3, fontWeight: 700 }}>MISSION CONTROL</span>
-            <h1 style={{ color: COLORS.textPrimary, fontSize: 40, fontWeight: 700, marginTop: 14 }}>
-              Every live game touching your rosters.
-            </h1>
+          <div style={{ position: 'relative', width: '100%', height: '100%', fontFamily, padding: '40px 48px' }}>
+            <PulseHeader
+              state="game_day"
+              greeting="Good afternoon, Lawrence."
+              decisions={4}
+              leagues={3}
+              estMinutes={5}
+              doneToday={1}
+              totalToday={4}
+            />
 
-            <div style={{ marginTop: 32, display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 760 }}>
+            <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 760 }}>
               {RESTING_CARDS.map((c) => (
-                <div
-                  key={c.tag}
-                  style={{
-                    padding: '18px 22px',
-                    borderRadius: 12,
-                    backgroundColor: COLORS.navyCard,
-                    borderLeft: `3px solid ${c.color}`,
-                    opacity: 0.85,
-                  }}
-                >
-                  <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: c.color }}>{c.tag}</span>
-                  <div style={{ color: COLORS.textPrimary, fontSize: 17, marginTop: 6 }}>{c.text}</div>
-                </div>
+                <PulseCardMock key={c.headline} {...c} />
               ))}
             </div>
 
-            {/* The interrupt card itself, overlaying the resting feed exactly
-                like the real product's single always-on-top slot. */}
+            {/* The interrupt card itself — real InterruptStack.tsx anatomy:
+                glass-heavy, 2.5px colored left border, mono type label, no
+                Done/Snooze (it's transient, not a queue item), overlaying
+                the resting feed exactly like the real product's single
+                always-on-top slot. */}
             <div
               style={{
                 position: 'absolute',
-                top: 210,
+                top: 200,
                 left: 900,
                 transform: `translateY(${cardY}px)`,
                 opacity: cardVisibility,
@@ -106,7 +119,7 @@ export const InterruptStackReveal: React.FC = () => {
 
             <Callout
               x={1180}
-              y={200}
+              y={170}
               side="above"
               width={420}
               appearAt={ENTER_AT + ENTER_FRAMES + 20}

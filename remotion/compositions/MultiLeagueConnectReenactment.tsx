@@ -2,6 +2,8 @@ import { AbsoluteFill, interpolate, useCurrentFrame } from 'remotion'
 import { loadFont } from '@remotion/google-fonts/Inter'
 import { COLORS } from '../tokens'
 import { AppFrame } from '../components/AppFrame'
+import { PulseHeader } from '../components/PulseHeader'
+import { PulseCardMock } from '../components/PulseCardMock'
 import { Callout } from '../components/Callout'
 import { cameraStyle } from '../components/camera'
 
@@ -30,9 +32,33 @@ const PLATFORMS = [
 const PULSE_AT = 12 * FPS
 
 const PULSE_ITEMS = [
-  { league: 'Sleeper', text: 'Bench Diggs, 2 leagues. 31mph winds at kickoff.' },
-  { league: 'Yahoo', text: 'Claim Jaylen Warren. Cutoff 3:00 PM.' },
-  { league: 'ESPN', text: 'Trade pending: Kupp for Ekeler. Lean accept.' },
+  {
+    headline: 'Bench Diggs, 2 leagues',
+    league: 'Dynasty Kings',
+    platform: 'Sleeper',
+    tag: 'WEATHER',
+    tagColor: COLORS.warn,
+    priorityColor: COLORS.crit,
+    reasoning: '31mph winds in Buffalo at kickoff.',
+  },
+  {
+    headline: 'Claim Jaylen Warren',
+    league: 'Gridiron Co.',
+    platform: 'Yahoo',
+    tag: 'WAIVER',
+    tagColor: COLORS.live,
+    priorityColor: COLORS.warn,
+    reasoning: 'Cutoff 3:00 PM today.',
+  },
+  {
+    headline: 'Trade pending: Kupp for Ekeler',
+    league: 'The League',
+    platform: 'ESPN',
+    tag: 'REVIEW',
+    tagColor: COLORS.signal,
+    priorityColor: COLORS.signal,
+    reasoning: 'Lean accept, it fixes your RB2 gap.',
+  },
 ]
 
 export const MultiLeagueConnectReenactment: React.FC = () => {
@@ -140,30 +166,19 @@ export const MultiLeagueConnectReenactment: React.FC = () => {
         {showPulse && (
           <AbsoluteFill style={{ opacity: pulseOpacity }}>
             <AppFrame state="standard" modeLabel="BALANCED">
-              <div style={{ position: 'relative', width: '100%', height: '100%', fontFamily, padding: '44px 48px' }}>
-                <span style={{ color: COLORS.signal, fontSize: 20, letterSpacing: 3, fontWeight: 700 }}>PULSE</span>
-                <h1 style={{ color: COLORS.textPrimary, fontSize: 40, fontWeight: 700, marginTop: 12 }}>
-                  Three leagues, one morning list.
-                </h1>
-                <div style={{ marginTop: 32, display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 820 }}>
+              <div style={{ position: 'relative', width: '100%', height: '100%', fontFamily, padding: '40px 48px' }}>
+                <PulseHeader
+                  state="standard"
+                  greeting="Good morning, Lawrence."
+                  decisions={3}
+                  leagues={3}
+                  estMinutes={4}
+                  doneToday={0}
+                  totalToday={3}
+                />
+                <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 820 }}>
                   {PULSE_ITEMS.map((item) => (
-                    <div
-                      key={item.league}
-                      style={{
-                        padding: '20px 26px',
-                        borderRadius: 14,
-                        backgroundColor: COLORS.navyCard,
-                        borderLeft: `4px solid ${COLORS.signal}`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 18,
-                      }}
-                    >
-                      <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.signal, letterSpacing: 1, minWidth: 80 }}>
-                        {item.league.toUpperCase()}
-                      </span>
-                      <span style={{ color: COLORS.textPrimary, fontSize: 19 }}>{item.text}</span>
-                    </div>
+                    <PulseCardMock key={item.headline} {...item} />
                   ))}
                 </div>
 
