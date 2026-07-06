@@ -16,11 +16,25 @@ export default function PublicHeader() {
       </Link>
       <div className="flex items-center gap-2 md:gap-3">
         <Link
+          href="/features"
+          className="hidden sm:block text-sm font-medium px-3 py-1.5 rounded-lg transition-colors hover:opacity-80"
+          style={{ color: 'var(--t2)' }}
+        >
+          Features
+        </Link>
+        <Link
           href="/draft"
           className="hidden sm:block text-sm font-medium px-3 py-1.5 rounded-lg transition-colors hover:opacity-80"
           style={{ color: 'var(--t2)' }}
         >
           Draft Kit
+        </Link>
+        <Link
+          href="/faq"
+          className="hidden md:block text-sm font-medium px-3 py-1.5 rounded-lg transition-colors hover:opacity-80"
+          style={{ color: 'var(--t2)' }}
+        >
+          FAQ
         </Link>
         <Link
           href="/login"

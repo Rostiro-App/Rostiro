@@ -93,6 +93,13 @@ export default function SignupPage() {
             >
               {loading ? 'Creating account...' : 'Create free account →'}
             </button>
+
+            <p className="text-xs mt-3 text-center leading-relaxed" style={{ color: 'var(--t4)' }}>
+              By creating an account, you agree to Rostiro&apos;s{' '}
+              <Link href="/terms" className="underline" style={{ color: 'var(--t3)' }}>Terms of Service</Link>
+              {' '}and{' '}
+              <Link href="/privacy" className="underline" style={{ color: 'var(--t3)' }}>Privacy Policy</Link>.
+            </p>
           </form>
         </div>
 

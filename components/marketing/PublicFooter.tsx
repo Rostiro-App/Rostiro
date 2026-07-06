@@ -16,10 +16,13 @@ export default function PublicFooter() {
           <p className="text-sm" style={{ color: 'var(--t3)' }}>Run Every League.</p>
         </div>
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm" style={{ color: 'var(--t2)' }}>
+          <Link href="/features" className="transition-colors hover:opacity-80">Features</Link>
           <Link href="/draft" className="transition-colors hover:opacity-80">Draft Kit</Link>
+          <Link href="/faq" className="transition-colors hover:opacity-80">FAQ</Link>
           <Link href="/login" className="transition-colors hover:opacity-80">Sign in</Link>
           <Link href="/signup" className="transition-colors hover:opacity-80">Get started</Link>
           <Link href="/privacy" className="transition-colors hover:opacity-80">Privacy</Link>
+          <Link href="/terms" className="transition-colors hover:opacity-80">Terms</Link>
         </div>
       </div>
       <p className="max-w-5xl mx-auto mt-8 text-xs" style={{ color: 'var(--t4)' }}>
