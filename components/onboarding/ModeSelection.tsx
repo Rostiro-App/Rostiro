@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { browserClient } from '@/lib/supabase-browser'
 
 type Mode = 'focused' | 'balanced' | 'savant'
 
@@ -33,10 +34,31 @@ const MODES = [
 
 export default function ModeSelection({ onContinue }: { onContinue: (mode: Mode) => void }) {
   const [selected, setSelected] = useState<Mode>('balanced')
+  // T-123: captured here (post-email-confirmation, since onboarding only
+  // runs after that per the signup redirect) rather than on the signup
+  // form itself — asking for a name before someone has even confirmed
+  // their email adds friction to the step most likely to lose them.
+  // Written to Supabase Auth's own user_metadata.full_name, which
+  // app/api/pulse/sleeper/route.ts already reads for the Pulse greeting —
+  // that plumbing existed, nothing was ever collecting the name for it.
+  const [name, setName] = useState('')
+  const [saving, setSaving] = useState(false)
 
-  function handleContinue() {
+  async function handleContinue() {
     if (typeof window !== 'undefined') {
       localStorage.setItem('rostiro_mode', selected)
+    }
+    const trimmed = name.trim()
+    if (trimmed) {
+      setSaving(true)
+      try {
+        await browserClient.auth.updateUser({ data: { full_name: trimmed } })
+      } catch {
+        // Non-critical — the greeting just falls back to name-less phrasing
+        // if this fails, never blocks onboarding on it.
+      } finally {
+        setSaving(false)
+      }
     }
     onContinue(selected)
   }
@@ -57,6 +79,29 @@ export default function ModeSelection({ onContinue }: { onContinue: (mode: Mode)
             <p className="text-sm" style={{ color: 'var(--t2)' }}>
               This shapes every screen. You can change it anytime.
             </p>
+          </div>
+
+          {/* T-123: name capture — optional, single first-name field. Not
+              gated on it; Continue works either way, the greeting just
+              stays name-less if skipped. */}
+          <div className="max-w-xs mx-auto mb-10">
+            <label htmlFor="onboarding-name" className="block text-xs font-medium mb-2 text-center" style={{ color: 'var(--t2)' }}>
+              What should we call you?
+            </label>
+            <input
+              id="onboarding-name"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="First name"
+              maxLength={40}
+              className="w-full text-center text-sm rounded-xl px-4 py-2.5 focus:outline-none"
+              style={{
+                backgroundColor: 'rgba(8, 15, 26, 0.6)',
+                border: '1.5px solid var(--hairline)',
+                color: 'white',
+              }}
+            />
           </div>
 
           {/* Mode cards */}
@@ -124,10 +169,11 @@ export default function ModeSelection({ onContinue }: { onContinue: (mode: Mode)
           <div className="flex flex-col items-center gap-3">
             <button
               onClick={handleContinue}
-              className="w-full sm:w-72 py-3.5 rounded-xl font-semibold text-sm text-white transition-all duration-200 hover:brightness-110"
+              disabled={saving}
+              className="w-full sm:w-72 py-3.5 rounded-xl font-semibold text-sm text-white transition-all duration-200 hover:brightness-110 disabled:opacity-60"
               style={{ backgroundColor: 'var(--signal)' }}
             >
-              Continue →
+              {saving ? 'Saving…' : 'Continue →'}
             </button>
             <p className="text-xs" style={{ color: 'var(--t3)' }}>
               Free for 7 days — no card required.

@@ -30,6 +30,13 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  // T-123: name lives on Supabase Auth's own user_metadata, not the public
+  // users table — same field app/api/pulse/sleeper/route.ts already reads
+  // for the Pulse greeting, kept as the one source of truth rather than
+  // duplicating it onto a users.name column.
+  const meta = (user.user_metadata ?? {}) as Record<string, unknown>
+  const fullName = typeof meta.full_name === 'string' ? meta.full_name : null
+
   const [{ data: profile, error: profileError }, { data: leagues, error: leaguesError }] = await Promise.all([
     supabase
       .from('users')
@@ -82,6 +89,7 @@ export async function GET() {
 
   return NextResponse.json({
     email: row.email,
+    fullName,
     plan: row.plan,
     pushEnabled: row.push_enabled,
     mode: modeAvailable ? row.mode : null,

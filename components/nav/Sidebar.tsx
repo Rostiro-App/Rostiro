@@ -85,6 +85,19 @@ const SETTINGS_ITEM = {
   ),
 }
 
+// T-126: Profile — the identity/billing/log-out hub, deliberately distinct
+// from Settings' granular config.
+const PROFILE_ITEM = {
+  href: '/profile',
+  label: 'Profile',
+  icon: (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  ),
+}
+
 function DockTip({ children }: { children: React.ReactNode }) {
   return (
     <span
@@ -186,6 +199,18 @@ export default function Sidebar() {
       </span>
 
       <span className="flex-1" />
+
+      <span className="relative group">
+        <Link
+          href={PROFILE_ITEM.href}
+          aria-label="Profile"
+          className="flex items-center justify-center w-9 h-9 rounded-[10px] transition-all hover:bg-[rgba(75,163,245,0.07)]"
+          style={dockItemStyle(pathname.startsWith('/profile'))}
+        >
+          {PROFILE_ITEM.icon}
+        </Link>
+        <DockTip>Profile</DockTip>
+      </span>
 
       <span className="relative group">
         <Link

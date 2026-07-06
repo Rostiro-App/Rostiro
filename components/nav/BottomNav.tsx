@@ -50,6 +50,7 @@ const NAV_ITEMS = [
 const MORE_ITEMS = [
   { href: '/lineup', label: 'Lineups' },
   { href: '/trades', label: 'Trades' },
+  { href: '/profile', label: 'Profile' },
   { href: '/settings', label: 'Settings' },
 ]
 
