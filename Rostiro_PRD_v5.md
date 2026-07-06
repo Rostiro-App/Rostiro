@@ -1029,8 +1029,6 @@ Every remaining task (T-73 onward) sits in exactly one of these phases or the de
 - T-100 Engagement telemetry instrumentation
 
 **Deferred — bigger, standalone, real runway before they're needed:**
-- T-101 Live Fantasy Matchup Scoring — already flagged as needing its own design pass; comparable in size to T-81's original backend, not a slot-in.
-- T-89 Player Intelligence Card — a whole new UI surface, not required for states/pricing/launch to function.
 - T-88 ESPN native projections wiring — nice-to-have parity feature, no user-facing gap without it yet.
 - T-83 Playoffs/Championship theming — irrelevant until weeks 15–17, no reason to touch before December.
 - (Carried forward from earlier sessions, unchanged: T-74 pending the marketing-design pass, T-77 post-launch by design, T-98 and T-111 per their own entries.)
@@ -1102,7 +1100,7 @@ Additional tasks from v5.2 (Stats/Projections/Commentary data sources, Player In
 |---|---|
 | T-87 | ✓ **Done.** nflverse ingestion — real gap found and solved: nflverse's `snap_counts` release has no Sleeper player id, only a Pro-Football-Reference id. Verified join chain, not guessed: `pfr_player_id` → nflverse's own `players.csv` crosswalk → `gsis_id` → Sleeper's raw `/players/nfl` payload (confirmed live to carry `gsis_id` per player) → our canonical `sleeper_id`. New `lib/nflverseUsage.ts` resolves this once per sync using data the daily players cron already fetches (no second Sleeper API call); new `player_usage_snapshots` table (`migration_player_usage.sql`). Verified against real 2025 data (2026's file doesn't exist yet — season hasn't started): 1,434 rows resolved for week 1, spot-checked against Sleeper directly (player_id 4984 = Josh Allen, QB, BUF, 100% offense snaps week 1 — correct). Confirmed 2026 gracefully returns empty rather than erroring. |
 | T-88 | ESPN native projections wiring — surface `statSourceId: 1` from already-fetched roster/player-pool responses (no new API call, data is already in hand from `getEspnRosters`/waiver-pool fetches once those are wired per 5.2's engineering note); verify Yahoo/Sleeper equivalents before assuming parity. |
-| T-89 | Player Intelligence Card — ⌘K result becomes a full card (availability/usage/snap/projection/trend/context), reprioritized by active Rostiro State, reusing `/api/draft/players` for lookup. |
+| T-89 | ✓ **Done** — status corrected July 6, 2026 (was stale: this table and the §12 deferred list both still said "not required for launch," but the card has been built and wired for several sessions). `components/players/PlayerIntelligenceCard.tsx` + `/api/players/[playerId]/intelligence` — availability/usage/snap/projection/trend/context, opened via the shared `openPlayerCard()` trigger (`lib/openPlayerCard.ts`) now wired into every player-name surface in the app (T-118): ⌘K, Draft Kit, Lineups, Pulse, Trades, the live draft session, System Bar/Pulse's Live Now line, and the LIVE tab. |
 
 Additional tasks from v5.3 (Game Day Engagement System, Per-State Visual Language — see 6.12, 6.13):
 
@@ -1134,7 +1132,7 @@ Additional task from v5.6 (UX Behavior Spec, Live Fantasy Matchup Scoring — se
 
 | Task | Description |
 |---|---|
-| T-101 | Live Fantasy Matchup Scoring — a real per-player live stat feed (new data source, beyond T-81's team-level scoreboard), a scoring engine against each league's existing `ScoringSettings`, Sleeper matchup-by-week pairing, and live aggregation of active starters into a team total for both sides of the matchup. Standalone build, comparable in size to T-81's original backend — needs its own design pass before implementation. |
+| T-101 | ◐ **Mostly done — status corrected July 6, 2026.** This table still said "needs its own design pass" but the LIVE tab build session (which mislabeled its own code comments "T-111" — a real numbering collision with the actual T-111, Full Founder Recognition, below; not fixed retroactively across every comment, but noted here so the two are never confused again) already delivered nearly all of this: per-player live stat feed (`lib/liveMatchupPoints.ts`), a scoring engine against each league's real `ScoringSettings` (`lib/scoring.ts`, T-116), Sleeper matchup-by-week pairing and live starter aggregation into a team total for both sides (`lib/liveRoster.ts`'s `matchups`), all surfaced on `/live`. What's still genuinely missing: this lives only on the LIVE tab, not on Pulse's own matchup framing or the System Bar; ESPN/Yahoo aren't wired (Sleeper-only, same as the rest of LIVE). |
 
 Additional tasks from `Rostiro_Behavior_Wiring_Plan.md` — recommended build sequence, in order:
 
