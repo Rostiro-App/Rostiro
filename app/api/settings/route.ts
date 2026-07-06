@@ -37,7 +37,7 @@ export async function GET() {
   const meta = (user.user_metadata ?? {}) as Record<string, unknown>
   const fullName = typeof meta.full_name === 'string' ? meta.full_name : null
 
-  const [{ data: profile, error: profileError }, { data: leagues, error: leaguesError }] = await Promise.all([
+  const [{ data: profile, error: profileError }, { data: leagues, error: leaguesError }, { data: founderRow, error: founderError }] = await Promise.all([
     supabase
       .from('users')
       .select('email, plan, push_enabled, mode, seen_hints, created_at')
@@ -48,7 +48,17 @@ export async function GET() {
       .select('id, platform, league_name, waiver_cutoff_day, waiver_cutoff_hour')
       .eq('user_id', user.id)
       .order('created_at', { ascending: true }),
+    // T-111: queried separately from the profile select above rather than
+    // folded into it — a single undefined column fails the whole select,
+    // and this one comes from its own independent migration
+    // (migration_founder_recognition.sql), so it needs to degrade on its
+    // own rather than compounding the existing mode/seen_hints fallback.
+    supabase.from('users').select('founding_number').eq('id', user.id).maybeSingle(),
   ])
+
+  const foundingNumber = founderError?.code === '42703' || founderError?.code === 'PGRST204'
+    ? null
+    : (founderRow as { founding_number: number | null } | null)?.founding_number ?? null
 
   // T-107: migration_waiver_cutoff.sql not run yet — retry without the two
   // new columns so the rest of Settings (and league list) still works.
@@ -91,6 +101,7 @@ export async function GET() {
     email: row.email,
     fullName,
     plan: row.plan,
+    foundingNumber,
     pushEnabled: row.push_enabled,
     mode: modeAvailable ? row.mode : null,
     seenHints: (row as { seen_hints?: string[] }).seen_hints ?? [],

@@ -18,6 +18,7 @@ interface ProfileData {
   email: string
   fullName: string | null
   plan: string
+  foundingNumber: number | null
   createdAt: string
 }
 
@@ -35,6 +36,9 @@ export default function ProfilePage() {
   const [name, setName] = useState('')
   const [editingName, setEditingName] = useState(false)
   const [savingName, setSavingName] = useState(false)
+  const [feedback, setFeedback] = useState('')
+  const [sendingFeedback, setSendingFeedback] = useState(false)
+  const [feedbackSent, setFeedbackSent] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -69,6 +73,28 @@ export default function ProfilePage() {
       setTimeout(() => setError(null), 4000)
     } finally {
       setSavingName(false)
+    }
+  }
+
+  async function sendFeedback() {
+    const trimmed = feedback.trim()
+    if (!trimmed) return
+    setSendingFeedback(true)
+    try {
+      const res = await fetch('/api/founder/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: trimmed }),
+      })
+      if (!res.ok) throw new Error()
+      setFeedback('')
+      setFeedbackSent(true)
+      setTimeout(() => setFeedbackSent(false), 4000)
+    } catch {
+      setError('Could not send feedback — try again.')
+      setTimeout(() => setError(null), 4000)
+    } finally {
+      setSendingFeedback(false)
     }
   }
 
@@ -182,6 +208,70 @@ export default function ProfilePage() {
             Billing management arrives with Stripe checkout (T-85) — nothing to manage yet on the Free plan.
           </p>
         </Section>
+
+        {/* T-111: Founding 500 recognition — visible only to actual Founders
+            (plan === 'commissioner'), not a generic upsell panel. */}
+        {data.plan === 'commissioner' && (
+          <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(245,200,66,0.06)', border: '1px solid rgba(245,200,66,0.35)' }}>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-semibold tracking-widest uppercase" style={{ color: '#F5C842' }}>
+                Founding 500
+              </p>
+              <span
+                className="text-[10px] font-bold tracking-wider px-2 py-1 rounded"
+                style={{ backgroundColor: '#F5C842', color: '#0D0800' }}
+              >
+                ★ FOUNDER
+              </span>
+            </div>
+
+            <p className="text-sm text-white">
+              {data.foundingNumber ? `Founding Member #${data.foundingNumber} of 500` : 'Founding Member — number assigning soon'}
+            </p>
+
+            <ul className="mt-3 space-y-1.5 text-xs" style={{ color: 'var(--t2)' }}>
+              <li>✓ Lifetime access, locked in for good</li>
+              <li>✓ Priority feedback access (below)</li>
+              <li style={{ color: 'var(--t4)' }}>○ Early feature previews — coming soon</li>
+            </ul>
+
+            <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(245,200,66,0.2)' }}>
+              <p className="text-xs font-medium mb-2" style={{ color: 'var(--t2)' }}>Send feedback directly</p>
+              <textarea
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                placeholder="What's working, what isn't, what you want built next..."
+                rows={3}
+                maxLength={2000}
+                className="w-full text-sm rounded-lg px-3 py-2.5 focus:outline-none resize-none"
+                style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', border: '1.5px solid var(--hairline)', color: 'white' }}
+              />
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-xs" style={{ color: feedbackSent ? 'var(--live)' : 'var(--t4)' }}>
+                  {feedbackSent ? 'Sent — thank you.' : 'Goes straight to the founder, flagged as priority.'}
+                </span>
+                <button
+                  onClick={sendFeedback}
+                  disabled={sendingFeedback || !feedback.trim()}
+                  className="text-xs font-semibold px-3 py-2 rounded-lg disabled:opacity-50 flex-shrink-0"
+                  style={{ backgroundColor: '#F5C842', color: '#0D0800' }}
+                >
+                  {sendingFeedback ? 'Sending…' : 'Send'}
+                </button>
+              </div>
+
+              {/* External real-time channel — no live link yet, so this
+                  stays an honest placeholder rather than a fake URL. */}
+              <div
+                className="mt-3 flex items-center justify-between text-xs px-3 py-2.5 rounded-lg"
+                style={{ backgroundColor: 'rgba(8, 15, 26, 0.4)', border: '1px dashed var(--hairline)', color: 'var(--t4)' }}
+              >
+                <span>Founders community channel</span>
+                <span>Coming soon</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         <Section title="Session">
           <form action="/api/auth/signout" method="POST">
