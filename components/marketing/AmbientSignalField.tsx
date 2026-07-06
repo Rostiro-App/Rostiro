@@ -1,23 +1,28 @@
 // T-124 revision ("Living Signal Field"): homepage hero ambient background.
-// Two deliberately abstract layers, nothing legible — founder flagged a
-// literal ticker (real player names/stats) as intimidating to a first-time
-// casual visitor, the exact audience the hero has to not scare off.
+// Two deliberately abstract-ish layers:
 //
 // Layer 1: oversized, heavily blurred pulse-waveform strips (the same
 // heartbeat envelope shape as components/PulseMark.tsx, scaled way up),
-// drifting slowly — the "Bloomberg line-chart" and "the system is alive"
-// feeling, expressed as pure motion, never as data to read.
-// Layer 2: a handful of sparse floating single-word tag pills, using the
-// real product's own Pulse card vocabulary (TYPE_CONFIG's labels in
-// app/(dashboard)/pulse/page.tsx) so it's honest foreshadowing rather than
-// invented decoration — but only ever 2-3 visible at once, fading in and
-// out on staggered cycles, never a dense scrolling row.
+// drifting slowly — the "Bloomberg line-chart, the system is alive"
+// feeling, expressed as pure motion.
 //
-// No JS, no client component needed — everything here is static markup
-// driven entirely by CSS animations (globals.css's .signal-wave /
-// .tag-pill-float), so it renders once on the server with zero hydration
-// cost and respects prefers-reduced-motion for free via the same block
-// every other ambient animation on the site already uses.
+// Layer 2, second revision: modeled directly on keyboardkarate.io's own
+// hero (the founder's other product) — glass pills that type themselves
+// out character-by-character with a blinking cursor, not static text.
+// Content is short, real product moments (Pulse, Co-Pilot Signal, Waiver
+// Day, Game Day, Film Room), each colored by that feature/state's real
+// accent from STATE_CONFIG, so it's honest foreshadowing rather than
+// invented decoration. Kept deliberately sparser and shorter-line than
+// keyboardkarate's denser 2-3 line pills — founder's explicit concern is
+// not overwhelming a first-time casual visitor with anything that reads
+// as stats to parse, so these are short phrases, never numbers-heavy.
+//
+// No client JS: the typewriter reveal is pure CSS (an overflow-hidden
+// span animating width in `ch` units with steps(N), globals.css's
+// .type-reveal-text), so this renders once on the server with zero
+// hydration cost and respects prefers-reduced-motion for free.
+
+import { STATE_CONFIG } from '@/lib/brandTokens'
 
 const WAVE_PATH =
   'M0,100 L120,100 L150,60 L180,140 L210,20 L240,160 L270,100 L420,100 ' +
@@ -25,12 +30,12 @@ const WAVE_PATH =
   'L750,60 L780,140 L810,20 L840,160 L870,100 L1020,100 ' +
   'L1050,60 L1080,140 L1110,20 L1140,160 L1170,100 L1400,100'
 
-const TAG_PILLS = [
-  { label: 'WAIVER', color: 'var(--live)', top: '12%', left: '8%', duration: '17s', delay: '0s' },
-  { label: 'TOUCHDOWN', color: 'var(--live)', top: '68%', left: '82%', duration: '19s', delay: '4s' },
-  { label: 'TRADE', color: 'var(--signal)', top: '78%', left: '14%', duration: '15s', delay: '8s' },
-  { label: 'INJURY', color: 'var(--crit)', top: '20%', left: '86%', duration: '18s', delay: '11s' },
-  { label: 'REVIEW', color: 'var(--signal)', top: '45%', left: '90%', duration: '16s', delay: '2s' },
+const SIGNAL_PILLS = [
+  { text: 'Bench Diggs, 2 leagues', color: STATE_CONFIG.standard.color, top: '10%', left: '6%', duration: '17s', delay: '0s' },
+  { text: 'Co-Pilot: value pick available', color: STATE_CONFIG.draft.color, top: '70%', left: '78%', duration: '19s', delay: '5s' },
+  { text: 'Claim Warren, cutoff 3PM', color: STATE_CONFIG.waiver_day.color, top: '76%', left: '10%', duration: '15s', delay: '9s' },
+  { text: 'BUF 14–KC 10, Allen live', color: STATE_CONFIG.game_day.color, top: '16%', left: '82%', duration: '18s', delay: '3s' },
+  { text: 'Week 3 recap: buy-low signal', color: STATE_CONFIG.film_room.color, top: '46%', left: '88%', duration: '16s', delay: '12s' },
 ]
 
 export default function AmbientSignalField({ accent }: { accent: string }) {
@@ -54,25 +59,32 @@ export default function AmbientSignalField({ accent }: { accent: string }) {
         <path d={WAVE_PATH} fill="none" stroke={accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
 
-      {/* Layer 2: sparse floating tag pills — real product vocabulary,
-          never more than a couple visible at once. */}
-      {TAG_PILLS.map((p) => (
+      {/* Layer 2: sparse floating "typing" pills — keyboardkarate.io-style,
+          real product vocabulary, never more than 2-3 visible at once. */}
+      {SIGNAL_PILLS.map((p) => (
         <span
-          key={p.label}
-          className="tag-pill-float mono-data absolute text-[11px] tracking-[0.14em] px-3 py-1 rounded-full"
+          key={p.text}
+          className="tag-pill-float mono-data absolute text-[12px] px-3 py-1.5 rounded-lg"
           style={
             {
               top: p.top,
               left: p.left,
               color: p.color,
-              border: `1px solid ${p.color}`,
-              backgroundColor: 'rgba(8,15,26,0.4)',
+              border: `1px solid ${p.color}66`,
+              backgroundColor: 'rgba(8,15,26,0.55)',
               '--pill-duration': p.duration,
               '--pill-delay': p.delay,
             } as React.CSSProperties
           }
         >
-          {p.label}
+          {'✓ '}
+          <span
+            className="type-reveal-text"
+            style={{ '--type-width': `${p.text.length}ch`, '--type-steps': p.text.length } as React.CSSProperties}
+          >
+            {p.text}
+          </span>
+          <span className="type-cursor">|</span>
         </span>
       ))}
     </div>
