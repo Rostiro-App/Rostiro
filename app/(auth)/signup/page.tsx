@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { browserClient } from '@/lib/supabase-browser'
 import Link from 'next/link'
+import AmbientStateSweep from '@/components/AmbientStateSweep'
 
 export default function SignupPage() {
   const [email, setEmail] = useState('')
@@ -35,8 +36,9 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: 'var(--void)' }}>
-      <div className="w-full max-w-sm">
+    <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: 'var(--void)', position: 'relative' }}>
+      <AmbientStateSweep />
+      <div className="w-full max-w-sm" style={{ position: 'relative', zIndex: 1 }}>
 
         <div className="mb-8 text-center">
           <p className="text-xs font-semibold tracking-[0.2em] uppercase mb-3" style={{ color: 'var(--signal)' }}>

@@ -177,6 +177,28 @@ body {
 }
 .type-cursor { animation: cursor-blink 0.9s step-end infinite; }
 
+/* T-124-adjacent: auth screens (login/signup) were flat var(--void) with
+   zero texture, unlike every other page on the site. Founder's own idea —
+   a slow ambient wash cycling through all five real Rostiro States'
+   colors, not just blue, as a literal answer to "the various states of
+   the OS throughout the fantasy week." Deliberately much calmer than the
+   marketing hero's motion: no pills, no ticker vocabulary, a single slow
+   sequential crossfade between five blurred solid-color blobs stacked in
+   the same position (same staggered-delay technique as the hero's
+   tag-pill-float, just five-way and much slower) — this is a task screen
+   (typing a password), not a selling moment. */
+@keyframes state-sweep-cycle {
+  0% { opacity: 0; }
+  6% { opacity: 1; }
+  20% { opacity: 1; }
+  27% { opacity: 0; }
+  100% { opacity: 0; }
+}
+.state-sweep-blob {
+  animation: state-sweep-cycle var(--sweep-duration, 80s) ease-in-out infinite;
+  animation-delay: var(--sweep-delay, 0s);
+}
+
 /* ═══ Live-state animations ═══ */
 @keyframes rostiro-ping {
   0% { transform: scale(1); opacity: 0.9; }
@@ -372,6 +394,10 @@ body {
     animation: none;
   }
   .type-cursor {
+    animation: none;
+    opacity: 0;
+  }
+  .state-sweep-blob {
     animation: none;
     opacity: 0;
   }
