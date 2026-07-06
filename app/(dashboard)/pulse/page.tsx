@@ -14,6 +14,7 @@ import { useMode, type Mode } from '@/components/nav/AppShell'
 import { STATE_CONFIG } from '@/lib/brandTokens'
 import { useGameDayKickoffTransition } from '@/lib/gameDayTransition'
 import { useFocusTrap } from '@/lib/useFocusTrap'
+import HintAnchor from '@/components/hints/HintAnchor'
 import type { LiveGameScore, PulseItem, PulseItemType, PulsePriority, RostiroState } from '@/types'
 
 // ─── Priority + type config ────────────────────────────────────────────────────
@@ -482,13 +483,14 @@ export default function PulsePage() {
       )}
       {!loading && items.length > 0 && (
         <div className={mode === 'balanced' ? 'space-y-3' : 'space-y-2'}>
-          {displayItems.map((item) => (
+          {displayItems.map((item, index) => (
             <PulseCard
               key={item.id}
               item={item}
               mode={mode}
               isLeaving={leaving.has(item.id)}
               isReprioritized={isMissionBriefing && item.type === 'waiver_alert'}
+              isFirst={index === 0}
               onOpen={() => setDetail(item)}
               onAction={persistent ? handleAction : null}
             />
@@ -533,6 +535,7 @@ function PulseCard({
   mode,
   isLeaving,
   isReprioritized,
+  isFirst,
   onOpen,
   onAction,
 }: {
@@ -540,6 +543,7 @@ function PulseCard({
   mode: Mode
   isLeaving: boolean
   isReprioritized: boolean
+  isFirst: boolean
   onOpen: () => void
   onAction: ActionHandler
 }) {
@@ -611,7 +615,7 @@ function PulseCard({
             </span>
           )}
         </div>
-        <ActionRow item={item} onAction={onAction} />
+        <ActionRow item={item} onAction={onAction} isFirst={isFirst} />
       </div>
     </article>
   )
@@ -623,9 +627,9 @@ function leagueLabel(item: PulseItem): string {
 }
 
 // Done / Snooze / Dismiss — hidden entirely in live-only mode (onAction null)
-function ActionRow({ item, onAction }: { item: PulseItem; onAction: ActionHandler }) {
+function ActionRow({ item, onAction, isFirst }: { item: PulseItem; onAction: ActionHandler; isFirst: boolean }) {
   if (!onAction) return null
-  return (
+  const row = (
     <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
       <button
         onClick={() => onAction(item, 'done')}
@@ -651,6 +655,10 @@ function ActionRow({ item, onAction }: { item: PulseItem; onAction: ActionHandle
       </button>
     </div>
   )
+  // T-72: coach mark anchored to only the first card's action row — every
+  // row shares the same `pulse-actions` hint id, so anchoring all of them
+  // would show the popover on every card at once.
+  return isFirst ? <HintAnchor id="pulse-actions">{row}</HintAnchor> : row
 }
 
 // ─── Detail drawer — glass layer over the receded queue ──────────────────────

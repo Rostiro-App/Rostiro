@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { setGlobalMode, useMode, type Mode } from '@/components/nav/AppShell'
 import { bigAnimationsEnabled, setBigAnimationsEnabled } from '@/lib/animationPrefs'
+import { useHints } from '@/components/hints/HintProvider'
 
 interface SettingsData {
   email: string
@@ -51,6 +52,7 @@ const MODES: Array<{ id: Mode; label: string; tagline: string }> = [
 export default function SettingsPage() {
   const router = useRouter()
   const mode = useMode()
+  const hints = useHints()
   const [data, setData] = useState<SettingsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -411,6 +413,26 @@ export default function SettingsPage() {
                     backgroundColor: animationsOn ? '#FFFFFF' : 'var(--t2)',
                   }}
                 />
+              </button>
+            </div>
+          </Section>
+
+          {/* ─── Product tour (T-72) ────────────────────────────────────── */}
+          <Section title="Product tour" subtitle="Skippable coach marks on the key instruments — mode chip, ⌘K, league health, Pulse actions, the ticker.">
+            <div className="flex items-center justify-between py-1">
+              <div>
+                <p className="text-sm text-white">Replay tour</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--t3)' }}>
+                  Shows every coach mark again, the next time you&rsquo;re on the surface it points to.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => hints?.replayTour()}
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0 transition-all"
+                style={{ color: 'var(--t1)', border: '1px solid var(--hairline)' }}
+              >
+                Replay
               </button>
             </div>
           </Section>

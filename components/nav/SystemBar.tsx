@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from 'react'
 import { type Mode, ModeButton, ModeSwitcher } from './AppShell'
 import PulseMark from '@/components/PulseMark'
 import { useGameDayKickoffTransition } from '@/lib/gameDayTransition'
+import HintAnchor from '@/components/hints/HintAnchor'
 import type { LeagueHealthStatus, LiveGameScore, SystemStatus, UserPlan } from '@/types'
 
 // T-110: nothing in the UI showed plan at all — free deliberately gets no
@@ -158,6 +159,7 @@ export default function SystemBar({
 
         {/* League health dots */}
         {status && status.leagues.length > 0 && (
+          <HintAnchor id="system-bar-health">
           <span className="flex items-center gap-2.5">
             <span className="hidden md:inline text-[9px] tracking-[0.14em]" style={{ color: 'var(--t3)' }}>
               LEAGUES
@@ -185,6 +187,7 @@ export default function SystemBar({
               </span>
             ))}
           </span>
+          </HintAnchor>
         )}
 
         {/* T-90: live scores — Game Day only, and only for games where a
@@ -251,9 +254,12 @@ export default function SystemBar({
         )}
 
         {/* Mode chip */}
-        <ModeButton mode={mode} onClick={() => setSwitcherOpen(true)} />
+        <HintAnchor id="mode-chip">
+          <ModeButton mode={mode} onClick={() => setSwitcherOpen(true)} />
+        </HintAnchor>
 
         {/* ⌘K affordance */}
+        <HintAnchor id="command-palette" desktopOnly className="relative hidden md:inline-flex">
         <button
           type="button"
           onClick={() => window.dispatchEvent(new CustomEvent('rostiro:open-command-palette'))}
@@ -272,6 +278,7 @@ export default function SystemBar({
             ⌘K
           </kbd>
         </button>
+        </HintAnchor>
       </div>
 
       {switcherOpen && (

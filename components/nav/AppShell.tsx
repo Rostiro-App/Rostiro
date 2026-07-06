@@ -11,6 +11,7 @@ import SimulationPanel from '@/components/admin/SimulationPanel'
 import InterruptStack from '@/components/InterruptStack'
 import BootSequence from '@/components/BootSequence'
 import LiveUnlockAnnouncement from '@/components/LiveUnlockAnnouncement'
+import HintProvider from '@/components/hints/HintProvider'
 
 export type Mode = 'focused' | 'balanced' | 'savant'
 
@@ -83,6 +84,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <ModeContext.Provider value={mode}>
+      <HintProvider>
       <div className="flex flex-col h-screen overflow-hidden relative" style={{ backgroundColor: 'var(--void)' }}>
         {/* T-72: plays once per tab session, above everything else. */}
         <BootSequence />
@@ -140,6 +142,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {/* Bloomberg strip — desktop only */}
         <TickerBar />
       </div>
+      </HintProvider>
     </ModeContext.Provider>
   )
 }

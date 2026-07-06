@@ -14,11 +14,12 @@ import { useRouter } from 'next/navigation'
 import type { Mode } from '@/components/nav/AppShell'
 import { useFocusTrap } from '@/lib/useFocusTrap'
 import { openPlayerCard } from '@/lib/openPlayerCard'
+import { useHints } from '@/components/hints/HintProvider'
 import type { ADPPlayer, PulseItem } from '@/types'
 
 interface Command {
   id: string
-  section: 'Navigate' | 'Mode' | 'Pulse' | 'Players'
+  section: 'Navigate' | 'Mode' | 'Pulse' | 'Players' | 'Help'
   label: string
   hint: string | null
   run: () => void
@@ -55,6 +56,7 @@ export default function CommandPalette({
   onModeChange: (m: Mode) => void
 }) {
   const router = useRouter()
+  const hints = useHints()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState(0)
@@ -165,6 +167,19 @@ export default function CommandPalette({
       hint: 'Changes how every screen shows data',
       run: () => {
         onModeChange(m)
+        close()
+      },
+    })
+  }
+
+  if (hints && (!q || 'replay tour'.includes(q))) {
+    commands.push({
+      id: 'help:replay-tour',
+      section: 'Help',
+      label: 'Replay tour',
+      hint: 'Coach marks on the key instruments',
+      run: () => {
+        hints.replayTour()
         close()
       },
     })

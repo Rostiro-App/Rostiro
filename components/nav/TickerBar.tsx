@@ -13,6 +13,7 @@
 
 import { useEffect, useState } from 'react'
 import { useGameDayKickoffTransition } from '@/lib/gameDayTransition'
+import HintAnchor from '@/components/hints/HintAnchor'
 import type { LiveGameScore, RostiroState } from '@/types'
 
 interface Mover {
@@ -227,20 +228,22 @@ export default function TickerBar() {
         WebkitBackdropFilter: 'blur(14px)',
       }}
     >
-      <span
-        className="flex items-center gap-2 px-3.5 h-full flex-shrink-0 relative z-10 tracking-[0.1em]"
-        style={{
-          color: 'var(--t3)',
-          borderRight: '1px solid var(--hairline)',
-          background: 'rgba(8, 15, 26, 0.9)',
-        }}
-      >
+      <HintAnchor id="ticker" desktopOnly className="relative flex items-center">
         <span
-          className="breathe w-[5px] h-[5px] rounded-full"
-          style={{ backgroundColor: 'var(--live)', boxShadow: '0 0 6px var(--live)' }}
-        />
-        LIVE
-      </span>
+          className="flex items-center gap-2 px-3.5 h-full flex-shrink-0 relative z-10 tracking-[0.1em]"
+          style={{
+            color: 'var(--t3)',
+            borderRight: '1px solid var(--hairline)',
+            background: 'rgba(8, 15, 26, 0.9)',
+          }}
+        >
+          <span
+            className="breathe w-[5px] h-[5px] rounded-full"
+            style={{ backgroundColor: 'var(--live)', boxShadow: '0 0 6px var(--live)' }}
+          />
+          LIVE
+        </span>
+      </HintAnchor>
       <div className="ticker-pause flex-1 overflow-hidden relative h-full">
         <div className="ticker-crawl absolute flex items-center gap-[34px] h-full whitespace-nowrap pl-5" aria-hidden="true">
           {crawl}

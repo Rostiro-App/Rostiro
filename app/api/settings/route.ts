@@ -33,7 +33,7 @@ export async function GET() {
   const [{ data: profile, error: profileError }, { data: leagues, error: leaguesError }] = await Promise.all([
     supabase
       .from('users')
-      .select('email, plan, push_enabled, mode, created_at')
+      .select('email, plan, push_enabled, mode, seen_hints, created_at')
       .eq('id', user.id)
       .maybeSingle(),
     supabase
@@ -57,8 +57,11 @@ export async function GET() {
     return NextResponse.json({ error: leaguesError.message }, { status: 500 })
   }
 
-  // 42703 = mode column missing (migration not run) — retry without it so
-  // the rest of Settings still works.
+  // 42703 = a selected column is missing (migration not run) — retry
+  // without mode/seen_hints so the rest of Settings still works. A single
+  // undefined column fails the whole select, and either one could be the
+  // culprit depending on which migrations have run, so both fall back
+  // together rather than guessing which one caused it.
   let row = profile
   let modeAvailable = true
   if (profileError?.code === '42703') {
@@ -68,7 +71,7 @@ export async function GET() {
       .select('email, plan, push_enabled, created_at')
       .eq('id', user.id)
       .maybeSingle()
-    row = fallback ? { ...fallback, mode: null } : null
+    row = fallback ? { ...fallback, mode: null, seen_hints: [] } : null
   } else if (profileError) {
     return NextResponse.json({ error: profileError.message }, { status: 500 })
   }
@@ -80,6 +83,7 @@ export async function GET() {
     plan: row.plan,
     pushEnabled: row.push_enabled,
     mode: modeAvailable ? row.mode : null,
+    seenHints: (row as { seen_hints?: string[] }).seen_hints ?? [],
     createdAt: row.created_at,
     leagues: (leagueRows ?? []).map((l) => ({
       id: l.id,
@@ -104,6 +108,19 @@ export async function PATCH(request: Request) {
   const update: Record<string, unknown> = {}
   if (parsed.data.mode !== undefined) update.mode = parsed.data.mode
   if (parsed.data.pushEnabled !== undefined) update.push_enabled = parsed.data.pushEnabled
+
+  // Never blind-overwrite seen_hints — read the current array first so a
+  // dismissal from one tab doesn't race-clobber one from another, then
+  // merge (or reset) and write the result. Reset wins over add if both are
+  // somehow sent together — a fresh "replay tour" click, never a partial one.
+  if (parsed.data.resetSeenHints) {
+    update.seen_hints = []
+  } else if (parsed.data.addSeenHints !== undefined) {
+    const { data: current } = await supabase.from('users').select('seen_hints').eq('id', user.id).maybeSingle()
+    const existing: string[] = (current as { seen_hints?: string[] } | null)?.seen_hints ?? []
+    update.seen_hints = [...new Set([...existing, ...parsed.data.addSeenHints])]
+  }
+
   update.updated_at = new Date().toISOString()
 
   const { error } = await supabase.from('users').update(update).eq('id', user.id)
