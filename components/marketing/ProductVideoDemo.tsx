@@ -1,19 +1,19 @@
-// Reusable placeholder for the mid-July veo rollout — every marketing/
+// Reusable placeholder for the mid-July veo rollout. Every marketing/
 // Features surface that needs "show, don't tell" points here instead of a
-// static screenshot. Glass-heavy frame + a subtle breathing signal glow
-// (reuses .breathe, the same idle-pulse the System Bar's sync dot uses —
-// no new animation invented just for marketing). Renders a real 16:9 frame
-// now so the layout doesn't jump when a real <video> tag drops in later;
-// swap the placeholder body for a <video>/<iframe> without touching any
+// static screenshot. Glass-heavy frame plus a subtle breathing signal glow
+// (reuses .breathe, the same idle-pulse the System Bar's sync dot uses; no
+// new animation invented just for marketing). Renders a real 16:9 frame
+// now so the layout doesn't jump when a real <video> tag drops in later.
+// Swap the placeholder body for a <video>/<iframe> without touching any
 // call site's props.
 //
 // `caption` is user-facing (shown under the frame). `recordingNote` is
-// intentionally never rendered — it's the founder's own shot list, read
+// intentionally never rendered. It's the founder's own shot list, read
 // from the source, not the page.
 
 interface ProductVideoDemoProps {
   caption: string
-  // Never rendered — the founder's own shot list for this exact clip, kept
+  // Never rendered. The founder's own shot list for this exact clip, kept
   // next to the component that will eventually show it rather than in a
   // separate doc that drifts out of sync with where each demo actually lives.
   recordingNote: string

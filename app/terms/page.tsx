@@ -1,19 +1,19 @@
-// Founder-written Terms of Service baseline — same posture as /privacy:
+// Founder-written Terms of Service baseline, same posture as /privacy:
 // accurate to what the product actually does today, not legal counsel's
 // work product. Flagged inline and here. The core liability concern this
 // draft is built to address (founder, July 2026): a fantasy manager losing
 // their league and blaming Rostiro's recommendation for it. Sections 6-7
-// and 11-14 are where that risk actually gets addressed — "no guaranteed
+// and 11-14 are where that risk actually gets addressed ("no guaranteed
 // outcome," "AI-generated, not human-reviewed," "as-is," a real liability
 // cap, and an arbitration/class-action-waiver clause, all standard in the
-// fantasy-advice and SaaS category, not novel. This still needs a real
-// lawyer before it's relied on — the banner below says so, and means it.
+// fantasy-advice and SaaS category, not novel). This still needs a real
+// lawyer before it's relied on. The banner below says so, and means it.
 
 import PublicHeader from '@/components/marketing/PublicHeader'
 import PublicFooter from '@/components/marketing/PublicFooter'
 
 export const metadata = {
-  title: 'Terms of Service — Rostiro',
+  title: 'Terms of Service · Rostiro',
 }
 
 function Section({ number, title, children }: { number: string; title: string; children: React.ReactNode }) {
@@ -53,9 +53,9 @@ export default function TermsPage() {
               style={{ color: 'var(--warn)', border: '1px solid rgba(245,166,35,.3)' }}
             >
               This is a founder-written baseline describing the terms we intend to operate under, written
-              directly by the Rostiro team. It has not yet been reviewed by a lawyer — treat it as an honest
-              draft of our intent, not a substitute for legal advice, until that review happens and this
-              banner is removed.
+              directly by the Rostiro team. It has not yet been reviewed by a lawyer, so treat it as an
+              honest draft of our intent, not a substitute for legal advice, until that review happens and
+              this banner is removed.
             </div>
 
             <Section number="1." title="Acceptance of these Terms">
@@ -67,19 +67,19 @@ export default function TermsPage() {
               </p>
             </Section>
 
-            <Section number="2." title="What Rostiro is — and isn't">
+            <Section number="2." title="What Rostiro is, and isn't">
               <p>
                 Rostiro is an analytical companion for fantasy football managers who already play on ESPN,
                 Yahoo, and/or Sleeper. Rostiro reads your connected league data and gives you decision
-                support — a daily prioritized list, start/sit and trade reasoning, waiver targets, and live
-                score tracking — to make managing multiple leagues faster and less error-prone.
+                support (a daily prioritized list, start/sit and trade reasoning, waiver targets, and live
+                score tracking) to make managing multiple leagues faster and less error-prone.
               </p>
               <p>
                 Rostiro is <strong style={{ color: 'var(--t1)' }}>not</strong> a fantasy platform, a league
                 host, a scoring engine, a stat provider, or a sportsbook. It does not run your league, settle
                 your matchups, or hold or move any money on your behalf. It does not replace ESPN, Yahoo, or
-                Sleeper — it enhances the experience you already have on top of them. Rostiro is not
-                affiliated with, sponsored by, or endorsed by ESPN, Yahoo, or Sleeper; all trademarks belong
+                Sleeper; it enhances the experience you already have on top of them. Rostiro is not
+                affiliated with, sponsored by, or endorsed by ESPN, Yahoo, or Sleeper. All trademarks belong
                 to their respective owners.
               </p>
             </Section>
@@ -88,8 +88,8 @@ export default function TermsPage() {
               <p>
                 You must be at least 13 years old to create a Rostiro account. If you&apos;re under the age
                 of majority in your jurisdiction, you confirm you have a parent or guardian&apos;s permission
-                to use Rostiro. One account per person; you&apos;re responsible for everything that happens
-                under your account.
+                to use Rostiro. One account per person, and you&apos;re responsible for everything that
+                happens under your account.
               </p>
             </Section>
 
@@ -102,23 +102,23 @@ export default function TermsPage() {
               </p>
             </Section>
 
-            <Section number="5." title="Connected platforms — read-only and OAuth boundaries">
+            <Section number="5." title="Connected platforms: read-only and OAuth boundaries">
               <p>
                 Rostiro connects to your fantasy leagues in three different ways, and the access level
                 matters:
               </p>
               <ul className="space-y-2 pl-1">
                 <li>
-                  <strong style={{ color: 'var(--t1)' }}>Sleeper</strong> — read-only, via Sleeper&apos;s
+                  <strong style={{ color: 'var(--t1)' }}>Sleeper.</strong> Read-only, via Sleeper&apos;s
                   public API. Rostiro cannot make any change to a Sleeper league on your behalf.
                 </li>
                 <li>
-                  <strong style={{ color: 'var(--t1)' }}>ESPN</strong> — read-only, via a browser cookie
+                  <strong style={{ color: 'var(--t1)' }}>ESPN.</strong> Read-only, via a browser cookie
                   handshake you provide (ESPN has no official public API). Rostiro cannot make any change to
                   an ESPN league on your behalf, and never has write access of any kind.
                 </li>
                 <li>
-                  <strong style={{ color: 'var(--t1)' }}>Yahoo</strong> — read and write, via Yahoo&apos;s
+                  <strong style={{ color: 'var(--t1)' }}>Yahoo.</strong> Read and write, via Yahoo&apos;s
                   official OAuth 2.0 authorization. This is the one platform where Rostiro can submit a
                   lineup, waiver claim, or trade proposal directly, and only ever when you explicitly tap to
                   do so. You can revoke this access at any time from your Yahoo account settings or from
@@ -128,7 +128,7 @@ export default function TermsPage() {
               <p>
                 You&apos;re responsible for complying with each connected platform&apos;s own terms of
                 service. Rostiro is not responsible for any action a connected platform takes against your
-                account — suspension, data changes, or access revocation — including as a result of that
+                account, including suspension, data changes, or access revocation, as a result of that
                 platform&apos;s own policies toward third-party tools.
               </p>
             </Section>
@@ -136,32 +136,32 @@ export default function TermsPage() {
             <Section number="6." title="AI-generated content">
               <p>
                 Rostiro uses Anthropic&apos;s Claude API to generate the plain-English reasoning behind a
-                recommendation. The underlying verdict — the start/sit call, the waiver priority, the trade
-                grade — is always computed first by Rostiro&apos;s own deterministic logic against your real
-                league data; Claude only narrates a decision that logic already made, it never makes the
+                recommendation. The underlying verdict (the start/sit call, the waiver priority, the trade
+                grade) is always computed first by Rostiro&apos;s own deterministic logic against your real
+                league data. Claude only narrates a decision that logic already made; it never makes the
                 decision itself.
               </p>
               <p>
                 That said, AI-generated text can be incomplete, out of date, or simply wrong, and is not
                 reviewed by a human before it reaches you. You&apos;re responsible for independently
-                verifying anything that matters before you act on it — a player&apos;s injury status, a
-                platform&apos;s own roster deadline, a league&apos;s specific rules. Rostiro is not liable for
-                any inaccuracy in AI-generated reasoning text.
+                verifying anything that matters before you act on it, such as a player&apos;s injury status,
+                a platform&apos;s own roster deadline, or a league&apos;s specific rules. Rostiro is not
+                liable for any inaccuracy in AI-generated reasoning text.
               </p>
             </Section>
 
-            <Section number="7." title="No guaranteed outcomes — please read this section">
+            <Section number="7." title="No guaranteed outcomes: please read this section">
               <p>
                 This is the most important section of these Terms, so we&apos;re not going to bury it in
                 legal language.
               </p>
               <p>
-                Fantasy football involves real, inherent uncertainty — injuries, weather, coaching decisions,
+                Fantasy football involves real, inherent uncertainty. Injuries, weather, coaching decisions,
                 and plain bad luck are outside anyone&apos;s control, including ours. Every recommendation
-                Rostiro gives — a start/sit call, a waiver priority, a trade grade, a Health Score, a Draft
-                Copilot suggestion — is an informational opinion generated from available statistics at the
-                time it was given. It is <strong style={{ color: 'var(--t1)' }}>not</strong> a guarantee of
-                any result.
+                Rostiro gives, whether a start/sit call, a waiver priority, a trade grade, a Health Score, or
+                a Draft Copilot suggestion, is an informational opinion generated from available statistics
+                at the time it was given. It is <strong style={{ color: 'var(--t1)' }}>not</strong> a
+                guarantee of any result.
               </p>
               <p>
                 <strong style={{ color: 'var(--t1)' }}>
@@ -169,8 +169,8 @@ export default function TermsPage() {
                   waiver claim, a trade, or your league. You are solely responsible for every roster decision
                   you make, whether or not it followed a Rostiro recommendation.
                 </strong>{' '}
-                Rostiro is not liable for any loss — a lost matchup, a missed payout, a league consequence,
-                or any other outcome — arising from your reliance on its recommendations.
+                Rostiro is not liable for any loss, including a lost matchup, a missed payout, a league
+                consequence, or any other outcome, arising from your reliance on its recommendations.
               </p>
               <p>
                 Rostiro is a decision-support tool for skill-based fantasy contests. It is not financial
@@ -214,7 +214,7 @@ export default function TermsPage() {
                 <strong style={{ color: 'var(--t1)' }}>&ldquo;as available,&rdquo;</strong> without warranties
                 of any kind, express or implied, including merchantability, fitness for a particular purpose,
                 and non-infringement. We don&apos;t warrant that Rostiro will be uninterrupted, error-free, or
-                that data pulled from ESPN, Yahoo, or Sleeper will always be accurate or current — those
+                that data pulled from ESPN, Yahoo, or Sleeper will always be accurate or current. Those
                 platforms are outside our control, and API outages, rate limits, or format changes on their
                 end can cause sync delays or gaps.
               </p>
@@ -240,7 +240,7 @@ export default function TermsPage() {
               </p>
             </Section>
 
-            <Section number="14." title="Dispute resolution — arbitration and class action waiver">
+            <Section number="14." title="Dispute resolution: arbitration and class action waiver">
               <p>
                 You and Rostiro agree to resolve any dispute arising from these Terms through binding
                 individual arbitration rather than in court, except that either party may bring an individual
@@ -270,14 +270,14 @@ export default function TermsPage() {
             <Section number="17." title="Governing law">
               <p>
                 These Terms are governed by the laws of the United States and the state in which Rostiro is
-                incorporated, without regard to conflict-of-law principles — to be finalized once entity
-                formation is complete.
+                incorporated, without regard to conflict-of-law principles. This section will be finalized
+                once entity formation is complete.
               </p>
             </Section>
 
             <Section number="18." title="Contact">
               <p>
-                Questions about these Terms — reach us at{' '}
+                Questions about these Terms can be sent to{' '}
                 <span className="mono-data" style={{ color: 'var(--t1)' }}>legal@rostiro.com</span>.
               </p>
             </Section>

@@ -1,10 +1,10 @@
 'use client'
 
-// Features page, Pillar 1 — a real interactive demo, not a static screenshot.
+// Features page, Pillar 1: a real interactive demo, not a static screenshot.
 // Reuses the exact same three-mode density model the product itself ships
 // (PRD §3), against one fixed decision, so a visitor feels "data density as
-// identity" by clicking instead of reading it as a claim. No auth, no fetch
-// — the underlying decision is fixed sample data, the same one row of
+// identity" by clicking instead of reading it as a claim. No auth, no fetch.
+// The underlying decision is fixed sample data, the same one row of
 // content just rendered three different ways.
 
 import { useState } from 'react'
@@ -84,7 +84,7 @@ export default function InteractivePulseDemo() {
             <>
               <p className="text-sm mt-2 leading-relaxed" style={{ color: 'var(--t2)' }}>
                 Bench role expanded to lead back after Sunday&apos;s usage shift. Cutoff today, 3:00 PM,
-                Yahoo League 2. Advisory only — the call is yours.
+                Yahoo League 2. Advisory only, the call is yours.
               </p>
               <div className="grid grid-cols-4 gap-3 mt-3">
                 {[

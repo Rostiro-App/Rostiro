@@ -1,6 +1,6 @@
 'use client'
 
-// Plain, dependency-free accordion — no external library, matches every
+// Plain, dependency-free accordion. No external library, matches every
 // other interactive surface in this codebase (ModeSwitcher, Command
 // Palette) in being hand-rolled against the real design tokens. Multiple
 // items can stay open at once; nothing here needs the "only one open"

@@ -1,4 +1,4 @@
-// Comprehensive FAQ — neutralizes the real objections both personas
+// Comprehensive FAQ. Neutralizes the real objections both personas
 // (PRD §3's Savant and casual manager) actually raise before signing up.
 // Answers are checked against what the product actually does today (the
 // same discipline as /privacy), not aspirational copy.
@@ -8,7 +8,7 @@ import PublicFooter from '@/components/marketing/PublicFooter'
 import FaqAccordion, { type FaqItem } from '@/components/marketing/FaqAccordion'
 
 export const metadata = {
-  title: 'FAQ — Rostiro',
+  title: 'FAQ · Rostiro',
   description: 'Answers on how Rostiro works with ESPN, Yahoo, and Sleeper, what Focused/Balanced/Savant modes mean, and how your league credentials are secured.',
 }
 
@@ -26,14 +26,14 @@ const GROUPS: FaqGroup[] = [
         answer: (
           <>
             <p>
-              No — and that&apos;s deliberate. Rostiro doesn&apos;t run your league, score your matchups, or
+              No, and that&apos;s deliberate. Rostiro doesn&apos;t run your league, score your matchups, or
               host your draft. ESPN, Yahoo, and Sleeper still do all of that. Rostiro watches all three at
               once and tells you what to do about what it sees.
             </p>
             <p className="mt-3">
               For Yahoo leagues, Rostiro can also set your lineup, claim a waiver, or propose a trade
               directly, since Yahoo&apos;s API supports that. For ESPN and Sleeper, Rostiro deep-links you to
-              the exact right screen on their own site to make the move yourself — it never pretends to take
+              the exact right screen on their own site to make the move yourself. It never pretends to take
               an action neither platform actually lets a third party take.
             </p>
           </>
@@ -44,10 +44,10 @@ const GROUPS: FaqGroup[] = [
         answer: (
           <p>
             ESPN, Yahoo, and Sleeper today. Standard, half-PPR, full-PPR, TE premium, and Superflex/2QB
-            formats are all read correctly from your league&apos;s real scoring settings — Rostiro never
+            formats are all read correctly from your league&apos;s real scoring settings; Rostiro never
             assumes a generic scoring format. Dynasty and keeper leagues work the same way rosters and
-            waivers already do; Rostiro doesn&apos;t yet have dynasty-specific features like rookie draft
-            pick valuations.
+            waivers already do, though Rostiro doesn&apos;t yet have dynasty-specific features like rookie
+            draft pick valuations.
           </p>
         ),
       },
@@ -55,8 +55,8 @@ const GROUPS: FaqGroup[] = [
         question: 'Is this sports betting advice?',
         answer: (
           <p>
-            No. Rostiro is a decision-support tool for skill-based season-long and weekly fantasy leagues —
-            it doesn&apos;t place bets, doesn&apos;t set lines, and doesn&apos;t make picks against a spread.
+            No. Rostiro is a decision-support tool for skill-based season-long and weekly fantasy leagues.
+            It doesn&apos;t place bets, doesn&apos;t set lines, and doesn&apos;t make picks against a spread.
             Nothing in the product is financial, investment, or betting advice, and Rostiro never guarantees
             a result in your league. See the{' '}
             <a href="/terms" className="underline" style={{ color: 'var(--signal)' }}>Terms of Service</a>{' '}
@@ -74,16 +74,16 @@ const GROUPS: FaqGroup[] = [
         answer: (
           <>
             <p>
-              It&apos;s a density choice, not a skill level — pick the one that matches how you actually want
+              It&apos;s a density choice, not a skill level. Pick the one that matches how you actually want
               to play, set it once at signup, and change it anytime.
             </p>
             <ul className="mt-3 space-y-2">
-              <li><strong style={{ color: 'var(--t1)' }}>Focused</strong> — &ldquo;Tell me what to do.&rdquo; Five decisions max, the verdict before any reasoning, one tap to act.</li>
-              <li><strong style={{ color: 'var(--t1)' }}>Balanced</strong> — &ldquo;Show me the key stuff.&rdquo; The call, plus the context that produced it — matchup, injury, weather — visible inline.</li>
-              <li><strong style={{ color: 'var(--t1)' }}>Savant</strong> — &ldquo;Give me everything.&rdquo; The full data layer: target share, usage trends, projections, nothing hidden. Rostiro advises, it never decides for you.</li>
+              <li><strong style={{ color: 'var(--t1)' }}>Focused.</strong> &ldquo;Tell me what to do.&rdquo; Five decisions max, the verdict before any reasoning, one tap to act.</li>
+              <li><strong style={{ color: 'var(--t1)' }}>Balanced.</strong> &ldquo;Show me the key stuff.&rdquo; The call, plus the context that produced it (matchup, injury, weather), visible inline.</li>
+              <li><strong style={{ color: 'var(--t1)' }}>Savant.</strong> &ldquo;Give me everything.&rdquo; The full data layer: target share, usage trends, projections, nothing hidden. Rostiro advises, it never decides for you.</li>
             </ul>
             <p className="mt-3">
-              Mode changes what every screen in the product shows — Pulse, Draft Kit, Lineups, Trades — not
+              Mode changes what every screen in the product shows: Pulse, Draft Kit, Lineups, Trades, not
               just one page.
             </p>
           </>
@@ -106,12 +106,12 @@ const GROUPS: FaqGroup[] = [
               Rostiro connects to your leagues read-mostly, and encrypts anything sensitive it has to store.
             </p>
             <ul className="mt-3 space-y-2">
-              <li><strong style={{ color: 'var(--t1)' }}>Sleeper</strong> — public, read-only API, no credentials at all. There&apos;s nothing to steal because nothing is stored.</li>
-              <li><strong style={{ color: 'var(--t1)' }}>Yahoo</strong> — official OAuth 2.0. Rostiro never sees your Yahoo password, only a scoped access token, encrypted at rest with AES-256-GCM.</li>
-              <li><strong style={{ color: 'var(--t1)' }}>ESPN</strong> — ESPN has no official API, so private leagues require a browser cookie handshake (espn_s2/SWID). That cookie is encrypted at rest the same way, AES-256-GCM, and used only to read your league&apos;s own data.</li>
+              <li><strong style={{ color: 'var(--t1)' }}>Sleeper.</strong> Public, read-only API, no credentials at all. There&apos;s nothing to steal because nothing is stored.</li>
+              <li><strong style={{ color: 'var(--t1)' }}>Yahoo.</strong> Official OAuth 2.0. Rostiro never sees your Yahoo password, only a scoped access token, encrypted at rest with AES-256-GCM.</li>
+              <li><strong style={{ color: 'var(--t1)' }}>ESPN.</strong> ESPN has no official API, so private leagues require a browser cookie handshake (espn_s2/SWID). That cookie is encrypted at rest the same way, AES-256-GCM, and used only to read your league&apos;s own data.</li>
             </ul>
             <p className="mt-3">
-              Sleeper and ESPN access is read-only by construction — Rostiro can&apos;t write anything back to
+              Sleeper and ESPN access is read-only by construction. Rostiro can&apos;t write anything back to
               either platform even if it wanted to. Full detail is in the{' '}
               <a href="/privacy" className="underline" style={{ color: 'var(--signal)' }}>Privacy Policy</a>.
             </p>
@@ -123,9 +123,9 @@ const GROUPS: FaqGroup[] = [
         answer: (
           <p>
             Only where a platform&apos;s own API allows it, and only when you tap to confirm. Yahoo is the
-            one platform where Rostiro can submit a lineup, waiver claim, or trade proposal directly — every
-            one of those is a deliberate action you take, never automatic. ESPN and Sleeper moves always
-            deep-link you to that platform&apos;s own site to finish the action yourself.
+            one platform where Rostiro can submit a lineup, waiver claim, or trade proposal directly, and
+            every one of those is a deliberate action you take, never automatic. ESPN and Sleeper moves
+            always deep-link you to that platform&apos;s own site to finish the action yourself.
           </p>
         ),
       },
@@ -133,9 +133,9 @@ const GROUPS: FaqGroup[] = [
         question: 'Can I delete my data?',
         answer: (
           <p>
-            Yes, anytime, from Settings → Data &amp; privacy — export everything Rostiro has on your account,
-            or permanently delete your account and every row tied to it. Deletion takes effect immediately
-            and can&apos;t be undone.
+            Yes, anytime, from Settings, then Data &amp; privacy. Export everything Rostiro has on your
+            account, or permanently delete your account and every row tied to it. Deletion takes effect
+            immediately and can&apos;t be undone.
           </p>
         ),
       },
@@ -156,7 +156,7 @@ const GROUPS: FaqGroup[] = [
             </p>
             <p className="mt-3">
               A touchdown from a player nobody on either side of your matchup rosters never reaches you.
-              One that does gets named — which player, how many points, which leagues — then clears itself,
+              One that does gets named (which player, how many points, which leagues), then clears itself,
               instead of piling up as a permanent notification you have to manually dismiss.
             </p>
           </>
@@ -166,7 +166,7 @@ const GROUPS: FaqGroup[] = [
         question: 'Will Rostiro spam me with notifications during a live game?',
         answer: (
           <p>
-            No — there&apos;s a hard rate ceiling regardless of how many games or leagues are live at once,
+            No, there&apos;s a hard rate ceiling regardless of how many games or leagues are live at once,
             and events are deduplicated across leagues (one push naming all three leagues a player affects,
             never three separate pushes). Push notifications for live events are a Pro feature; every plan
             still sees the same events inside the app the next time you open it.
@@ -180,11 +180,11 @@ const GROUPS: FaqGroup[] = [
     items: [
       {
         question: 'Is there a free plan?',
-        answer: <p>Yes, forever — one league, Draft Kit, a daily Pulse, and a limited number of AI-assisted start/sit and trade calls per week. No credit card required to start.</p>,
+        answer: <p>Yes, forever: one league, Draft Kit, a daily Pulse, and a limited number of AI-assisted start/sit and trade calls per week. No credit card required to start.</p>,
       },
       {
         question: 'Can I cancel anytime?',
-        answer: <p>Yes. Rostiro Pro is a standard monthly subscription with no lock-in — cancel from Settings and it stays active through the end of the current billing period.</p>,
+        answer: <p>Yes. Rostiro Pro is a standard monthly subscription with no lock-in. Cancel from Settings and it stays active through the end of the current billing period.</p>,
       },
       {
         question: 'What happens to the Founder tiers after launch?',

@@ -1,8 +1,8 @@
-// Real SVG, not a screenshot — the actual join chain lib/nflverseUsage.ts
+// Real SVG, not a screenshot. The actual join chain lib/nflverseUsage.ts
 // resolves once per sync (T-87): nflverse's snap_counts release only carries
 // a Pro-Football-Reference id, not a Sleeper one, so getting usage data onto
 // a Sleeper roster takes three real hops. Static and content-only (no
-// external asset, no animation) — this is meant to be glanceable for the
+// external asset, no animation). This is meant to be glanceable for the
 // Savant reader in under five seconds, not a marketing centerpiece.
 
 const NODES = [
