@@ -47,7 +47,7 @@ const WAIVER_DAY_END_HOUR_ET = 12 // Wednesday, hour of day (ET) Waiver Day yiel
 // league doesn't feel shorter or longer than the default one did.
 const WAIVER_WINDOW_HOURS = 24
 
-function partsInEastern(date: Date): { weekday: number; hour: number; dateKey: string } {
+export function partsInEastern(date: Date): { weekday: number; hour: number; dateKey: string } {
   const fmt = new Intl.DateTimeFormat('en-US', {
     timeZone: ET_TZ,
     weekday: 'short',

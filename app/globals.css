@@ -159,6 +159,16 @@ body {
 }
 .panel-enter { animation: panel-enter 0.38s var(--ease-os); }
 
+/* T-124: marketing hero entrance stagger — badge/headline/subtext/CTAs
+   cascade in once on load, each via its own animation-delay rather than a
+   JS-driven stagger. Plays once, no loop, respects prefers-reduced-motion
+   below like every other animation in this file. */
+@keyframes hero-fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+.hero-enter { animation: hero-fade-up 0.7s var(--ease-os) both; }
+
 /* Card dismissal collapse */
 @keyframes card-leave {
   to { opacity: 0; transform: translateX(12px); max-height: 0; margin-top: -9px;
@@ -301,7 +311,8 @@ body {
     animation: none;
   }
   .panel-enter,
-  .boot-fade-out {
+  .boot-fade-out,
+  .hero-enter {
     animation-duration: 0.01ms;
   }
 }

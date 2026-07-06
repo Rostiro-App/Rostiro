@@ -16,21 +16,27 @@ import InteractivePulseDemo from '@/components/marketing/InteractivePulseDemo'
 import DataJoinDiagram from '@/components/marketing/DataJoinDiagram'
 import CrossLeagueExposure from '@/components/marketing/CrossLeagueExposure'
 import InterruptStackDemo from '@/components/marketing/InterruptStackDemo'
+import PulseMark from '@/components/PulseMark'
 import { STATE_CONFIG } from '@/lib/brandTokens'
+import { getPublicRostiroState } from '@/lib/publicRostiroState'
 
 export const metadata = {
   title: 'Features · Rostiro',
   description: 'The operating system for fantasy sports: one Pulse across every league, a weekly cycle that reshapes itself, and Game Day Mission Control.',
 }
 
-export default function FeaturesPage() {
+export default async function FeaturesPage() {
+  // T-124: same live, schedule-driven state the homepage hero reads —
+  // identical for every visitor at a given moment (lib/publicRostiroState.ts).
+  const liveState = await getPublicRostiroState()
+
   return (
     <div style={{ backgroundColor: 'var(--void)', position: 'relative' }}>
       <div className="ambient-ground" aria-hidden="true" />
       <div style={{ position: 'relative', zIndex: 1 }}>
         <PublicHeader />
 
-        <FeaturesHero />
+        <FeaturesHero state={liveState} />
         <PillarOne />
         <PillarTwo />
         <PillarThree />
@@ -49,20 +55,29 @@ export default function FeaturesPage() {
 
 // ─── Hero ──────────────────────────────────────────────────────────────────────
 
-function FeaturesHero() {
+function FeaturesHero({ state }: { state: keyof typeof STATE_CONFIG }) {
+  const accent = STATE_CONFIG[state].color
+
   return (
     <section className="px-4 md:px-6 pt-14 pb-10 md:pt-20 md:pb-14 text-center">
       <span
-        className="mono-data inline-block text-[11px] tracking-[0.16em] uppercase px-3 py-1 rounded-full mb-5"
-        style={{ backgroundColor: 'var(--signal-dim)', color: 'var(--signal)' }}
+        className="hero-enter mono-data inline-flex items-center gap-2 text-[11px] tracking-[0.16em] uppercase px-3 py-1 rounded-full mb-5"
+        style={{ backgroundColor: `${accent}22`, color: accent, animationDelay: '0ms' }}
       >
+        <PulseMark state={state} />
         How Rostiro actually works
       </span>
-      <h1 className="text-3xl md:text-5xl font-bold tracking-tight leading-[1.15] max-w-3xl mx-auto" style={{ color: 'var(--t1)' }}>
+      <h1
+        className="hero-enter text-3xl md:text-5xl font-bold tracking-tight leading-[1.15] max-w-3xl mx-auto"
+        style={{ color: 'var(--t1)', animationDelay: '90ms' }}
+      >
         One system. Every league. It looks different depending on what day it is,
         on purpose.
       </h1>
-      <p className="text-base md:text-lg mt-5 max-w-2xl mx-auto leading-relaxed" style={{ color: 'var(--t2)' }}>
+      <p
+        className="hero-enter text-base md:text-lg mt-5 max-w-2xl mx-auto leading-relaxed"
+        style={{ color: 'var(--t2)', animationDelay: '180ms' }}
+      >
         Whether you&apos;re running five leagues on a spreadsheet or you just want someone to
         tell you who to start, Rostiro is built to meet you exactly there.
       </p>

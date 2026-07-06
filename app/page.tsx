@@ -15,15 +15,22 @@ import PublicHeader from '@/components/marketing/PublicHeader'
 import PublicFooter from '@/components/marketing/PublicFooter'
 import OldWayVsRostiro from '@/components/marketing/OldWayVsRostiro'
 import RostiroStatesCycle from '@/components/marketing/RostiroStatesCycle'
+import PulseMark from '@/components/PulseMark'
 import { STATE_CONFIG } from '@/lib/brandTokens'
+import { getPublicRostiroState } from '@/lib/publicRostiroState'
 
-export default function Home() {
+export default async function Home() {
+  // T-124: the hero reflects the real, live Rostiro State — schedule-driven
+  // and identical for every visitor at a given moment, same as the public
+  // ticker (lib/publicRostiroState.ts), not a per-user/demo value.
+  const liveState = await getPublicRostiroState()
+
   return (
     <div style={{ backgroundColor: 'var(--void)', position: 'relative' }}>
       <div className="ambient-ground" aria-hidden="true" />
       <div style={{ position: 'relative', zIndex: 1 }}>
         <PublicHeader />
-        <Hero />
+        <Hero state={liveState} />
         <ProblemSection />
         <StatesSection />
         <PulseSection />
@@ -41,25 +48,41 @@ export default function Home() {
 
 // ─── Hero ──────────────────────────────────────────────────────────────────────
 
-function Hero() {
+function Hero({ state }: { state: keyof typeof STATE_CONFIG }) {
+  const accent = STATE_CONFIG[state].color
+
   return (
     <section className="px-4 md:px-6 pt-16 pb-20 md:pt-24 md:pb-28">
       <div className="max-w-3xl mx-auto text-center">
         <span
-          className="mono-data inline-block text-[11px] tracking-[0.16em] uppercase px-3 py-1 rounded-full mb-6"
-          style={{ backgroundColor: 'var(--signal-dim)', color: 'var(--signal)' }}
+          className="hero-enter mono-data inline-flex items-center gap-2 text-[11px] tracking-[0.16em] uppercase px-3 py-1 rounded-full mb-6"
+          style={{ backgroundColor: `${accent}22`, color: accent, animationDelay: '0ms' }}
         >
+          {/* T-124: the one visitor-visible proof this is real, not a
+              static claim — same PulseMark component and STATE_CONFIG the
+              product itself reads, animating at this state's actual
+              amplitude/cycle speed (lib/publicRostiroState.ts). */}
+          <PulseMark state={state} />
           The operating system for fantasy sports
         </span>
-        <h1 className="text-4xl md:text-6xl font-bold tracking-tight leading-[1.1]" style={{ color: 'var(--t1)' }}>
+        <h1
+          className="hero-enter text-4xl md:text-6xl font-bold tracking-tight leading-[1.1]"
+          style={{ color: 'var(--t1)', animationDelay: '90ms' }}
+        >
           Run Every League.
         </h1>
-        <p className="text-lg md:text-xl mt-6 leading-relaxed" style={{ color: 'var(--t2)' }}>
+        <p
+          className="hero-enter text-lg md:text-xl mt-6 leading-relaxed"
+          style={{ color: 'var(--t2)', animationDelay: '180ms' }}
+        >
           You didn&apos;t lose because you made a bad call. You lost because the alert was in
           a different app. Rostiro watches every league you play, on every platform you use,
           and tells you the one thing to do before it costs you.
         </p>
-        <div className="flex flex-col sm:flex-row gap-3 justify-center mt-9">
+        <div
+          className="hero-enter flex flex-col sm:flex-row gap-3 justify-center mt-9"
+          style={{ animationDelay: '270ms' }}
+        >
           <Link
             href="/signup"
             className="text-sm font-semibold px-6 py-3 rounded-xl text-white transition-all hover:brightness-110"
@@ -75,7 +98,7 @@ function Hero() {
             Try Draft Kit, no signup
           </Link>
         </div>
-        <p className="text-xs mt-4" style={{ color: 'var(--t3)' }}>
+        <p className="hero-enter text-xs mt-4" style={{ color: 'var(--t3)', animationDelay: '340ms' }}>
           Free plan forever. No credit card required.
         </p>
       </div>
