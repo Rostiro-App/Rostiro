@@ -1,9 +1,15 @@
 # Rostiro Video Shotlist v1.0
 ## Status: DEFERRED — requires the founder to film. Not buildable by Claude Code.
 
-> These are the three "Founder B-roll" clips referenced in `app/features/page.tsx`'s `ProductVideoDemo` call sites (lines ~104, ~184, ~272) and in `Rostiro_Marketing_Plan_v1.md` §5. All three need real device footage of the actual product against real accounts and, for two of them, a real live NFL Sunday — none of that can be produced by an AI agent. This doc turns the one-line shot-list notes already in the code into a filmable, beat-by-beat script so shoot day has zero ambiguity. Nothing here is optional creative interpretation; shoot exactly what's below, then swap the placeholder in `ProductVideoDemo` for the real file.
+> These are the three "Founder B-roll" clips referenced in `app/features/page.tsx`'s `ProductVideoDemo` call sites and in `Rostiro_Marketing_Plan_v1.md` §5. All three need real device footage of the actual product against real accounts and, for two of them, a real live NFL Sunday — none of that can be produced by an AI agent. This doc turns the one-line shot-list notes already in the code into a filmable, beat-by-beat script so shoot day has zero ambiguity. Nothing here is optional creative interpretation; shoot exactly what's below, then swap the placeholder in `ProductVideoDemo` for the real file.
 
-**Rough placeholder GIFs of the underlying UI behavior already exist** (screen-recorded from the live dev site, not real device footage) in case they're useful for internal review while these are pending: `rostiro-interrupt-stack-demo.gif`, `rostiro-states-cycle-demo.gif`, `rostiro-mode-density-demo.gif`. They are not a substitute for the clips below — no real accounts, no real Sunday, no real kickoff.
+**Update (2026-07-06): all three slots are temporarily filled with Remotion-rendered placeholders**, not blank "coming soon" states, so the Features page has something real to show while these are pending:
+- `remotion/compositions/KickoffTransition.tsx` and `InterruptStackReveal.tsx` are motion-graphic recreations built from the actual `brandTokens.ts` colors and the real `STATE_TRANSITION_MS`/`AUTO_DISMISS_MS` timing — accurate to how the product actually behaves, just not real device footage of a real Sunday. Their captions say so ("motion-graphic recreation — real footage pending").
+- `remotion/compositions/MultiLeagueConnectReenactment.tsx` is a staged walkthrough with placeholder account names, since that clip's entire point is proving real OAuth against real accounts, which can't be faked authentically. It carries a permanent on-screen "ILLUSTRATIVE REENACTMENT — NOT REAL ACCOUNT FOOTAGE" badge baked into the video itself, and its caption says the same.
+
+**None of this changes what's below.** The real founder shoot is still deferred and still needed — these placeholders exist so the page isn't empty, not as a substitute for shooting the real thing. When the real clips are shot, replace the `src` prop on the corresponding `ProductVideoDemo` call (files live at `public/videos/`) and delete the Remotion placeholder compositions.
+
+Rough placeholder GIFs of the underlying UI behavior also exist from an earlier pass (screen-recorded from the live dev site): `rostiro-interrupt-stack-demo.gif`, `rostiro-states-cycle-demo.gif`, `rostiro-mode-density-demo.gif`. Superseded by the Remotion renders above for on-site use; kept only for internal review.
 
 ---
 

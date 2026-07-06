@@ -106,11 +106,16 @@ function PillarOne() {
 
         {/* Founder B-roll clip: connect a second and third league (Sleeper to
             Yahoo to ESPN) back to back, then land on Pulse showing one
-            unified list that names all three leagues in the same card. */}
+            unified list that names all three leagues in the same card.
+            Placeholder below is a labeled Remotion reenactment (see
+            Rostiro_Video_Shotlist.md) — swap `src` for the real founder
+            footage once shot; the on-screen "illustrative" badge is baked
+            into this placeholder video and must not carry over. */}
         <div className="mt-14 max-w-2xl mx-auto">
           <ProductVideoDemo
-            caption="Three leagues, one morning list. Connecting a league to Pulse in under a minute"
+            caption="Three leagues, one morning list. Connecting a league to Pulse in under a minute (illustrative reenactment — real founder footage pending)"
             recordingNote="Founder B-roll clip: connect a second and third league (Sleeper to Yahoo to ESPN) back to back, then land on Pulse showing one unified list that names all three leagues in the same card."
+            src="/videos/multi-league-connect-reenactment.mp4"
           />
         </div>
       </div>
@@ -186,11 +191,18 @@ function PillarTwo() {
 
         {/* Founder B-roll clip: a single Sunday timelapse (sped up) showing
             the System Bar accent and Pulse header visibly sweep from
-            Standard's blue to Game Day's cockpit red at the first kickoff. */}
+            Standard's blue to Game Day's cockpit red at the first kickoff.
+            Placeholder below is a Remotion motion-graphic recreation built
+            from the real STATE_CONFIG colors and the real 800ms
+            STATE_TRANSITION_MS (see remotion/compositions/
+            KickoffTransition.tsx) — accurate to the product's actual
+            behavior, but not real device footage of a real Sunday. Swap
+            `src` for the real founder timelapse once shot. */}
         <div className="mt-14 max-w-2xl mx-auto">
           <ProductVideoDemo
-            caption="The kickoff transition. Watch the whole OS shift the moment your first game goes live"
+            caption="The kickoff transition. Watch the whole OS shift the moment your first game goes live (motion-graphic recreation — real Sunday footage pending)"
             recordingNote="Founder B-roll clip: a single Sunday timelapse (sped up) showing the System Bar accent and Pulse header visibly sweep from Standard's blue to Game Day's cockpit red at the first kickoff."
+            src="/videos/kickoff-transition.mp4"
           />
         </div>
       </div>
@@ -278,11 +290,16 @@ function PillarThree() {
         {/* Founder B-roll clip: a real Sunday afternoon. Trigger a
             touchdown_swing scenario via the dev Simulation Panel, capture
             the Interrupt Stack card appearing, flashing the point delta,
-            then auto-dismissing on its own a few seconds later. */}
+            then auto-dismissing on its own a few seconds later. Placeholder
+            below is a Remotion recreation using the real 7s AUTO_DISMISS_MS
+            timing from components/InterruptStack.tsx (see remotion/
+            compositions/InterruptStackReveal.tsx) — swap `src` for the real
+            founder-triggered footage once shot. */}
         <div className="mt-10 max-w-2xl mx-auto">
           <ProductVideoDemo
-            caption="The Interrupt Stack in action. A touchdown lands, gets named, and clears itself"
+            caption="The Interrupt Stack in action. A touchdown lands, gets named, and clears itself (motion-graphic recreation — real footage pending)"
             recordingNote="Founder B-roll clip: a real Sunday afternoon. Trigger a touchdown_swing scenario via the dev Simulation Panel, capture the Interrupt Stack card appearing, flashing the point delta, then auto-dismissing on its own a few seconds later."
+            src="/videos/interrupt-stack-reveal.mp4"
           />
         </div>
       </div>

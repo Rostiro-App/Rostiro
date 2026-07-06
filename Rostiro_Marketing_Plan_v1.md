@@ -139,9 +139,15 @@ Built as real code components (not screenshots/illustrations), matching the site
 All four type-checked, lint-checked, and confirmed working live in the browser (touchdown simulate/auto-dismiss, states cycling, mode-density switching all verified interactively).
 
 ### Video shoot — DEFERRED, requires the founder to film
-**Full beat-by-beat script for all three clips now lives in `Rostiro_Video_Shotlist.md`** (shot setup, exact timing, what must be on screen, non-negotiables per clip) — this replaces the one-line shot-list notes as the shoot-day reference. None of this is buildable by Claude Code: two clips require a real live NFL Sunday, all three require the founder's real connected Sleeper/Yahoo/ESPN accounts. Status stays DEFERRED until raw footage exists; once it does, wiring the files into `ProductVideoDemo`'s placeholder slots in `app/features/page.tsx` is a small follow-up task, not a shoot-day one.
+**Full beat-by-beat script for all three clips lives in `Rostiro_Video_Shotlist.md`** (shot setup, exact timing, what must be on screen, non-negotiables per clip) — this is the shoot-day reference. None of this is buildable by Claude Code: two clips require a real live NFL Sunday, all three require the founder's real connected Sleeper/Yahoo/ESPN accounts.
 
-Rough placeholder GIFs of the underlying UI behavior (screen-recorded from the live dev site, not real device footage — no real accounts, no real Sunday) exist for internal review only: `rostiro-interrupt-stack-demo.gif`, `rostiro-states-cycle-demo.gif`, `rostiro-mode-density-demo.gif`. Not a substitute for the real shoot.
+**Placeholder update (2026-07-06):** all three `ProductVideoDemo` slots on the Features page are now filled with real rendered `.mp4` placeholders (`public/videos/`), built with Remotion (`remotion/` directory, installed as a dev dependency) instead of the bare "Demo coming soon" state:
+- **Kickoff transition** and **Interrupt Stack** clips are motion-graphic recreations built directly from the real `brandTokens.ts` colors and real `STATE_TRANSITION_MS`/`AUTO_DISMISS_MS` timing — accurate to actual product behavior, captioned "recreation, real footage pending."
+- **Multi-league connect** clip is a staged reenactment with placeholder account names (can't authentically fake real OAuth), permanently watermarked on-screen "ILLUSTRATIVE REENACTMENT — NOT REAL ACCOUNT FOOTAGE."
+
+This does not change the DEFERRED status of the real shoot — the placeholders exist so the page isn't empty, not as a substitute. Once real footage is shot, swap the `src` prop at each `ProductVideoDemo` call site and delete the Remotion compositions.
+
+Rough placeholder GIFs from an earlier pass (screen-recorded from the live dev site) still exist for internal review only: `rostiro-interrupt-stack-demo.gif`, `rostiro-states-cycle-demo.gif`, `rostiro-mode-density-demo.gif` — superseded by the Remotion renders above for on-site use.
 
 ---
 

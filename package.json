@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "remotion:studio": "remotion studio remotion/index.ts",
+    "remotion:render": "remotion render remotion/index.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.109.1",
@@ -21,12 +23,15 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@remotion/cli": "^4.0.485",
+    "@remotion/google-fonts": "^4.0.485",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
+    "remotion": "^4.0.485",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
