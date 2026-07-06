@@ -7,10 +7,11 @@ import { useMode } from '@/components/nav/AppShell'
 import { openPlayerCard } from '@/lib/openPlayerCard'
 import type { ADPPlayer, NFLPosition, RostiroState } from '@/types'
 
-// T-104 / 6.13: matches the already-shipped STATE_CONFIG.draft amber
-// (PulseMark/System Bar) — not 6.13's text, which says "opportunity green"
-// and was never reconciled with the real STATE_CONFIG values.
-const DRAFT_STATE_COLOR = '#EF9F27'
+// T-104 / 6.13: matches STATE_CONFIG.draft's opportunity green — founder
+// confirmed (July 6, 2026) Draft should read as the same "opportunity"
+// emotion as Waiver Day, resolving the amber-vs-green mismatch this
+// comment used to flag.
+const DRAFT_STATE_COLOR = '#1D9E75'
 
 // DEF omitted — Sleeper never assigns search_rank to team defenses, so there's
 // no ranking signal for them yet. Add back once consensus ADP covers DEF.

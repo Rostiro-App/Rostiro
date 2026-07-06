@@ -455,15 +455,14 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
       <div className="flex flex-col lg:flex-1 lg:min-h-0">
 
       {showPanicPanel && (
-        // T-104 / 6.13: Draft State's accent — matches the already-shipped
-        // STATE_CONFIG.draft amber (PulseMark/System Bar), not the PRD 6.13
-        // text's "opportunity green," which was never reconciled with the
-        // real STATE_CONFIG values.
+        // T-104 / 6.13: Draft State's accent — matches STATE_CONFIG.draft's
+        // opportunity green, resolving the amber-vs-green mismatch this
+        // comment used to flag (founder confirmed July 6, 2026).
         <div
           className="rounded-xl p-4 mb-4 flex-shrink-0"
-          style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', border: '1px solid #EF9F27', borderLeft: '3px solid #EF9F27' }}
+          style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', border: '1px solid #1D9E75', borderLeft: '3px solid #1D9E75' }}
         >
-          <p className="text-xs font-semibold tracking-widest uppercase mb-3" style={{ color: '#EF9F27' }}>
+          <p className="text-xs font-semibold tracking-widest uppercase mb-3" style={{ color: '#1D9E75' }}>
             {picksLeft === 0 ? "You're on the clock" : `Your turn in ${picksLeft} pick${picksLeft === 1 ? '' : 's'}`}
           </p>
 

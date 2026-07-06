@@ -31,7 +31,7 @@ const PLAN_OPTIONS: { key: string; label: string }[] = [
 ]
 
 const STATE_OPTIONS: { key: RostiroState; label: string; color: string }[] = [
-  { key: 'draft', label: 'Draft', color: '#EF9F27' },
+  { key: 'draft', label: 'Draft', color: '#1D9E75' },
   { key: 'standard', label: 'Standard', color: '#378ADD' },
   { key: 'waiver_day', label: 'Waiver Day', color: '#1D9E75' },
   { key: 'game_day', label: 'Game Day', color: '#E24B4A' },

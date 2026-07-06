@@ -19,7 +19,11 @@ export interface StateConfig {
 
 export const STATE_CONFIG: Record<RostiroState, StateConfig> = {
   draft: {
-    color: '#EF9F27', // amber
+    // T-104: matches Waiver Day's green — founder confirmed (July 6, 2026)
+    // both acquisition moments should read as the same "opportunity"
+    // emotion, per 6.13's original spec (shipped amber never reconciled
+    // with it until now).
+    color: '#1D9E75', // opportunity green — shared with waiver_day
     amplitude: 11,
     cycleSec: 1.8,
     strokeWidth: 2.0,
