@@ -67,7 +67,7 @@ export function classifyPointDelta(delta: number, scoring: ScoringSettings, posi
 // null entirely for the one real ESPN league (never populated at connect
 // time). A live event misclassified off stale scoring is worse than one
 // extra API call per league per classification pass.
-async function fetchLeagueScoring(
+export async function fetchLeagueScoring(
   admin: AdminClient,
   leagueRowId: string
 ): Promise<ScoringSettings | null> {

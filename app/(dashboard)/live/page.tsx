@@ -28,6 +28,7 @@ interface LiveRosterPlayer {
   position: string | null
   nflTeam: string | null
   points: number
+  projectedPoints: number | null
   game: LiveGameContext
   leagues: { leagueId: string; leagueName: string; status: 'starting' | 'bench' }[]
 }
@@ -36,7 +37,9 @@ interface LiveMatchupSummary {
   leagueId: string
   leagueName: string
   myScore: number
+  myProjectedScore: number | null
   opponentScore: number
+  opponentProjectedScore: number | null
 }
 
 interface LiveUpdateItem {
@@ -107,6 +110,13 @@ export default function LivePage() {
   const [loading, setLoading] = useState(true)
   const [bigPlay, setBigPlay] = useState<{ player: LiveRosterPlayer; event: RecentEvent } | null>(null)
   const shownEventKeys = useRef(new Set<string>())
+  // T-116: last-seen point total per player/matchup, purely to derive a tick
+  // direction (up/down) for the subtle score-tick animation below. The
+  // running "last seen" values live in a ref (not read during render, only
+  // written/read inside the poll callback); the derived up/down map is
+  // real render state, set alongside status in the same callback.
+  const prevPointsRef = useRef(new Map<string, number>())
+  const [tickDirections, setTickDirections] = useState<Map<string, 'up' | 'down'>>(new Map())
   const [statSheet, setStatSheet] = useState<{ player: LiveRosterPlayer; loading: boolean; lines: StatLine[] } | null>(null)
   const justUnlocked = useLiveUnlockTransition(status?.unlocked === true)
   const [clockNow, setClockNow] = useState(() => Date.now())
@@ -167,6 +177,19 @@ export default function LivePage() {
         .then((res) => (res.ok ? res.json() : Promise.reject(new Error('Failed to load'))))
         .then((data: LiveStatus) => {
           if (cancelled) return
+
+          const newTicks = new Map<string, 'up' | 'down'>()
+          const trackTick = (key: string, value: number) => {
+            const prev = prevPointsRef.current.get(key)
+            if (prev !== undefined && value !== prev) newTicks.set(key, value > prev ? 'up' : 'down')
+            prevPointsRef.current.set(key, value)
+          }
+          for (const p of data.liveRoster) trackTick(`player:${p.playerId}`, p.points)
+          for (const m of data.matchups) {
+            trackTick(`matchup:${m.leagueId}:mine`, m.myScore)
+            trackTick(`matchup:${m.leagueId}:opp`, m.opponentScore)
+          }
+          setTickDirections(newTicks)
           setStatus(data)
 
           // Fire the takeover for a touchdown OR big play we haven't shown
@@ -362,7 +385,16 @@ export default function LivePage() {
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <p className="mono-data text-lg font-bold" style={{ color: 'var(--t1)' }}>{p.points.toFixed(1)}</p>
+                    <p
+                      key={`player:${p.playerId}:${p.points}`}
+                      className={`mono-data text-lg font-bold ${tickDirections.get(`player:${p.playerId}`) === 'up' ? 'score-tick-up' : tickDirections.get(`player:${p.playerId}`) === 'down' ? 'score-tick-down' : ''}`}
+                      style={{ color: 'var(--t1)' }}
+                    >
+                      {p.points.toFixed(1)}
+                    </p>
+                    {p.projectedPoints !== null && (
+                      <p className="mono-data text-[9.5px]" style={{ color: 'var(--t4)' }}>proj {p.projectedPoints.toFixed(1)}</p>
+                    )}
                     {recentEvent && eventLabel && (
                       <p
                         className="mono-data text-[9.5px] font-semibold tracking-wide mt-0.5"
@@ -409,16 +441,42 @@ export default function LivePage() {
         <>
           <p className="mono-data text-[10px] tracking-widest uppercase mb-2" style={{ color: 'var(--t3)' }}>Your matchups</p>
           <div className="flex gap-2 overflow-x-auto pb-1">
-            {status.matchups.map((m) => (
-              <div key={m.leagueId} className="rounded-lg px-3 py-2 flex-shrink-0" style={{ border: '1px solid var(--hairline)', minWidth: 150 }}>
-                <p className="mono-data text-[9px] uppercase" style={{ color: 'var(--t3)' }}>{m.leagueName}</p>
-                <div className="flex items-baseline justify-between mt-1">
-                  <span className="mono-data text-sm font-bold" style={{ color: 'var(--live)' }}>{m.myScore.toFixed(1)}</span>
-                  <span className="mono-data text-[9px]" style={{ color: 'var(--t4)' }}>vs</span>
-                  <span className="mono-data text-sm" style={{ color: 'var(--t3)' }}>{m.opponentScore.toFixed(1)}</span>
+            {status.matchups.map((m) => {
+              const mineTick = tickDirections.get(`matchup:${m.leagueId}:mine`)
+              const oppTick = tickDirections.get(`matchup:${m.leagueId}:opp`)
+              return (
+                <div key={m.leagueId} className="rounded-lg px-3 py-2 flex-shrink-0" style={{ border: '1px solid var(--hairline)', minWidth: 150 }}>
+                  <p className="mono-data text-[9px] uppercase" style={{ color: 'var(--t3)' }}>{m.leagueName}</p>
+                  <div className="flex items-baseline justify-between mt-1">
+                    <span
+                      key={`matchup:${m.leagueId}:mine:${m.myScore}`}
+                      className={`mono-data text-sm font-bold ${mineTick === 'up' ? 'score-tick-up' : mineTick === 'down' ? 'score-tick-down' : ''}`}
+                      style={{ color: 'var(--live)' }}
+                    >
+                      {m.myScore.toFixed(1)}
+                    </span>
+                    <span className="mono-data text-[9px]" style={{ color: 'var(--t4)' }}>vs</span>
+                    <span
+                      key={`matchup:${m.leagueId}:opp:${m.opponentScore}`}
+                      className={`mono-data text-sm ${oppTick === 'up' ? 'score-tick-up' : oppTick === 'down' ? 'score-tick-down' : ''}`}
+                      style={{ color: 'var(--t3)' }}
+                    >
+                      {m.opponentScore.toFixed(1)}
+                    </span>
+                  </div>
+                  {(m.myProjectedScore !== null || m.opponentProjectedScore !== null) && (
+                    <div className="flex items-baseline justify-between mt-0.5">
+                      <span className="mono-data text-[9px]" style={{ color: 'var(--t4)' }}>
+                        {m.myProjectedScore !== null ? `proj ${m.myProjectedScore.toFixed(1)}` : ''}
+                      </span>
+                      <span className="mono-data text-[9px]" style={{ color: 'var(--t4)' }}>
+                        {m.opponentProjectedScore !== null ? `proj ${m.opponentProjectedScore.toFixed(1)}` : ''}
+                      </span>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </>
       )}

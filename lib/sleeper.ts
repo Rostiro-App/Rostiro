@@ -92,6 +92,55 @@ export async function getSleeperWeekStats(season: number, week: number): Promise
   return byId
 }
 
+// ─── Weekly projections (T-116) ────────────────────────────────────────────────
+// Same shape and endpoint family as getSleeperWeekStats (raw per-category
+// stat lines: pass_yd, rush_td, rec, etc.), just `/projections/` instead of
+// `/stats/` — Sleeper's own pregame projection, not yet scored to any
+// specific league's settings (see lib/scoring.ts, which applies the real
+// league ScoringSettings the same way classifyPointDelta already does for
+// live deltas — never trust Sleeper's own generic pts_ppr/pts_std, since
+// those assume standard modifiers a real league can override). A
+// projection doesn't move nearly as often as a live stat line, so this
+// caches far longer than the 30s actuals cache — same ~2-6MB per-week
+// payload, no reason to refetch it every 15s poll cycle.
+const PROJECTIONS_BASE_URL = 'https://api.sleeper.app/projections/nfl'
+const weekProjectionsCache = new Map<string, { data: Map<string, Record<string, number>>; expiresAt: number }>()
+const WEEK_PROJECTIONS_TTL_MS = 5 * 60_000
+
+interface SleeperWeekProjectionRow {
+  player_id: string
+  stats: Record<string, number>
+}
+
+export async function getSleeperWeekProjections(season: number, week: number): Promise<Map<string, Record<string, number>>> {
+  const cacheKey = `${season}-${week}`
+  const cached = weekProjectionsCache.get(cacheKey)
+  if (cached && cached.expiresAt > Date.now()) return cached.data
+
+  await checkCircuitBreaker('sleeper')
+  const start = Date.now()
+  const path = `/nfl/${season}/${week}?season_type=regular (projections)`
+  const url = `${PROJECTIONS_BASE_URL}/${season}/${week}?season_type=regular`
+  let res: Response
+
+  try {
+    res = await fetch(url, { next: { revalidate: 0 } })
+  } catch (err) {
+    await recordApiCall('sleeper', path, Date.now() - start, false)
+    throw new SleeperAPIError(`Network error fetching ${path}: ${String(err)}`, 'SLEEPER_NETWORK_ERROR')
+  }
+  if (!res.ok) {
+    await recordApiCall('sleeper', path, Date.now() - start, false, res.status)
+    throw new SleeperAPIError(`Sleeper API error ${res.status} on ${path}`, 'SLEEPER_HTTP_ERROR', res.status)
+  }
+  await recordApiCall('sleeper', path, Date.now() - start, true, res.status)
+
+  const rows = (await res.json()) as SleeperWeekProjectionRow[]
+  const byId = new Map(rows.filter((r) => r.stats && Object.keys(r.stats).length > 0).map((r) => [r.player_id, r.stats]))
+  weekProjectionsCache.set(cacheKey, { data: byId, expiresAt: Date.now() + WEEK_PROJECTIONS_TTL_MS })
+  return byId
+}
+
 // ─── Types (raw Sleeper API shapes) ───────────────────────────────────────────
 
 interface SleeperUser {

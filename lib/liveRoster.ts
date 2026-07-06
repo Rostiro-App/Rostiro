@@ -15,9 +15,11 @@
 // "cross-league before single-league" rule (Section 1), applied here for
 // the first time to a live view.
 
-import { getSleeperRosters, getSleeperMatchups } from '@/lib/sleeper'
+import { getSleeperRosters, getSleeperMatchups, getSleeperWeekProjections, SEASON } from '@/lib/sleeper'
 import { toNflverseTeamCode } from '@/lib/liveScores'
 import { currentNflWeek } from '@/lib/liveMatchupPoints'
+import { fetchLeagueScoring } from '@/lib/liveEvents'
+import { computeStatlinePoints } from '@/lib/scoring'
 import { createAdminClient } from '@/lib/supabase'
 
 type AdminClient = ReturnType<typeof createAdminClient>
@@ -52,6 +54,7 @@ export interface LiveRosterPlayer {
   position: string | null
   nflTeam: string | null
   points: number
+  projectedPoints: number | null
   game: LiveGameContext
   leagues: { leagueId: string; leagueName: string; status: 'starting' | 'bench' }[]
 }
@@ -60,7 +63,9 @@ export interface LiveMatchupSummary {
   leagueId: string
   leagueName: string
   myScore: number
+  myProjectedScore: number | null
   opponentScore: number
+  opponentProjectedScore: number | null
 }
 
 export async function buildLiveRoster(
@@ -117,7 +122,17 @@ export async function buildLiveRoster(
   const playersById = new Map<string, LiveRosterPlayer>()
   const matchups: LiveMatchupSummary[] = []
 
+  // T-116: one projections fetch for the whole roster, not per-league or
+  // per-player — same real "current" week every league's matchup rail
+  // already uses (currentNflWeek), and the same cached-Sleeper-payload
+  // pattern as live stats (lib/sleeper.ts). Scored per-league below via
+  // computeStatlinePoints, never Sleeper's own generic pts_ppr/pts_std —
+  // same reasoning as classifyPointDelta's real-scoring-settings rule.
+  const week = await currentNflWeek(admin)
+  const projectionsById = week !== null ? await getSleeperWeekProjections(SEASON, week).catch(() => new Map<string, Record<string, number>>()) : new Map<string, Record<string, number>>()
+
   for (const league of sleeperLeagues) {
+    const scoring = await fetchLeagueScoring(admin, league.id)
     const rosters = await getSleeperRosters(league.league_id).catch(() => [])
     const myRoster = rosters.find((r) => String(r.roster_id) === league.team_id)
     if (!myRoster) continue
@@ -161,6 +176,7 @@ export async function buildLiveRoster(
           position: player.position,
           nflTeam: player.nfl_team,
           points: myPoints[playerId] ?? 0,
+          projectedPoints: scoring ? computeStatlinePoints(projectionsById.get(playerId), player.position, scoring) : null,
           game,
           leagues: [{ leagueId: league.id, leagueName: league.league_name, status }],
         })
@@ -176,7 +192,6 @@ export async function buildLiveRoster(
     // at two different poll moments — same real drift risk a scenario
     // couldn't even simulate, since Sleeper's own live response can't be
     // faked. One cache, one source of truth, fixes both.
-    const week = await currentNflWeek(admin)
     if (week !== null) {
       const weekMatchups = await getSleeperMatchups(league.league_id, week).catch(() => [])
       const mine = weekMatchups.find((m) => m.roster_id === myRoster.roster_id)
@@ -186,6 +201,18 @@ export async function buildLiveRoster(
 
         const sumStarters = (starters: string[], points: Record<string, number>): number =>
           starters.filter((id) => id && id !== '0').reduce((sum, id) => sum + (points[id] ?? 0), 0)
+
+        // Projected total sums the same per-player projection the roster
+        // cards show, over each side's real starters — never a
+        // league-level average or Sleeper's own generic total.
+        const sumProjected = (starters: string[], playerLookup: Map<string, CachedPlayer>): number | null => {
+          if (!scoring) return null
+          const values = starters
+            .filter((id) => id && id !== '0')
+            .map((id) => computeStatlinePoints(projectionsById.get(id), playerLookup.get(id)?.position, scoring))
+            .filter((v): v is number => v !== null)
+          return values.length > 0 ? values.reduce((sum, v) => sum + v, 0) : null
+        }
 
         let opponentPoints: Record<string, number> = {}
         if (opponentRoster) {
@@ -200,10 +227,22 @@ export async function buildLiveRoster(
           opponentPoints = row?.players_points ?? {}
         }
 
+        let opponentCached = new Map<string, CachedPlayer>()
+        if (opponentRoster && (opponentRoster.players ?? []).length > 0) {
+          const { data: oppRows } = await admin
+            .from('players_cache')
+            .select('player_id, name, position, nfl_team')
+            .eq('platform', 'sleeper')
+            .in('player_id', opponentRoster.players ?? [])
+          opponentCached = new Map(((oppRows ?? []) as CachedPlayer[]).map((p) => [p.player_id, p]))
+        }
+
         const myScore = sumStarters(myRoster.starters ?? [], myPoints)
         const opponentScore = opponentRoster ? sumStarters(opponentRoster.starters ?? [], opponentPoints) : 0
+        const myProjectedScore = sumProjected(myRoster.starters ?? [], byId)
+        const opponentProjectedScore = opponentRoster ? sumProjected(opponentRoster.starters ?? [], opponentCached) : null
 
-        matchups.push({ leagueId: league.id, leagueName: league.league_name, myScore, opponentScore })
+        matchups.push({ leagueId: league.id, leagueName: league.league_name, myScore, myProjectedScore, opponentScore, opponentProjectedScore })
       }
     }
   }

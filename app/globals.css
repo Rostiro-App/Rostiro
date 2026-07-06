@@ -262,6 +262,24 @@ body {
 }
 .live-announce-out { animation: live-announce-out 1.4s var(--ease-os) forwards; }
 
+/* T-116: subtle per-player/matchup live-point tick — plays once per real
+   point change (parent remounts the number via a `key` on the value
+   itself, so this never needs a JS timer to reset). Deliberately smaller
+   and quieter than the touchdown/big-play takeover — most ticks are a
+   couple of yards, not a score, and shouldn't compete with that moment. */
+@keyframes score-tick-up {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.16); color: var(--live); }
+  100% { transform: scale(1); }
+}
+@keyframes score-tick-down {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.06); color: var(--warn); }
+  100% { transform: scale(1); }
+}
+.score-tick-up { display: inline-block; animation: score-tick-up 0.7s var(--ease-os); }
+.score-tick-down { display: inline-block; animation: score-tick-down 0.7s var(--ease-os); }
+
 /* iOS safe area support for bottom nav */
 @supports (padding: env(safe-area-inset-bottom)) {
   .pb-safe {
