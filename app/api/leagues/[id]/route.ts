@@ -65,9 +65,13 @@ export async function PATCH(
     .maybeSingle()
 
   if (error) {
-    // 42703 = migration_waiver_cutoff.sql not run yet — degrade honestly
-    // rather than a generic 500.
-    if (error.code === '42703') {
+    // migration_waiver_cutoff.sql not run yet — degrade honestly rather
+    // than a generic 500. 42703 is Postgres's own "undefined_column" (a
+    // direct SQL path); PGRST204 is PostgREST's equivalent for a column
+    // missing from its schema cache, which is what a real Supabase project
+    // actually returns here — verified live, this is the one that fires in
+    // practice, not 42703.
+    if (error.code === '42703' || error.code === 'PGRST204') {
       return NextResponse.json({ error: 'Waiver cutoff config not enabled yet — run migration_waiver_cutoff.sql' }, { status: 503 })
     }
     return NextResponse.json({ error: error.message }, { status: 500 })

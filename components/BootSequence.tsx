@@ -116,7 +116,7 @@ export default function BootSequence() {
     <div
       onClick={skip}
       role="presentation"
-      className={`fixed inset-0 z-[100] flex items-center justify-center cursor-pointer ${phase === 'out' ? 'boot-fade-out' : ''}`}
+      className={`fixed inset-0 z-[100] flex items-center justify-center cursor-pointer ${phase === 'out' ? 'boot-fade-out' : ''}`.trim()}
       style={{ backgroundColor: 'var(--void)' }}
     >
       <div className="ambient-ground" aria-hidden="true" />

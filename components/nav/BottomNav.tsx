@@ -96,7 +96,7 @@ export default function BottomNav() {
         {liveUnlocked ? (
           <Link
             href="/live"
-            className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-all ${liveUnlocking ? 'live-unlock-flash' : ''}`}
+            className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-all ${liveUnlocking ? 'live-unlock-flash' : ''}`.trim()}
             style={{ color: '#E24B4A' }}
           >
             <svg

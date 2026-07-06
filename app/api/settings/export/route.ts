@@ -58,7 +58,11 @@ export async function GET() {
   // gated behind their own migration, same as everywhere else that reads
   // them — degrade rather than 500 the whole export if either hasn't run.
   let leagueRows = leagues.data
-  if (leagues.error?.code === '42703') {
+  // PGRST204 is PostgREST's real code for a schema-cache column miss on a
+  // live Supabase project — verified directly, not a guess; 42703 (Postgres's
+  // own "undefined_column") kept alongside it in case a future direct-SQL
+  // path ever hits this differently.
+  if (leagues.error?.code === '42703' || leagues.error?.code === 'PGRST204') {
     const fallback = await supabase
       .from('connected_leagues')
       .select('platform, league_name, season, team_name, sync_status, last_synced_at, created_at')

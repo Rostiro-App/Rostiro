@@ -46,7 +46,9 @@ export async function GET() {
   // T-107: migration_waiver_cutoff.sql not run yet — retry without the two
   // new columns so the rest of Settings (and league list) still works.
   let leagueRows = leagues
-  if (leaguesError?.code === '42703') {
+  // PGRST204 is PostgREST's real code for a schema-cache column miss on a
+  // live Supabase project — verified directly; 42703 kept for a direct-SQL path.
+  if (leaguesError?.code === '42703' || leaguesError?.code === 'PGRST204') {
     const fallback = await supabase
       .from('connected_leagues')
       .select('id, platform, league_name')
@@ -64,7 +66,7 @@ export async function GET() {
   // together rather than guessing which one caused it.
   let row = profile
   let modeAvailable = true
-  if (profileError?.code === '42703') {
+  if (profileError?.code === '42703' || profileError?.code === 'PGRST204') {
     modeAvailable = false
     const { data: fallback } = await supabase
       .from('users')
@@ -126,9 +128,17 @@ export async function PATCH(request: Request) {
   const { error } = await supabase.from('users').update(update).eq('id', user.id)
 
   if (error) {
-    if (error.code === '42703') {
+    // 42703 is Postgres's own "undefined_column" (a direct SQL path);
+    // PGRST204 is PostgREST's equivalent for a column missing from its
+    // schema cache, which is what a real Supabase project actually returns
+    // here — verified live against this project, not a guess. Whichever
+    // migration is actually missing gets named in the message rather than
+    // a generic one, since mode and seen_hints come from two different
+    // migrations that can be run independently of each other.
+    if (error.code === '42703' || error.code === 'PGRST204') {
+      const migration = update.mode !== undefined ? 'migration_os_shell.sql' : 'migration_experience.sql'
       return NextResponse.json(
-        { error: 'Mode persistence not enabled yet — run migration_os_shell.sql' },
+        { error: `Setting not enabled yet — run ${migration}` },
         { status: 503 }
       )
     }

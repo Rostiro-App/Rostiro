@@ -111,7 +111,7 @@ export default function SystemBar({
   return (
     <>
       <div
-        className={`glass-bar mono-data flex items-center gap-3 md:gap-5 px-3 md:px-4 flex-shrink-0 relative z-20 ${kickoffSweeping ? 'kickoff-sweep' : ''}`}
+        className={`glass-bar mono-data flex items-center gap-3 md:gap-5 px-3 md:px-4 flex-shrink-0 relative z-20 ${kickoffSweeping ? 'kickoff-sweep' : ''}`.trim()}
         style={{ borderBottom: '1px solid var(--hairline)', height: '42px', fontSize: '11px' }}
       >
         {/* Pulse mark — the one element that visibly reflects the active
@@ -215,7 +215,7 @@ export default function SystemBar({
               {deadline.label} · {deadline.leagueName}
             </span>
             <span
-              className={`text-xs ${deadline.kind === 'lineup_lock' && deadlineMs < 5 * 60_000 ? 'breathe' : ''}`}
+              className={`text-xs ${deadline.kind === 'lineup_lock' && deadlineMs < 5 * 60_000 ? 'breathe' : ''}`.trim()}
               style={{
                 color: 'var(--t1)',
                 textShadow: `0 0 14px ${deadline.kind === 'lineup_lock' ? lineupLockRampGlow(deadlineMs) : 'rgba(245,166,35,0.25)'}`,

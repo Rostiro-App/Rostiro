@@ -160,7 +160,7 @@ export default function Sidebar() {
           <Link
             href="/live"
             aria-label="LIVE"
-            className={`flex items-center justify-center w-9 h-9 rounded-[10px] transition-all ${liveUnlocking ? 'live-unlock-flash' : ''}`}
+            className={`flex items-center justify-center w-9 h-9 rounded-[10px] transition-all ${liveUnlocking ? 'live-unlock-flash' : ''}`.trim()}
             style={
               liveActive
                 ? { color: '#E24B4A', backgroundColor: 'rgba(226,75,74,0.14)', boxShadow: '0 0 18px rgba(226,75,74,.25)' }

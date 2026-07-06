@@ -86,7 +86,7 @@ export default function PulseMark({ state, playoffs = false, size = 'nav', class
       viewBox={`0 0 ${width} ${height}`}
       role="img"
       aria-label={`Rostiro ${state.replace('_', ' ')} state`}
-      className={`flex-shrink-0 ${className ?? ''}`}
+      className={`flex-shrink-0 ${className ?? ''}`.trim()}
     >
       <polyline
         points={points}

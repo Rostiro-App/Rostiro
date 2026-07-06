@@ -86,7 +86,10 @@ export async function GET() {
     .eq('user_id', user.id)
 
   let rows: LeagueRow[]
-  if (error?.code === '42703') {
+  // PGRST204 is PostgREST's real code for a schema-cache column miss on a
+  // live Supabase project — verified directly; 42703 (Postgres's own
+  // "undefined_column") kept alongside it for a direct-SQL path.
+  if (error?.code === '42703' || error?.code === 'PGRST204') {
     // T-107: migration_waiver_cutoff.sql not run yet — degrade to the
     // pre-T-107 select rather than 500ing the whole bar over two missing
     // columns nothing critical depends on yet.

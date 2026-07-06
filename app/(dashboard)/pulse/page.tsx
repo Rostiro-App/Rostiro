@@ -296,7 +296,7 @@ export default function PulsePage() {
         {isMissionControl && (
           <span
             key={kickoffSweeping ? 'mission-control-sweep' : 'mission-control-steady'}
-            className={`mono-data inline-block text-[9.5px] tracking-[0.16em] px-2 py-0.5 rounded-full mb-2 ${kickoffSweeping ? 'value-tick' : ''}`}
+            className={`mono-data inline-block text-[9.5px] tracking-[0.16em] px-2 py-0.5 rounded-full mb-2 ${kickoffSweeping ? 'value-tick' : ''}`.trim()}
             style={{
               color: STATE_CONFIG.game_day.color,
               border: `1px solid ${STATE_CONFIG.game_day.color}`,

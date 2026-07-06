@@ -47,7 +47,9 @@ export async function PATCH(
 
   if (error) {
     // 42703 = the persistence columns don't exist yet (migration not run).
-    if (error.code === '42703') {
+    // PGRST204 is PostgREST's real code for this on a live Supabase project
+    // (verified directly) — kept alongside 42703 for a direct-SQL path.
+    if (error.code === '42703' || error.code === 'PGRST204') {
       return NextResponse.json(
         { error: 'Pulse persistence not enabled yet — run migration_os_shell.sql' },
         { status: 503 }

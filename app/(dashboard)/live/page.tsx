@@ -280,7 +280,7 @@ export default function LivePage() {
 
   return (
     <div
-      className={`max-w-4xl mx-auto px-4 pt-6 pb-16 md:px-6 md:pt-8 relative ${justUnlocked ? 'live-reveal' : ''}`}
+      className={`max-w-4xl mx-auto px-4 pt-6 pb-16 md:px-6 md:pt-8 relative ${justUnlocked ? 'live-reveal' : ''}`.trim()}
       style={{ filter: idle ? 'brightness(0.4)' : 'none', transition: 'filter 1.2s' }}
       onClick={idle ? wake : undefined}
     >
@@ -403,7 +403,7 @@ export default function LivePage() {
                   <div className="text-right flex-shrink-0">
                     <p
                       key={`player:${p.playerId}:${p.points}`}
-                      className={`mono-data text-lg font-bold ${tickDirections.get(`player:${p.playerId}`) === 'up' ? 'score-tick-up' : tickDirections.get(`player:${p.playerId}`) === 'down' ? 'score-tick-down' : ''}`}
+                      className={`mono-data text-lg font-bold ${tickDirections.get(`player:${p.playerId}`) === 'up' ? 'score-tick-up' : tickDirections.get(`player:${p.playerId}`) === 'down' ? 'score-tick-down' : ''}`.trim()}
                       style={{ color: 'var(--t1)' }}
                     >
                       {p.points.toFixed(1)}
@@ -466,7 +466,7 @@ export default function LivePage() {
                   <div className="flex items-baseline justify-between mt-1">
                     <span
                       key={`matchup:${m.leagueId}:mine:${m.myScore}`}
-                      className={`mono-data text-sm font-bold ${mineTick === 'up' ? 'score-tick-up' : mineTick === 'down' ? 'score-tick-down' : ''}`}
+                      className={`mono-data text-sm font-bold ${mineTick === 'up' ? 'score-tick-up' : mineTick === 'down' ? 'score-tick-down' : ''}`.trim()}
                       style={{ color: 'var(--live)' }}
                     >
                       {m.myScore.toFixed(1)}
@@ -474,7 +474,7 @@ export default function LivePage() {
                     <span className="mono-data text-[9px]" style={{ color: 'var(--t4)' }}>vs</span>
                     <span
                       key={`matchup:${m.leagueId}:opp:${m.opponentScore}`}
-                      className={`mono-data text-sm ${oppTick === 'up' ? 'score-tick-up' : oppTick === 'down' ? 'score-tick-down' : ''}`}
+                      className={`mono-data text-sm ${oppTick === 'up' ? 'score-tick-up' : oppTick === 'down' ? 'score-tick-down' : ''}`.trim()}
                       style={{ color: 'var(--t3)' }}
                     >
                       {m.opponentScore.toFixed(1)}

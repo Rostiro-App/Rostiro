@@ -28,7 +28,7 @@ export async function GET() {
     // 42703 = the layer column doesn't exist yet (migration_interrupt_layer.sql
     // not run) — degrade to an empty stack rather than a broken page; nothing
     // downstream depends on this succeeding.
-    if (error.code === '42703') return NextResponse.json({ items: [] })
+    if (error.code === '42703' || error.code === 'PGRST204') return NextResponse.json({ items: [] })
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
