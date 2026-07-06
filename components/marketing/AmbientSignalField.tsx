@@ -30,12 +30,22 @@ const WAVE_PATH =
   'L750,60 L780,140 L810,20 L840,160 L870,100 L1020,100 ' +
   'L1050,60 L1080,140 L1110,20 L1140,160 L1170,100 L1400,100'
 
-const SIGNAL_PILLS = [
-  { text: 'Bench Diggs, 2 leagues', color: STATE_CONFIG.standard.color, top: '10%', left: '6%', duration: '17s', delay: '0s' },
-  { text: 'Co-Pilot: value pick available', color: STATE_CONFIG.draft.color, top: '70%', left: '78%', duration: '19s', delay: '5s' },
-  { text: 'Claim Warren, cutoff 3PM', color: STATE_CONFIG.waiver_day.color, top: '76%', left: '10%', duration: '15s', delay: '9s' },
-  { text: 'BUF 14–KC 10, Allen live', color: STATE_CONFIG.game_day.color, top: '16%', left: '82%', duration: '18s', delay: '3s' },
-  { text: 'Week 3 recap: buy-low signal', color: STATE_CONFIG.film_room.color, top: '46%', left: '88%', duration: '16s', delay: '12s' },
+// Right-side pills anchor via `right`, not `left` — a wide pill positioned
+// with left:90% extends well past the viewport edge and gets clipped by
+// the wrapper's overflow-hidden, which is exactly the bug this caused on
+// first pass. Anchoring from the right edge instead keeps every pill fully
+// on-screen regardless of its text length.
+const SIGNAL_PILLS: Array<{ text: string; color: string; top: string; left?: string; right?: string; duration: string; delay: string }> = [
+  { text: 'Bench Diggs, 2 leagues', color: STATE_CONFIG.standard.color, top: '6%', left: '4%', duration: '17s', delay: '0s' },
+  { text: '5 decisions, 3 leagues', color: STATE_CONFIG.standard.color, top: '5%', right: '3%', duration: '18s', delay: '7s' },
+  { text: 'Co-Pilot: value pick available', color: STATE_CONFIG.draft.color, top: '26%', left: '2%', duration: '19s', delay: '5s' },
+  { text: 'Co-Pilot: start Zach Moss', color: STATE_CONFIG.draft.color, top: '24%', right: '3%', duration: '16s', delay: '13s' },
+  { text: 'Claim Warren, cutoff 3PM', color: STATE_CONFIG.waiver_day.color, top: '46%', left: '3%', duration: '15s', delay: '9s' },
+  { text: 'FAAB $42 bid recommended', color: STATE_CONFIG.waiver_day.color, top: '48%', right: '3%', duration: '17s', delay: '2s' },
+  { text: 'BUF 14–KC 10, Allen live', color: STATE_CONFIG.game_day.color, top: '66%', left: '5%', duration: '18s', delay: '3s' },
+  { text: 'Touchdown: +8.4 pts swing', color: STATE_CONFIG.game_day.color, top: '68%', right: '4%', duration: '19s', delay: '11s' },
+  { text: 'Week 3 recap: buy-low signal', color: STATE_CONFIG.film_room.color, top: '85%', left: '7%', duration: '16s', delay: '12s' },
+  { text: 'Usage up 12%, sell-high', color: STATE_CONFIG.film_room.color, top: '86%', right: '5%', duration: '15s', delay: '6s' },
 ]
 
 export default function AmbientSignalField({ accent }: { accent: string }) {
@@ -59,16 +69,21 @@ export default function AmbientSignalField({ accent }: { accent: string }) {
         <path d={WAVE_PATH} fill="none" stroke={accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
 
-      {/* Layer 2: sparse floating "typing" pills — keyboardkarate.io-style,
-          real product vocabulary, never more than 2-3 visible at once. */}
+      {/* Layer 2: floating "typing" pills — keyboardkarate.io-style, real
+          product vocabulary. Ten of them spread across the full hero
+          height/width (founder feedback: the first pass left too much
+          empty space) — still short single-line phrases, never a dense
+          wall of numbers, just more of them filling the flanks around
+          the headline. */}
       {SIGNAL_PILLS.map((p) => (
         <span
           key={p.text}
-          className="tag-pill-float mono-data absolute text-[12px] px-3 py-1.5 rounded-lg"
+          className="tag-pill-float mono-data absolute text-[13px] px-3.5 py-2 rounded-lg"
           style={
             {
               top: p.top,
               left: p.left,
+              right: p.right,
               color: p.color,
               border: `1px solid ${p.color}66`,
               backgroundColor: 'rgba(8,15,26,0.55)',

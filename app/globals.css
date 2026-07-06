@@ -159,7 +159,7 @@ body {
    parse, just atmosphere. */
 @keyframes type-reveal-cycle {
   0%, 12% { width: 0; }
-  38%, 82% { width: var(--type-width); }
+  24%, 82% { width: var(--type-width); }
   100% { width: var(--type-width); }
 }
 .type-reveal-text {
