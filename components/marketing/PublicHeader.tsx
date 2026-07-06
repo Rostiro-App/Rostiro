@@ -1,6 +1,6 @@
 // Shared header for public (no-auth) surfaces: marketing landing + Draft Kit.
 // T-112: rebuilt on the real Rostiro OS tokens (glass-bar, var(--t1) etc.)
-// instead of hardcoded navy hex — this is the same chrome material the
+// instead of hardcoded navy hex. This is the same chrome material the
 // System Bar uses post-auth, not an approximation of it.
 
 import Link from 'next/link'

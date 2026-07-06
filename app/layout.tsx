@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Rostiro — Run Every League.",
+  title: "Rostiro: Run Every League.",
   description: "The operating system for fantasy sports. Manage every league in one place.",
 };
 

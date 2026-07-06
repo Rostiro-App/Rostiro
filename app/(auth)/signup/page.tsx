@@ -29,7 +29,7 @@ export default function SignupPage() {
     } else {
       setMessage({
         type: 'success',
-        text: 'Check your email to confirm — then your 7-day Starter trial begins automatically.',
+        text: 'Check your email to confirm, then your 7-day Starter trial begins automatically.',
       })
     }
   }

@@ -2,7 +2,7 @@
 // (they check for a real, reachable privacy policy during app approval) and
 // before real payments start under T-85.
 //
-// This is a founder-written draft, not legal counsel's — flagged inline
+// This is a founder-written draft, not legal counsel's. Flagged inline
 // below and in the PRD. It accurately describes what the product actually
 // does today (checked against the schema and lib/claude.ts, not assumed),
 // but a lawyer should review it before it's relied on for compliance.
@@ -11,7 +11,7 @@ import PublicHeader from '@/components/marketing/PublicHeader'
 import PublicFooter from '@/components/marketing/PublicFooter'
 
 export const metadata = {
-  title: 'Privacy Policy — Rostiro',
+  title: 'Privacy Policy | Rostiro',
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -49,7 +49,7 @@ export default function PrivacyPage() {
               style={{ color: 'var(--warn)', border: '1px solid rgba(245,166,35,.3)' }}
             >
               This policy describes what Rostiro actually collects and does with your data today,
-              written directly by the Rostiro team. It has not yet been reviewed by a lawyer — treat
+              written directly by the Rostiro team. It has not yet been reviewed by a lawyer, so treat
               it as an accurate draft, not a substitute for legal advice, until that review happens.
             </div>
 
@@ -67,12 +67,12 @@ export default function PrivacyPage() {
               </p>
               <p>
                 <strong style={{ color: 'var(--t1)' }}>Usage data:</strong> which features you use, how often,
-                and the AI-generated recommendations we&apos;ve produced for you — this is what powers your
+                and the AI-generated recommendations we&apos;ve produced for you. This is what powers your
                 Pulse history and lets support diagnose an issue with your account.
               </p>
               <p>
                 <strong style={{ color: 'var(--t1)' }}>Payment information:</strong> handled directly by our
-                payment processor (Stripe) once billing is live — we store a reference to your subscription,
+                payment processor (Stripe) once billing is live. We store a reference to your subscription,
                 never your card number.
               </p>
             </Section>
@@ -81,13 +81,13 @@ export default function PrivacyPage() {
               <p>
                 We use your league and roster data to compute the things Rostiro is actually for: a Health
                 Score per league, start/sit and trade recommendations, waiver priority, and the daily Pulse
-                list. All of that scoring happens in our own deterministic code — the same inputs always
+                list. All of that scoring happens in our own deterministic code: the same inputs always
                 produce the same verdict.
               </p>
               <p>
                 <strong style={{ color: 'var(--t1)' }}>AI processing disclosure:</strong> Rostiro uses
                 Anthropic&apos;s Claude API to turn an already-computed verdict into a short, plain-English
-                explanation of why — Claude never decides your lineup, waiver claim, or trade grade, it only
+                explanation of why. Claude never decides your lineup, waiver claim, or trade grade; it only
                 narrates a decision our own code already made. The relevant roster and matchup context for
                 that explanation is sent to Anthropic&apos;s API to generate it, governed by Anthropic&apos;s
                 own API terms. We do not use your data to train our own models.
@@ -111,8 +111,8 @@ export default function PrivacyPage() {
               </p>
               <p>
                 <strong style={{ color: 'var(--t1)' }}>Deletion:</strong> permanently delete your account and
-                every row tied to it — connected leagues, Pulse history, AI query logs, notification
-                subscriptions — from the same Settings page. This is irreversible and takes effect
+                every row tied to it: connected leagues, Pulse history, AI query logs, notification
+                subscriptions, from the same Settings page. This is irreversible and takes effect
                 immediately.
               </p>
               <p>
@@ -125,7 +125,7 @@ export default function PrivacyPage() {
               <p>
                 We keep your data for as long as your account is active, so Rostiro can keep computing
                 Health Scores and Pulse history against it. If you delete your account, everything tied to
-                it is removed immediately — there is no retention period afterward.
+                it is removed immediately. There is no retention period afterward.
               </p>
             </Section>
 
@@ -152,7 +152,7 @@ export default function PrivacyPage() {
 
             <Section title="Contact">
               <p>
-                Questions about this policy or your data — reach us at{' '}
+                Questions about this policy or your data? Reach us at{' '}
                 <span className="mono-data" style={{ color: 'var(--t1)' }}>privacy@rostiro.com</span>.
               </p>
             </Section>

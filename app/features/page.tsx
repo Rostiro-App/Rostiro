@@ -14,6 +14,8 @@ import TickerBar from '@/components/nav/TickerBar'
 import ProductVideoDemo from '@/components/marketing/ProductVideoDemo'
 import InteractivePulseDemo from '@/components/marketing/InteractivePulseDemo'
 import DataJoinDiagram from '@/components/marketing/DataJoinDiagram'
+import CrossLeagueExposure from '@/components/marketing/CrossLeagueExposure'
+import InterruptStackDemo from '@/components/marketing/InterruptStackDemo'
 import { STATE_CONFIG } from '@/lib/brandTokens'
 
 export const metadata = {
@@ -89,6 +91,10 @@ function PillarOne() {
             audience="For the casual manager"
             body="A 2-minute morning checklist. Rostiro tells you exactly who to start, what to claim, and why, in plain English, not a spreadsheet. No homework, no research rabbit hole before kickoff."
           />
+        </div>
+
+        <div className="max-w-xl mx-auto mt-8">
+          <CrossLeagueExposure />
         </div>
 
         <div className="mt-12">
@@ -264,6 +270,9 @@ function PillarThree() {
             twelve minutes before kickoff). A second event queues behind the first instead of stacking on
             top of it, no matter how many leagues are live at once.
           </p>
+          <div className="mt-6">
+            <InterruptStackDemo />
+          </div>
         </div>
 
         {/* Founder B-roll clip: a real Sunday afternoon. Trigger a

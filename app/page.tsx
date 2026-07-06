@@ -3,16 +3,18 @@
 // philosophy: "Never market AI. Market the outcome."
 //
 // T-112 (July 2026): rebuilt on the real Rostiro OS design tokens
-// (app/globals.css — void ground, glass surfaces, signal glow, mono
+// (app/globals.css: void ground, glass surfaces, signal glow, mono
 // tabular-nums) instead of a hardcoded navy palette that had drifted away
 // from what the post-auth product actually looks like. Pricing corrected to
 // the confirmed model: Free / Rostiro Pro / Founder Season Pass / Founding
-// 500 — the old Scout/Starter/Pro/Commissioner copy matched neither the
+// 500. The old Scout/Starter/Pro/Commissioner copy matched neither the
 // shipped code nor the PRD's target.
 
 import Link from 'next/link'
 import PublicHeader from '@/components/marketing/PublicHeader'
 import PublicFooter from '@/components/marketing/PublicFooter'
+import OldWayVsRostiro from '@/components/marketing/OldWayVsRostiro'
+import RostiroStatesCycle from '@/components/marketing/RostiroStatesCycle'
 import { STATE_CONFIG } from '@/lib/brandTokens'
 
 export default function Home() {
@@ -84,7 +86,7 @@ function Hero() {
 }
 
 // A real reproduction of the System Bar + Pulse, using the same glass/
-// mono-data/ping-dot primitives the post-auth product renders with — not an
+// mono-data/ping-dot primitives the post-auth product renders with, not an
 // approximation of them in a different palette.
 function PulsePreviewCard() {
   const items = [
@@ -161,14 +163,15 @@ function ProblemSection() {
         <p className="text-base mt-8 font-medium" style={{ color: 'var(--signal)' }}>
           Rostiro watches all of it, so you don&apos;t have to remember to.
         </p>
+        <OldWayVsRostiro />
       </div>
     </section>
   )
 }
 
 // ─── Rostiro States ─────────────────────────────────────────────────────────────
-// New section (T-112): the product's actual centerpiece — the OS reshapes
-// around what day it is — had no representation anywhere on the marketing
+// New section (T-112): the product's actual centerpiece (the OS reshapes
+// around what day it is) had no representation anywhere on the marketing
 // site before this. Colors pulled directly from lib/brandTokens.ts's
 // STATE_CONFIG, the same source of truth the product renders from, so this
 // can't drift out of sync the way the old pricing copy did.
@@ -178,7 +181,7 @@ function StatesSection() {
     { key: 'draft', label: 'Draft', when: 'Preseason', copy: 'Live pick recommendations, tiered ADP, no dead air between picks.' },
     { key: 'standard', label: 'Standard', when: 'Wed–Sat', copy: 'Calm monitoring. One ranked list, nothing urgent inflated to look urgent.' },
     { key: 'waiver_day', label: 'Waiver Day', when: 'Tue night / Wed', copy: 'Priority targets, real FAAB math, and the roster-health delta each claim buys you.' },
-    { key: 'game_day', label: 'Game Day', when: 'Thu / Sun / Mon', copy: 'Live scores that name your players, not just the teams — mission control for kickoff to final whistle.' },
+    { key: 'game_day', label: 'Game Day', when: 'Thu / Sun / Mon', copy: 'Live scores that name your players, not just the teams. Mission control for kickoff to final whistle.' },
     { key: 'film_room', label: 'Film Room', when: 'Mon night / Tue AM', copy: 'A quiet recap of what just happened and what it means for next week. Win or lose, no pile-on.' },
   ]
 
@@ -193,11 +196,12 @@ function StatesSection() {
             Rostiro doesn&apos;t look the same on a random Tuesday as it does at kickoff.
           </h2>
           <p className="text-base mt-3 max-w-2xl mx-auto" style={{ color: 'var(--t3)' }}>
-            The whole product reprioritizes itself around what your leagues actually need right now —
+            The whole product reprioritizes itself around what your leagues actually need right now:
             five states, driven by the calendar, not a setting you have to manage.
           </p>
         </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <RostiroStatesCycle />
+        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-14">
           {states.map((s) => {
             const color = STATE_CONFIG[s.key].color
             return (
@@ -354,7 +358,7 @@ function DraftKitSection() {
 }
 
 // ─── Pricing ───────────────────────────────────────────────────────────────────
-// T-112: corrected to the confirmed model (PRD §9) — Free / Rostiro Pro /
+// T-112: corrected to the confirmed model (PRD §9): Free / Rostiro Pro /
 // Founder Season Pass / Founding 500. The prior copy here (Scout/Starter/
 // Pro/Commissioner) matched neither the shipped plan enum nor this model.
 
@@ -380,7 +384,7 @@ function PricingSection() {
       name: '2026 Founder Season Pass',
       price: '$59',
       period: 'full season',
-      includes: ['Everything in Rostiro Pro', 'Locked for the entire 2026 season', 'Launch-window pricing — won’t be offered again'],
+      includes: ['Everything in Rostiro Pro', 'Locked for the entire 2026 season', 'Launch-window pricing, won’t be offered again'],
       cta: 'Claim your season',
       highlight: false,
       badge: 'Launch window only',
@@ -404,7 +408,7 @@ function PricingSection() {
             Start free. Upgrade when it&apos;s already paying for itself.
           </h2>
           <p className="text-sm mt-3" style={{ color: 'var(--t3)' }}>
-            The Founder tiers are launch-window pricing — once the window closes, or the first 500 sell out, they&apos;re gone for good.
+            The Founder tiers are launch-window pricing: once the window closes, or the first 500 sell out, they&apos;re gone for good.
           </p>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -11,7 +11,7 @@ type Step = 'mode' | 'connect' | 'sleeper' | 'yahoo' | 'espn'
 
 const CONNECT_ERRORS: Record<string, string> = {
   yahoo_auth_failed: 'Yahoo connection failed. Please try again.',
-  espn_auth_failed: 'ESPN connection failed — check your cookies and try again.',
+  espn_auth_failed: 'ESPN connection failed. Check your cookies and try again.',
 }
 
 function OnboardingFlow() {
@@ -71,7 +71,7 @@ function OnboardingFlow() {
           <div className="space-y-3">
             <PlatformCard
               name="Sleeper"
-              description="No login needed — just your username."
+              description="No login needed, just your username."
               connected={connected.includes('sleeper')}
               onClick={() => setStep('sleeper')}
             />
@@ -100,7 +100,7 @@ function OnboardingFlow() {
 
             {connected.length === 0 && (
               <p className="text-center text-xs pt-4" style={{ color: 'var(--t3)' }}>
-                Skip is available — but your Pulse will be empty.
+                Skip is available, but your Pulse will be empty.
               </p>
             )}
           </div>
