@@ -4,12 +4,20 @@ import { createSSRClient, createAdminClient } from '@/lib/supabase'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
+  const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
   const state = searchParams.get('state')
   const storedState = request.cookies.get('yahoo_oauth_state')?.value
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://rostiro.vercel.app'
+  // T-128: same bug as app/api/auth/signout/route.ts — was hardcoded to
+  // NEXT_PUBLIC_APP_URL, which .env.local sets to the production URL, so
+  // this would misredirect in any environment where that env var doesn't
+  // exactly match the domain Yahoo actually redirected back to (local
+  // dev, a preview deploy, etc.). Yahoo's own redirect already lands on
+  // whatever domain is correct for this request, so deriving from that
+  // request's own origin instead is strictly more correct, not just a
+  // local-dev workaround.
+  const appUrl = origin
 
   if (!code || !state || state !== storedState) {
     return NextResponse.redirect(`${appUrl}/onboarding?error=yahoo_auth_failed`)
