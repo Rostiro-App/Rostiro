@@ -393,6 +393,13 @@ export interface SystemStatusLeague {
   name: string
   platform: Platform
   health: LeagueHealth
+  // T-117: enough to deep-link into the platform's own league and to edit
+  // the per-league waiver cutoff directly from the Leagues page, without a
+  // second round trip to Settings' own copy of this data.
+  leagueId: string // platform's own league id
+  teamId: string | null
+  waiverCutoffDay: number | null
+  waiverCutoffHour: number | null
 }
 
 export interface SystemDeadline {

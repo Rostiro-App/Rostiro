@@ -147,10 +147,17 @@ export async function GET() {
 
   const results = await Promise.allSettled(
     rows.map(async (league): Promise<SystemStatusLeague> => {
+      const leagueMeta = {
+        leagueId: league.league_id,
+        teamId: league.team_id,
+        waiverCutoffDay: league.waiver_cutoff_day,
+        waiverCutoffHour: league.waiver_cutoff_hour,
+      }
+
       // Health + deadlines are Sleeper-only until Yahoo/ESPN league sync is
       // live end-to-end; other platforms still appear in the bar as unknown.
       if (league.platform !== 'sleeper') {
-        return { id: league.id, name: league.league_name, platform: league.platform, health: UNKNOWN_HEALTH }
+        return { id: league.id, name: league.league_name, platform: league.platform, health: UNKNOWN_HEALTH, ...leagueMeta }
       }
 
       const [rosters, drafts] = await Promise.all([
@@ -174,7 +181,7 @@ export async function GET() {
 
       const myRoster = rosters.find((r) => String(r.roster_id) === league.team_id)
       if (!myRoster) {
-        return { id: league.id, name: league.league_name, platform: 'sleeper', health: UNKNOWN_HEALTH }
+        return { id: league.id, name: league.league_name, platform: 'sleeper', health: UNKNOWN_HEALTH, ...leagueMeta }
       }
 
       const allRosteredIds = new Set(rosters.flatMap((r) => r.players ?? []))
@@ -237,14 +244,23 @@ export async function GET() {
         bestFreeAgentName: bestFreeAgent?.name ?? null,
       })
 
-      return { id: league.id, name: league.league_name, platform: 'sleeper', health }
+      return { id: league.id, name: league.league_name, platform: 'sleeper', health, ...leagueMeta }
     })
   )
 
   const statusLeagues: SystemStatusLeague[] = results.map((r, i) =>
     r.status === 'fulfilled'
       ? r.value
-      : { id: rows[i].id, name: rows[i].league_name, platform: rows[i].platform, health: UNKNOWN_HEALTH }
+      : {
+          id: rows[i].id,
+          name: rows[i].league_name,
+          platform: rows[i].platform,
+          health: UNKNOWN_HEALTH,
+          leagueId: rows[i].league_id,
+          teamId: rows[i].team_id,
+          waiverCutoffDay: rows[i].waiver_cutoff_day,
+          waiverCutoffHour: rows[i].waiver_cutoff_hour,
+        }
   )
 
   deadlines.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())

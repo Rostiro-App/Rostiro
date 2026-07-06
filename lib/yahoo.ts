@@ -405,6 +405,8 @@ export async function proposeYahooTrade(
 
 // ─── Deep-link helpers ─────────────────────────────────────────────────────────
 
+export { yahooLeagueUrl } from '@/lib/leagueLinks'
+
 export function yahooLineupUrl(leagueKey: string, teamKey: string): string {
   const leagueId = leagueKey.split('.l.')[1]
   const teamId = teamKey.split('.t.')[1]

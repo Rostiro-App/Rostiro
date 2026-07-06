@@ -294,6 +294,8 @@ export function getEspnPlayerProjection(
 // ─── Deep-link helpers ─────────────────────────────────────────────────────────
 // Never say "Go to ESPN." Use these exact button labels per PRD.
 
+export { espnLeagueUrl } from '@/lib/leagueLinks'
+
 export function espnLineupUrl(leagueId: string, teamId: string): string {
   return `https://fantasy.espn.com/football/team?leagueId=${leagueId}&teamId=${teamId}`
 }

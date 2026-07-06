@@ -15,7 +15,40 @@
 
 import { useEffect, useState } from 'react'
 import { useMode } from '@/components/nav/AppShell'
+import { sleeperLeagueUrl, espnLeagueUrl, yahooLeagueUrl } from '@/lib/leagueLinks'
 import type { LeagueHealthFactor, LeagueHealthStatus, RostiroState, SystemStatus, SystemStatusLeague } from '@/types'
+
+// T-117: plain-language reference for the 5 Health Score factors (PRD 6.2)
+// — the page showed the raw factor labels/weights with nothing explaining
+// what they mean or how they're computed, real feedback from watching
+// someone actually use this page. Wording matches lib/healthScore.ts's real
+// formulas, not a generic gloss.
+// Labels match lib/healthScore.ts's allFactors() exactly (30/20/20/20/10%).
+const FACTOR_LABEL: Record<string, string> = {
+  injury: 'Starter injury risk',
+  bye: 'Bye exposure',
+  waiver: 'Waiver opportunity',
+  matchup: 'Matchup difficulty',
+  depth: 'Roster depth',
+}
+
+const FACTOR_EXPLAINER: Record<string, string> = {
+  injury: 'How healthy your starters are right now. A core player marked Out/IR costs a lot; Questionable/Doubtful costs less.',
+  bye: 'How many of your rostered players are on bye in a given week. Loads once the season schedule is live.',
+  waiver: 'Whether a free agent on the wire is a better player (by ADP) than your weakest starter — a sign there’s a real upgrade sitting unclaimed.',
+  matchup: 'How tough your opponent’s roster is this week. Loads once weekly matchups are set.',
+  depth: 'How close your bench is to your starters in talent — deep bench survives an injury, thin bench doesn’t.',
+}
+
+const WAIVER_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+function platformLeagueUrl(league: SystemStatusLeague): string | null {
+  if (!league.leagueId) return null
+  if (league.platform === 'sleeper') return sleeperLeagueUrl(league.leagueId)
+  if (league.platform === 'espn') return espnLeagueUrl(league.leagueId)
+  if (league.platform === 'yahoo') return yahooLeagueUrl(league.leagueId)
+  return null
+}
 
 function sortFactorsByUrgency(factors: LeagueHealthFactor[]): LeagueHealthFactor[] {
   return [...factors].sort((a, b) => {
@@ -58,6 +91,39 @@ export default function LeaguesPage() {
   const [status, setStatus] = useState<SystemStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showExplainer, setShowExplainer] = useState(false)
+
+  // Optimistic-update-with-rollback, same pattern as Settings' identical
+  // controls — this page and Settings both write through the same
+  // /api/leagues/[id] routes, just from the context where a user actually
+  // looks (real feedback: "there's no league management here").
+  async function disconnect(leagueId: string) {
+    const prevLeagues = status?.leagues ?? []
+    setStatus((prev) => (prev ? { ...prev, leagues: prev.leagues.filter((l) => l.id !== leagueId) } : prev))
+    const res = await fetch(`/api/leagues/${leagueId}`, { method: 'DELETE' })
+    if (!res.ok) {
+      setStatus((prev) => (prev ? { ...prev, leagues: prevLeagues } : prev))
+      setError('Could not disconnect that league — try again.')
+    }
+  }
+
+  async function updateWaiverCutoff(leagueId: string, waiverCutoffDay: number | null, waiverCutoffHour: number | null) {
+    const prevLeagues = status?.leagues ?? []
+    setStatus((prev) =>
+      prev
+        ? { ...prev, leagues: prev.leagues.map((l) => (l.id === leagueId ? { ...l, waiverCutoffDay, waiverCutoffHour } : l)) }
+        : prev
+    )
+    const res = await fetch(`/api/leagues/${leagueId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ waiverCutoffDay, waiverCutoffHour }),
+    })
+    if (!res.ok) {
+      setStatus((prev) => (prev ? { ...prev, leagues: prevLeagues } : prev))
+      setError('Could not save that waiver cutoff — try again.')
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -93,17 +159,47 @@ export default function LeaguesPage() {
               : 'Health recalculated on every sync'}
           </p>
         </div>
-        {/* T-109: previously only reachable when leagues.length === 0 — a
-            returning user with leagues already connected had no way to add
-            another one anywhere in the app. */}
-        <a
-          href="/leagues/add"
-          className="mono-data flex-shrink-0 text-[11px] font-semibold tracking-[0.05em] px-3 py-1.5 rounded-lg transition-all hover:brightness-110"
-          style={{ backgroundColor: 'var(--signal-dim)', color: 'var(--signal)', border: '1px solid rgba(75,163,245,.4)' }}
-        >
-          + Add league
-        </a>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => setShowExplainer((v) => !v)}
+            className="mono-data text-[11px] font-semibold tracking-[0.05em] px-3 py-1.5 rounded-lg transition-all"
+            style={{ color: 'var(--t2)', border: '1px solid var(--hairline)' }}
+          >
+            {showExplainer ? 'Hide' : 'What do these mean?'}
+          </button>
+          {/* T-109: previously only reachable when leagues.length === 0 — a
+              returning user with leagues already connected had no way to add
+              another one anywhere in the app. */}
+          <a
+            href="/leagues/add"
+            className="mono-data text-[11px] font-semibold tracking-[0.05em] px-3 py-1.5 rounded-lg transition-all hover:brightness-110"
+            style={{ backgroundColor: 'var(--signal-dim)', color: 'var(--signal)', border: '1px solid rgba(75,163,245,.4)' }}
+          >
+            + Add league
+          </a>
+        </div>
       </div>
+
+      {showExplainer && (
+        <div className="glass rounded-[14px] p-5 mb-5">
+          <p className="text-[13px] font-semibold mb-1" style={{ color: 'var(--t1)' }}>What is Health Score?</p>
+          <p className="text-[12.5px] mb-3" style={{ color: 'var(--t2)' }}>
+            0–100, a weighted average of the factors below. If a factor has no data yet (preseason bye/matchup),
+            it&apos;s dropped and the rest reweight to fill the gap — never a guessed number standing in.
+          </p>
+          <div className="space-y-2">
+            {Object.entries(FACTOR_EXPLAINER).map(([key, text]) => (
+              <p key={key} className="text-[12px] leading-snug" style={{ color: 'var(--t2)' }}>
+                <span className="font-semibold" style={{ color: 'var(--t1)' }}>
+                  {FACTOR_LABEL[key] ?? key}:
+                </span>{' '}
+                {text}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
 
       {loading && <SkeletonGrid />}
       {!loading && error && (
@@ -120,7 +216,14 @@ export default function LeaguesPage() {
       {!loading && !error && leagues.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {leagues.map((league) => (
-            <LeagueCard key={league.id} league={league} rostiroState={status?.rostiroState ?? 'standard'} mode={mode} />
+            <LeagueCard
+              key={league.id}
+              league={league}
+              rostiroState={status?.rostiroState ?? 'standard'}
+              mode={mode}
+              onDisconnect={disconnect}
+              onUpdateWaiverCutoff={updateWaiverCutoff}
+            />
           ))}
         </div>
       )}
@@ -132,10 +235,14 @@ function LeagueCard({
   league,
   rostiroState,
   mode,
+  onDisconnect,
+  onUpdateWaiverCutoff,
 }: {
   league: SystemStatusLeague
   rostiroState: RostiroState
   mode: string
+  onDisconnect: (leagueId: string) => void
+  onUpdateWaiverCutoff: (leagueId: string, day: number | null, hour: number | null) => void
 }) {
   const { health } = league
   const color = STATUS_COLOR[health.status]
@@ -145,6 +252,9 @@ function LeagueCard({
   // Balanced/Savant keep the full breakdown (identical today, since there's
   // no deeper data layer to add for Savant here yet).
   const showFactors = mode !== 'focused'
+  const [managing, setManaging] = useState(false)
+  const [confirmingDisconnect, setConfirmingDisconnect] = useState(false)
+  const leagueUrl = platformLeagueUrl(league)
 
   return (
     <div className="glass card-hover rounded-[16px] p-6">
@@ -180,6 +290,103 @@ function LeagueCard({
           ))}
         </div>
       )}
+
+      {/* T-117: this page had zero league management — found via direct
+          founder feedback ("no league management options here"). Deep-link
+          to the platform's own league, and the same disconnect/waiver-
+          cutoff controls Settings already has, reachable from where a user
+          actually looks at a specific league. */}
+      <div className="mt-5 pt-4" style={{ borderTop: '1px solid var(--hairline)' }}>
+        <div className="flex items-center justify-between gap-2">
+          {leagueUrl ? (
+            <a
+              href={leagueUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11.5px] font-semibold"
+              style={{ color: 'var(--signal)' }}
+            >
+              Open in {PLATFORM_LABEL[league.platform] ?? league.platform} →
+            </a>
+          ) : (
+            <span />
+          )}
+          <button
+            type="button"
+            onClick={() => setManaging((v) => !v)}
+            className="text-[11.5px] px-2.5 py-1 rounded-lg transition-all"
+            style={{ color: 'var(--t3)', border: '1px solid var(--hairline)' }}
+          >
+            {managing ? 'Done' : 'Manage'}
+          </button>
+        </div>
+
+        {managing && (
+          <div className="mt-3 space-y-3">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px]" style={{ color: 'var(--t3)' }}>Waiver cutoff</span>
+              <select
+                value={league.waiverCutoffDay ?? ''}
+                onChange={(e) => {
+                  const day = e.target.value === '' ? null : Number(e.target.value)
+                  onUpdateWaiverCutoff(league.id, day, day === null ? null : league.waiverCutoffHour ?? 3)
+                }}
+                className="text-[10px] rounded px-1.5 py-0.5 outline-none"
+                style={{ backgroundColor: 'rgba(6,11,19,0.55)', border: '1px solid var(--hairline)', color: 'var(--t2)' }}
+              >
+                <option value="">Default (Tue/Wed)</option>
+                {WAIVER_DAYS.map((d, i) => (
+                  <option key={i} value={i}>{d}</option>
+                ))}
+              </select>
+              {league.waiverCutoffDay !== null && (
+                <select
+                  value={league.waiverCutoffHour ?? 3}
+                  onChange={(e) => onUpdateWaiverCutoff(league.id, league.waiverCutoffDay, Number(e.target.value))}
+                  className="text-[10px] rounded px-1.5 py-0.5 outline-none"
+                  style={{ backgroundColor: 'rgba(6,11,19,0.55)', border: '1px solid var(--hairline)', color: 'var(--t2)' }}
+                >
+                  {Array.from({ length: 24 }, (_, h) => (
+                    <option key={h} value={h}>{String(h).padStart(2, '0')}:00 ET</option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between">
+              <p className="text-[10.5px]" style={{ color: 'var(--t4)' }}>
+                Overrides the global Tue/Wed default for Waiver Day.
+              </p>
+              {confirmingDisconnect ? (
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <button
+                    onClick={() => onDisconnect(league.id)}
+                    className="text-[11px] font-semibold px-2.5 py-1 rounded-lg"
+                    style={{ backgroundColor: 'rgba(232,80,74,.13)', color: 'var(--crit)' }}
+                  >
+                    Confirm
+                  </button>
+                  <button
+                    onClick={() => setConfirmingDisconnect(false)}
+                    className="text-[11px] px-2.5 py-1 rounded-lg"
+                    style={{ color: 'var(--t2)' }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmingDisconnect(true)}
+                  className="text-[11px] px-2.5 py-1 rounded-lg flex-shrink-0 transition-all"
+                  style={{ color: 'var(--t3)', border: '1px solid var(--hairline)' }}
+                >
+                  Disconnect
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
