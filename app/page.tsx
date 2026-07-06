@@ -15,6 +15,7 @@ import PublicHeader from '@/components/marketing/PublicHeader'
 import PublicFooter from '@/components/marketing/PublicFooter'
 import OldWayVsRostiro from '@/components/marketing/OldWayVsRostiro'
 import RostiroStatesCycle from '@/components/marketing/RostiroStatesCycle'
+import AmbientSignalField from '@/components/marketing/AmbientSignalField'
 import PulseMark from '@/components/PulseMark'
 import { STATE_CONFIG } from '@/lib/brandTokens'
 import { getPublicRostiroState } from '@/lib/publicRostiroState'
@@ -52,8 +53,9 @@ function Hero({ state }: { state: keyof typeof STATE_CONFIG }) {
   const accent = STATE_CONFIG[state].color
 
   return (
-    <section className="px-4 md:px-6 pt-16 pb-20 md:pt-24 md:pb-28">
-      <div className="max-w-3xl mx-auto text-center">
+    <section className="px-4 md:px-6 pt-16 pb-20 md:pt-24 md:pb-28" style={{ position: 'relative' }}>
+      <AmbientSignalField accent={accent} />
+      <div className="max-w-3xl mx-auto text-center" style={{ position: 'relative', zIndex: 1 }}>
         <span
           className="hero-enter mono-data inline-flex items-center gap-2 text-[11px] tracking-[0.16em] uppercase px-3 py-1 rounded-full mb-6"
           style={{ backgroundColor: `${accent}22`, color: accent, animationDelay: '0ms' }}
@@ -122,7 +124,7 @@ function PulsePreviewCard() {
   return (
     <div
       className="glass-heavy max-w-2xl mx-auto mt-14 rounded-2xl overflow-hidden"
-      style={{ boxShadow: '0 20px 60px -20px rgba(0,0,0,0.6)' }}
+      style={{ boxShadow: '0 20px 60px -20px rgba(0,0,0,0.6)', position: 'relative', zIndex: 1 }}
     >
       <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid var(--hairline)' }}>
         <div className="flex items-center gap-2">

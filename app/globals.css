@@ -119,6 +119,32 @@ body {
   to { transform: translate(-5vw, -6vh); }
 }
 
+/* T-124 revision: homepage hero ambient background — "Living Signal
+   Field." Two layers, both deliberately abstract, nothing legible:
+   (1) oversized blurred pulse-waveform lines (the same heartbeat shape as
+   PulseMark, scaled up) drifting slowly behind the hero, (2) a handful of
+   sparse floating single-word tag pills (real product vocabulary — WAIVER,
+   TOUCHDOWN, etc.) that fade in/out one at a time, never a dense wall of
+   text. Deliberately NOT a ticker of real stats/numbers/player names —
+   founder flagged that as intimidating to a first-time casual visitor. */
+@keyframes signal-wave-drift {
+  0% { transform: translateX(-3vw) translateY(0); }
+  50% { transform: translateX(3vw) translateY(-1.5vh); }
+  100% { transform: translateX(-3vw) translateY(0); }
+}
+.signal-wave { animation: signal-wave-drift var(--wave-duration, 40s) ease-in-out infinite; }
+
+@keyframes tag-pill-drift {
+  0% { opacity: 0; transform: translateY(24px); }
+  12% { opacity: 1; transform: translateY(0); }
+  82% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-24px); }
+}
+.tag-pill-float {
+  animation: tag-pill-drift var(--pill-duration, 16s) ease-in-out infinite;
+  animation-delay: var(--pill-delay, 0s);
+}
+
 /* ═══ Live-state animations ═══ */
 @keyframes rostiro-ping {
   0% { transform: scale(1); opacity: 0.9; }
@@ -307,7 +333,9 @@ body {
   .ticker-slide-in,
   .draft-queue-slide-in,
   .waiver-reflow-in,
-  .boot-mark-in {
+  .boot-mark-in,
+  .signal-wave,
+  .tag-pill-float {
     animation: none;
   }
   .panel-enter,
