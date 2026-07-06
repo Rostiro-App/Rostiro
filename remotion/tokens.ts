@@ -29,4 +29,6 @@ export const STATE_COLOR = {
   film_room: '#7F77DD',
 } as const
 
+export type RostiroStateKey = keyof typeof STATE_COLOR
+
 export const FONT_FAMILY = 'Inter, system-ui, sans-serif'
