@@ -415,6 +415,7 @@ export interface SystemDeadline {
 // cross-league-relevance rule; Pulse/System Bar show only those, the bottom
 // ticker shows all of them (its existing unfiltered, public-market character).
 export interface RelevantPlayer {
+  playerId: string
   name: string
   leagueNames: string[]
 }

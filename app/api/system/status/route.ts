@@ -325,7 +325,7 @@ export async function GET() {
         const team = toNflverseTeamCode(row.nfl_team)
         relevantTeams.add(team)
         const list = playersByTeam.get(team) ?? []
-        list.push({ name: row.name, leagueNames: [...(playerLeagueNames.get(row.player_id) ?? [])] })
+        list.push({ playerId: row.player_id, name: row.name, leagueNames: [...(playerLeagueNames.get(row.player_id) ?? [])] })
         playersByTeam.set(team, list)
       }
 
@@ -337,13 +337,17 @@ export async function GET() {
       // Pulse/System Bar without touching the real computation or
       // affecting any account without the flag.
       if (process.env.DEMO_MODE === 'true') {
+        // playerId values here are illustrative, not real Sleeper ids — the
+        // Player Intelligence Card degrades to its own "not found" state on
+        // click, same as any other unrecognized id. Fine for a dev-only,
+        // git-ignored flag; not something a real user ever sees.
         const DEMO_PLAYERS: Record<string, RelevantPlayer[]> = {
-          TEN: [{ name: 'Derrick Henry', leagueNames: ['Demo League'] }],
+          TEN: [{ playerId: 'demo-derrick-henry', name: 'Derrick Henry', leagueNames: ['Demo League'] }],
           PHI: [
-            { name: 'Jalen Hurts', leagueNames: ['Demo League'] },
-            { name: 'Saquon Barkley', leagueNames: ['Demo League 2'] },
+            { playerId: 'demo-jalen-hurts', name: 'Jalen Hurts', leagueNames: ['Demo League'] },
+            { playerId: 'demo-saquon-barkley', name: 'Saquon Barkley', leagueNames: ['Demo League 2'] },
           ],
-          DAL: [{ name: 'Cowboys D/ST', leagueNames: ['Demo League'] }],
+          DAL: [{ playerId: 'demo-cowboys-dst', name: 'Cowboys D/ST', leagueNames: ['Demo League'] }],
         }
         for (const team of (process.env.DEMO_ROSTER_TEAMS ?? 'TEN,PHI,DAL').split(',')) {
           const trimmed = team.trim()

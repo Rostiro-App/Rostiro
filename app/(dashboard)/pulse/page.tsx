@@ -15,6 +15,8 @@ import { STATE_CONFIG } from '@/lib/brandTokens'
 import { useGameDayKickoffTransition } from '@/lib/gameDayTransition'
 import { useFocusTrap } from '@/lib/useFocusTrap'
 import HintAnchor from '@/components/hints/HintAnchor'
+import { openPlayerCard } from '@/lib/openPlayerCard'
+import PlayerSummaryLine from '@/components/players/PlayerSummaryLine'
 import type { LiveGameScore, PulseItem, PulseItemType, PulsePriority, RostiroState } from '@/types'
 
 // ─── Priority + type config ────────────────────────────────────────────────────
@@ -74,6 +76,7 @@ interface PulseResponse {
 
 // T-108
 interface FilmRoomUsageSignal {
+  playerId: string
   name: string
   position: string | null
   direction: 'buy_low' | 'sell_high'
@@ -255,6 +258,16 @@ export default function PulsePage() {
   // T-92: plays once, the first moment this client notices a game go live.
   const kickoffSweeping = useGameDayKickoffTransition(rostiroState, liveGames.length > 0)
 
+  // PRD §3: Focused is "5 max actions" — a real, promised difference from
+  // Balanced/Savant, not just hidden reasoning text. Caps the already-
+  // prioritized list (server orders it worst/most-actionable first) rather
+  // than re-sorting; the header above still states the true total decision
+  // count honestly (Section 1: "explainable by default," never a number
+  // that quietly disagrees with reality elsewhere on the same screen).
+  const FOCUSED_CAP = 5
+  const visibleItems = mode === 'focused' ? displayItems.slice(0, FOCUSED_CAP) : displayItems
+  const hiddenByFocusedCap = displayItems.length - visibleItems.length
+
   return (
     <div className="max-w-2xl mx-auto px-4 pt-6 pb-8 md:px-6 md:pt-8">
 
@@ -399,10 +412,8 @@ export default function PulsePage() {
                 </div>
                 {/* UX Behavior Spec Gap #1: never blurred — why this game
                     is yours, not the score itself, so it isn't Pro-gated. */}
-                {playerSummary(g.relevantPlayers) && (
-                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--t2)' }}>
-                    {playerSummary(g.relevantPlayers)}
-                  </p>
+                {g.relevantPlayers.length > 0 && (
+                  <PlayerSummaryLine players={g.relevantPlayers} className="block text-[11px] mt-0.5" style={{ color: 'var(--t2)' }} />
                 )}
               </div>
             ))}
@@ -452,7 +463,14 @@ export default function PulsePage() {
                     quietest palette; the arrow carries the direction. */}
                 {r.usageSignal && (
                   <p className="mono-data text-[10.5px] mt-1.5" style={{ color: 'var(--t3)' }}>
-                    {r.usageSignal.direction === 'buy_low' ? '↑' : '↓'} {r.usageSignal.name}
+                    {r.usageSignal.direction === 'buy_low' ? '↑' : '↓'}{' '}
+                    <button
+                      type="button"
+                      onClick={() => openPlayerCard(r.usageSignal!.playerId)}
+                      className="underline decoration-dotted underline-offset-2 hover:text-[var(--t1)]"
+                    >
+                      {r.usageSignal.name}
+                    </button>
                     {r.usageSignal.position ? ` (${r.usageSignal.position})` : ''} — snap share{' '}
                     {r.usageSignal.direction === 'buy_low' ? 'up' : 'down'} {r.usageSignal.deltaPct}pts
                   </p>
@@ -468,7 +486,7 @@ export default function PulsePage() {
         <div className="mb-4 flex items-center gap-2">
           <div className="h-px flex-1" style={{ backgroundColor: 'var(--hairline)' }} />
           <span className="mono-data text-[9px] tracking-[0.18em]" style={{ color: 'var(--t3)' }}>
-            {items.length} ITEMS · FOCUSED
+            {hiddenByFocusedCap > 0 ? `TOP ${visibleItems.length} OF ${items.length} · FOCUSED` : `${items.length} ITEMS · FOCUSED`}
           </span>
           <div className="h-px flex-1" style={{ backgroundColor: 'var(--hairline)' }} />
         </div>
@@ -483,7 +501,7 @@ export default function PulsePage() {
       )}
       {!loading && items.length > 0 && (
         <div className={mode === 'balanced' ? 'space-y-3' : 'space-y-2'}>
-          {displayItems.map((item, index) => (
+          {visibleItems.map((item, index) => (
             <PulseCard
               key={item.id}
               item={item}
@@ -497,6 +515,11 @@ export default function PulsePage() {
           ))}
         </div>
       )}
+      {mode === 'focused' && hiddenByFocusedCap > 0 && (
+        <p className="text-[11.5px] text-center mt-3" style={{ color: 'var(--t4)' }}>
+          {hiddenByFocusedCap} more in Balanced or Savant
+        </p>
+      )}
 
       {detail && (
         <DetailDrawer
@@ -507,16 +530,6 @@ export default function PulsePage() {
       )}
     </div>
   )
-}
-
-// UX Behavior Spec Gap #1: "Hurts, Barkley (2 leagues)" — names every
-// rostered player that made this game relevant, and how many distinct
-// leagues they span.
-function playerSummary(players: LiveGameScore['relevantPlayers']): string {
-  if (!players || players.length === 0) return ''
-  const names = players.map((p) => p.name).join(', ')
-  const leagueCount = new Set(players.flatMap((p) => p.leagueNames)).size
-  return leagueCount > 0 ? `${names} (${leagueCount} ${leagueCount === 1 ? 'league' : 'leagues'})` : names
 }
 
 function greeting(): string {

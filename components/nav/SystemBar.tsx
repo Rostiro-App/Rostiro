@@ -12,6 +12,7 @@ import { type Mode, ModeButton, ModeSwitcher } from './AppShell'
 import PulseMark from '@/components/PulseMark'
 import { useGameDayKickoffTransition } from '@/lib/gameDayTransition'
 import HintAnchor from '@/components/hints/HintAnchor'
+import PlayerSummaryLine from '@/components/players/PlayerSummaryLine'
 import type { LeagueHealthStatus, LiveGameScore, SystemStatus, UserPlan } from '@/types'
 
 // T-110: nothing in the UI showed plan at all — free deliberately gets no
@@ -312,9 +313,9 @@ function LiveScoreBadge({ games, gated }: { games: LiveGameScore[]; gated: boole
           </span>
           {/* UX Behavior Spec Gap #1: never blurred — this is "why this
               game is yours," not the score itself, so it isn't Pro-gated. */}
-          {playerSummary(live[0].relevantPlayers) && (
+          {live[0].relevantPlayers.length > 0 && (
             <span className="hidden md:inline truncate max-w-40" style={{ color: 'var(--t3)' }}>
-              · {playerSummary(live[0].relevantPlayers)}
+              · <PlayerSummaryLine players={live[0].relevantPlayers} />
             </span>
           )}
         </span>
@@ -337,8 +338,8 @@ function LiveScoreBadge({ games, gated }: { games: LiveGameScore[]; gated: boole
           {live.map((g) => (
             <span key={g.gameId} className="flex items-baseline gap-1.5">
               <span style={{ filter: gated ? 'blur(4px)' : 'none' }}>{gameLabel(g)}</span>
-              {playerSummary(g.relevantPlayers) && (
-                <span style={{ color: 'var(--t3)' }}>· {playerSummary(g.relevantPlayers)}</span>
+              {g.relevantPlayers.length > 0 && (
+                <span style={{ color: 'var(--t3)' }}>· <PlayerSummaryLine players={g.relevantPlayers} /></span>
               )}
             </span>
           ))}
@@ -351,17 +352,6 @@ function LiveScoreBadge({ games, gated }: { games: LiveGameScore[]; gated: boole
 function gameLabel(g: LiveGameScore): string {
   const clock = g.statusState === 'post' ? 'FINAL' : `Q${g.period} ${g.displayClock}`
   return `${g.awayTeam} ${g.awayScore} – ${g.homeTeam} ${g.homeScore} · ${clock}`
-}
-
-// UX Behavior Spec Gap #1: "Hurts, Barkley (2 leagues)" — names every
-// rostered player that made this game relevant, and how many distinct
-// leagues they span. Empty string (never rendered) when there's nothing
-// to attribute, e.g. the DEMO_MODE team-only override with no players.
-function playerSummary(players: LiveGameScore['relevantPlayers']): string {
-  if (!players || players.length === 0) return ''
-  const names = players.map((p) => p.name).join(', ')
-  const leagueCount = new Set(players.flatMap((p) => p.leagueNames)).size
-  return leagueCount > 0 ? `${names} (${leagueCount} ${leagueCount === 1 ? 'league' : 'leagues'})` : names
 }
 
 // T-93/6.12: calm -> warm -> urgent as a lineup-lock deadline nears. Plain

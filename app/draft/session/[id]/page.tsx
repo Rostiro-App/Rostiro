@@ -23,12 +23,34 @@ import {
   type RankedPlayer,
 } from '@/lib/draftBoard'
 import { useMode } from '@/components/nav/AppShell'
+import { openPlayerCard } from '@/lib/openPlayerCard'
 import type { ADPPlayer, DraftPick, DraftSettings, DraftStrategy, NFLPosition, Platform } from '@/types'
 import type { DraftPickRecommendation } from '@/lib/claude'
 
 const POLL_INTERVAL_MS = 3_000
 const PREFETCH_THRESHOLD = 3
 const NEEDED_POSITIONS: NFLPosition[] = ['QB', 'RB', 'WR', 'TE', 'K']
+
+// T-118: every player name on this page opens the Player Intelligence Card
+// — Best Available, My Queue, Recent Picks, My Roster, and Copilot Signal
+// all had names as dead text, none of them wired despite the page being
+// entirely about players. stopPropagation matters here specifically: most
+// of these names sit inside rows that already have their own click/star
+// behavior (queue toggle, draft-a-player), and this must never trigger that.
+function PlayerNameButton({ playerId, children, className }: { playerId: string; children: React.ReactNode; className?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation()
+        openPlayerCard(playerId)
+      }}
+      className={`text-left underline decoration-dotted underline-offset-2 hover:brightness-125 ${className ?? ''}`}
+    >
+      {children}
+    </button>
+  )
+}
 
 export default function DraftSessionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: sessionId } = use(params)
@@ -504,7 +526,10 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
                       {rank ? `#${rank}` : '–'}
                     </span>
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-white">{p.name} <span className="text-xs font-normal" style={{ color: 'var(--t3)' }}>{p.position} · ADP {p.overallRank}</span></p>
+                      <p className="text-sm font-semibold text-white">
+                        <PlayerNameButton playerId={p.playerId}>{p.name}</PlayerNameButton>{' '}
+                        <span className="text-xs font-normal" style={{ color: 'var(--t3)' }}>{p.position} · ADP {p.overallRank}</span>
+                      </p>
                       <p className="text-sm mt-0.5" style={{ color: 'var(--t2)' }}>{rec.reasoning}</p>
                     </div>
                   </div>
@@ -566,7 +591,8 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
             <div className="mt-2.5 space-y-1">
               {pendingStrategy.drops.map((r) => (
                 <p key={r.player.playerId} className="text-sm" style={{ color: 'var(--t1)' }}>
-                  {r.player.name} <span style={{ color: 'var(--t3)' }}>{r.player.position}</span>
+                  <PlayerNameButton playerId={r.player.playerId}>{r.player.name}</PlayerNameButton>{' '}
+                  <span style={{ color: 'var(--t3)' }}>{r.player.position}</span>
                 </p>
               ))}
             </div>
@@ -632,7 +658,7 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
                   ADP {p.overallRank}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-white truncate">{p.name}</p>
+                  <PlayerNameButton playerId={p.playerId} className="block text-sm font-medium text-white truncate">{p.name}</PlayerNameButton>
                   <p className="text-xs truncate" style={{ color: 'var(--t3)' }}>{p.position} · {p.nflTeam || 'FA'}</p>
                 </div>
                 {mode !== 'focused' && (r.strategyWeight !== 0 || r.formatWeight !== 0) && (
@@ -692,7 +718,7 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
                     ★
                   </button>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-white truncate">{r.player.name}</p>
+                    <PlayerNameButton playerId={r.player.playerId} className="block text-sm font-medium text-white truncate">{r.player.name}</PlayerNameButton>
                     <p className="text-xs truncate" style={{ color: 'var(--t3)' }}>{r.player.position} · ADP {r.player.overallRank}</p>
                   </div>
                 </div>
@@ -720,7 +746,8 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
                 >
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate" style={{ color: p.isMyPick ? 'var(--signal)' : 'white' }}>
-                      {p.playerName} <span className="text-xs font-normal" style={{ color: 'var(--t3)' }}>{p.position}</span>
+                      <PlayerNameButton playerId={p.playerId}>{p.playerName}</PlayerNameButton>{' '}
+                      <span className="text-xs font-normal" style={{ color: 'var(--t3)' }}>{p.position}</span>
                     </p>
                     <p className="mono-data text-[10px] mt-0.5" style={{ color: 'var(--t3)' }}>
                       PICK {p.pickNumber} · {p.isMyPick ? 'YOU' : `TEAM ${p.pickedByTeamId}`}
@@ -755,7 +782,7 @@ export default function DraftSessionPage({ params }: { params: Promise<{ id: str
                   className="flex items-center justify-between px-4 py-2.5"
                   style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', borderTop: i === 0 ? 'none' : '1px solid var(--hairline)' }}
                 >
-                  <p className="text-sm font-medium text-white">{p.playerName}</p>
+                  <PlayerNameButton playerId={p.playerId} className="text-sm font-medium text-white">{p.playerName}</PlayerNameButton>
                   <span className="text-xs" style={{ color: 'var(--t3)' }}>{p.position} · Round {p.round}</span>
                 </div>
               ))

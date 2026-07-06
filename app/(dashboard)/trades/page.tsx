@@ -6,6 +6,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useMode } from '@/components/nav/AppShell'
+import { openPlayerCard } from '@/lib/openPlayerCard'
 import type { ADPPlayer, TradeAnalysis } from '@/types'
 
 const VERDICT_LABEL: Record<TradeAnalysis['verdict'], string> = {
@@ -143,8 +144,14 @@ function PlayerPicker({
             className="text-xs font-medium px-2 py-1 rounded-lg flex items-center gap-1.5"
             style={{ backgroundColor: 'var(--signal-dim)', color: 'var(--signal)' }}
           >
-            {p.name}
-            <button onClick={() => onRemove(p.playerId)} className="hover:brightness-125">×</button>
+            <button
+              type="button"
+              onClick={() => openPlayerCard(p.playerId)}
+              className="underline decoration-dotted underline-offset-2 hover:brightness-125"
+            >
+              {p.name}
+            </button>
+            <button onClick={() => onRemove(p.playerId)} className="hover:brightness-125" aria-label={`Remove ${p.name}`}>×</button>
           </span>
         ))}
       </div>
@@ -164,18 +171,36 @@ function PlayerPicker({
             style={{ backgroundColor: 'rgba(6, 11, 19, 0.55)', border: '1px solid var(--hairline)' }}
           >
             {results.map((p) => (
-              <button
+              <div
                 key={p.playerId}
-                onClick={() => {
-                  onAdd(p)
-                  setQuery('')
-                }}
-                className="w-full text-left text-sm px-3 py-2 hover:brightness-125 transition-all flex items-center justify-between"
+                className="w-full text-sm px-3 py-2 flex items-center justify-between"
                 style={{ color: '#C5D6E3' }}
               >
-                <span>{p.name}</span>
-                <span className="text-xs" style={{ color: 'var(--t3)' }}>{p.position} · {p.nflTeam}</span>
-              </button>
+                {/* Name opens the Player Intelligence Card; the rest of the
+                    row (position/team) is the "add to trade" click target —
+                    split so neither action is silently overloaded onto the
+                    other, since this row used to be one big add-on-click
+                    button covering the name too. */}
+                <button
+                  type="button"
+                  onClick={() => openPlayerCard(p.playerId)}
+                  className="text-left underline decoration-dotted underline-offset-2 hover:text-white"
+                >
+                  {p.name}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onAdd(p)
+                    setQuery('')
+                  }}
+                  className="text-xs flex items-center gap-1.5 hover:brightness-125 transition-all"
+                  style={{ color: 'var(--t3)' }}
+                >
+                  {p.position} · {p.nflTeam}
+                  <span style={{ color: 'var(--signal)' }}>+ Add</span>
+                </button>
+              </div>
             ))}
           </div>
         )}

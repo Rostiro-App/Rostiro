@@ -12,6 +12,7 @@ import { useWakeLock } from '@/lib/useWakeLock'
 import { useIdleDim } from '@/lib/useIdleDim'
 import { useLiveUnlockTransition } from '@/lib/useLiveUnlockTransition'
 import { bigAnimationsEnabled } from '@/lib/animationPrefs'
+import { openPlayerCard } from '@/lib/openPlayerCard'
 
 interface LiveGameContext {
   homeTeam: string
@@ -351,11 +352,17 @@ export default function LivePage() {
                         : 'YDS'
                 : null
               return (
-                <button
-                  type="button"
+                // Div, not button: the name inside is its own nested button
+                // (opens the Player Intelligence Card) — a button can't
+                // legally contain another button, and the row itself still
+                // needs to open the live box-score drawer on click/Enter.
+                <div
+                  role="button"
+                  tabIndex={0}
                   key={p.playerId}
                   onClick={() => openStatSheet(p)}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left"
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openStatSheet(p) }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left cursor-pointer"
                   style={{ borderTop: '1px solid var(--hairline)', backgroundColor: 'rgba(8,15,26,0.6)' }}
                 >
                   <img
@@ -366,7 +373,16 @@ export default function LivePage() {
                     onError={(e) => { e.currentTarget.style.visibility = 'hidden' }}
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-white truncate">{p.name}</p>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openPlayerCard(p.playerId)
+                      }}
+                      className="text-sm font-medium text-white truncate underline decoration-dotted underline-offset-2 hover:brightness-125 text-left block w-full"
+                    >
+                      {p.name}
+                    </button>
                     <p className="text-xs" style={{ color: 'var(--t3)' }}>{p.position} · {p.nflTeam}</p>
                     <div className="flex flex-wrap gap-1 mt-1">
                       {p.leagues.map((l) => (
@@ -404,7 +420,7 @@ export default function LivePage() {
                       </p>
                     )}
                   </div>
-                </button>
+                </div>
               )
             })}
           </div>
