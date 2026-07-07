@@ -1,4 +1,4 @@
-// T-64.1: Draft Copilot — pure computation. No network calls in this file —
+// T-64.1: Draft Copilot: pure computation. No network calls in this file:
 // everything here operates on data already fetched (cached player pool,
 // polled picks, draft settings), which is what makes the board "always
 // current" without a per-view API round trip. See PRD 6.3.1.
@@ -6,10 +6,10 @@
 import type { ADPPlayer, DraftPick, DraftStrategy, NFLPosition } from '@/types'
 
 // ─── Draft strategy ─────────────────────────────────────────────────────────────
-// A stated strategy changes what "need" means at a given point in the draft —
+// A stated strategy changes what "need" means at a given point in the draft:
 // Zero-RB says RB isn't a real need until the mid-rounds; Hero-RB says draft
 // exactly one elite RB early then pivot hard to WR. This is a real override
-// on top of pure roster-slot need, not just a tiebreaker — see the scoring in
+// on top of pure roster-slot need, not just a tiebreaker, see the scoring in
 // computeBestAvailable below for why the two have to be unified into one
 // signal rather than kept as separate sort passes.
 
@@ -31,7 +31,7 @@ export const STRATEGY_DESCRIPTIONS: Record<DraftStrategy, string> = {
   hero_rb: 'Take one elite RB early, then pivot hard to WR before circling back for RB depth.',
   hero_wr: 'Take one elite WR early, then prioritize RB before circling back for WR depth.',
   robust_rb: 'Commit to RB across the first three rounds, building a two- or three-deep RB core before WR.',
-  late_qb: 'Punt QB entirely until the double-digit rounds — the position is deep enough to wait, so bank the early picks on RB/WR/TE.',
+  late_qb: 'Punt QB entirely until the double-digit rounds: the position is deep enough to wait, so bank the early picks on RB/WR/TE.',
   te_premium: 'Prioritize an elite pass-catching TE in the first three rounds, then leave the position alone until the very late, replacement-level rounds.',
 }
 
@@ -80,7 +80,7 @@ const STRATEGY_RULES: Record<DraftStrategy, StrategyRule[]> = {
   ],
 }
 
-// Raw weight (-2..+2, 0 = neutral) — exposed so the UI can show *why* a
+// Raw weight (-2..+2, 0 = neutral), exposed so the UI can show *why* a
 // player's rank shifted, not just present a reordered list silently.
 export function getStrategyWeight(strategy: DraftStrategy, position: NFLPosition, round: number): number {
   const rules = STRATEGY_RULES[strategy]
@@ -117,7 +117,7 @@ export interface PositionRun {
 }
 
 // Looks at the most recent `windowSize` picks (any team, not just mine) and
-// flags when `threshold` or more share a position — the "a run just started"
+// flags when `threshold` or more share a position: the "a run just started"
 // signal from PRD 6.3.1.
 export function detectPositionRun(
   picks: DraftPick[],
@@ -155,8 +155,8 @@ export function findSnipedQueueTargets(queue: string[], draftedPlayerIds: Set<st
 export interface RankedPlayer {
   player: ADPPlayer
   isNeeded: boolean
-  strategyWeight: number // same scale as getStrategyWeight — 0 when strategy is 'balanced' or no rule applies
-  // Separate from strategyWeight on purpose — see getFormatWeight below.
+  strategyWeight: number // same scale as getStrategyWeight, 0 when strategy is 'balanced' or no rule applies
+  // Separate from strategyWeight on purpose, see getFormatWeight below.
   // Kept distinct so Claude's reasoning (lib/claude.ts) never misattributes
   // a format-driven adjustment to "the stated strategy" when the user
   // picked Balanced, which has zero position rules of its own.
@@ -167,10 +167,10 @@ export interface RankedPlayer {
 // Balanced strategy, standard single-QB league: Drake Maye showed as the
 // #4 overall recommendation. Root cause confirmed against the actual
 // session's settings_json (isSuperFlex: false) and a direct query against
-// players_cache: Sleeper's search_rank (the ADP proxy — no dedicated ADP
+// players_cache: Sleeper's search_rank (the ADP proxy: no dedicated ADP
 // endpoint exists, see lib/sleeper.ts) reflects search popularity across
 // ALL of Sleeper, including the large superflex/2QB dynasty population
-// that platform serves — which inflates QB rank sharply versus true
+// that platform serves, which inflates QB rank sharply versus true
 // single-QB draft value, where even an elite QB1 rarely goes before
 // rounds 3-5. This isn't a sorting bug; it's the underlying data source
 // not knowing which format it's being used for. Fixed with a format-aware
@@ -183,12 +183,12 @@ function getFormatWeight(position: NFLPosition, round: number, isSuperFlex: bool
 }
 
 // A flat need-before-filled partition (the original design) can't let a
-// strategy override "need" — Zero-RB's whole point is to deprioritize RB
+// strategy override "need": Zero-RB's whole point is to deprioritize RB
 // despite an empty RB slot, which a hard partition would never allow. So
 // need and strategy are combined into one adjusted-ADP score instead: each
 // shifts a player's effective ADP by a fixed amount, and the list sorts on
 // that. Constants below are tuned to feel like a strong nudge, not an
-// absolute override — a truly elite player one tier above the field can
+// absolute override: a truly elite player one tier above the field can
 // still outrank a same-position "needed" scrub.
 const NEED_ADP_BONUS = 50
 const STRATEGY_ADP_UNIT = 20
@@ -213,7 +213,7 @@ export function computeBestAvailable(
     return { player, isNeeded, strategyWeight, formatWeight }
   })
 
-  // overallRank, not adpConsensus — the latter (Sleeper's search_rank) has
+  // overallRank, not adpConsensus: the latter (Sleeper's search_rank) has
   // frequent exact ties across positions (e.g. the top RB and top QB both
   // at "1"), which would otherwise leave tie-breaking to sort() stability
   // rather than the actual overall order.

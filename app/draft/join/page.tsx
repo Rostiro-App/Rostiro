@@ -1,18 +1,18 @@
 'use client'
 
-// T-64.1/T-64.2: entry point for Draft Copilot — join a live/mock draft
+// T-64.1/T-64.2: entry point for Draft Copilot. Join a live/mock draft
 // (Sleeper or Yahoo), land on the live companion view.
 //
 // T-139 (founder-reported): rebuilt after founder feedback found three
 // real gaps. (1) ESPN wasn't mentioned anywhere, and founder testing
-// found it wasn't just under-explained — it genuinely isn't wired to this
+// found it wasn't just under-explained: it genuinely isn't wired to this
 // flow yet (SupportedPlatform was hardcoded to sleeper/yahoo only, even
 // though types.ts's Platform already includes 'espn'). Added as an honest
 // disabled/"Coming soon" tab rather than either pretending it works or
 // staying silent about it. (2) No copy explained how Co-Pilot actually
-// uses the selected strategy — added a dedicated explainer. (3) The whole
-// page sat in a max-w-md single column with huge unused margins on any
-// screen wider than a phone; rebuilt as two columns at md+.
+// uses the selected strategy, so a dedicated explainer was added. (3) The
+// whole page sat in a max-w-md single column with huge unused margins on
+// any screen wider than a phone; rebuilt as two columns at md+.
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { DraftStrategy, Platform } from '@/types'
@@ -58,7 +58,7 @@ export default function JoinDraftPage() {
   const [error, setError] = useState<string | null>(null)
   const [errorLink, setErrorLink] = useState<{ href: string; label: string } | null>(null)
 
-  // Best-effort — an anonymous Draft Kit visitor (401) just sees the
+  // Best-effort: an anonymous Draft Kit visitor (401) just sees the
   // manual form only, same as before this existed.
   useEffect(() => {
     let cancelled = false
@@ -99,7 +99,7 @@ export default function JoinDraftPage() {
         return
       }
       if (res.status === 401 && data.error === 'yahoo_not_connected') {
-        setError("Connect a Yahoo account first — you haven't linked one yet.")
+        setError("Connect a Yahoo account first, you haven't linked one yet.")
         setErrorLink({ href: '/onboarding', label: 'Connect Yahoo →' })
         setLoading(false)
         return
@@ -168,7 +168,7 @@ export default function JoinDraftPage() {
                 {p === 'sleeper' ? 'Sleeper' : 'Yahoo'}
               </button>
             ))}
-            {/* T-139: honest disabled state — ESPN draft tracking is
+            {/* T-139: honest disabled state. ESPN draft tracking is
                 verified reachable at the data layer but not yet wired to
                 this route, and wants one more confirmation pass against a
                 real (non-bot-filled) draft before it ships here. Better to
@@ -176,7 +176,7 @@ export default function JoinDraftPage() {
                 wondering, or worse, pretend it already works. */}
             <span
               aria-disabled="true"
-              title="ESPN draft tracking is in progress — join via Sleeper or Yahoo for now."
+              title="ESPN draft tracking is in progress. Join via Sleeper or Yahoo for now."
               className="text-xs font-semibold px-4 py-1.5 rounded-lg cursor-not-allowed"
               style={{ backgroundColor: 'rgba(8, 15, 26, 0.35)', color: 'var(--t4)', border: '1px solid var(--hairline)' }}
             >
@@ -315,8 +315,14 @@ export default function JoinDraftPage() {
         <div>
           <div className="rounded-xl p-4 mb-4" style={{ backgroundColor: 'var(--signal-dim)', border: '1px solid rgba(75,163,245,.35)' }}>
             <p className="text-xs font-semibold" style={{ color: 'var(--signal)' }}>How Co-Pilot uses your strategy</p>
-            <p className="text-xs mt-1.5 leading-relaxed" style={{ color: 'var(--t2)' }}>
-              Every recommendation Co-Pilot gives you — who&apos;s best available, who to target next, when a run is starting — is filtered through whichever strategy is selected below. Pick <b>Zero-RB</b> and it&apos;ll steer you toward WR depth early; pick <b>Late-Round QB</b> and it&apos;ll stop surfacing QBs until the double-digit rounds even if one&apos;s technically the highest-ranked player left. Switch strategies mid-draft — a run at a position, an injury, a reach by someone ahead of you — and every recommendation from that pick forward updates to match the new one instantly. Nothing here is static advice; it&apos;s a live filter on top of the board.
+            <p className="text-xs mt-2 leading-relaxed" style={{ color: 'var(--t2)' }}>
+              Every recommendation (best available, next target, run alerts) is filtered through whichever strategy you pick below.
+            </p>
+            <p className="text-xs mt-2 leading-relaxed" style={{ color: 'var(--t2)' }}>
+              Pick <b>Zero-RB</b> and it steers you toward WR depth early. Pick <b>Late-Round QB</b> and it won&apos;t surface a QB until the double-digit rounds, even if one is technically the top player left.
+            </p>
+            <p className="text-xs mt-2 leading-relaxed" style={{ color: 'var(--t2)' }}>
+              Switch strategies mid-draft and every recommendation from that pick forward updates instantly. Nothing here is static advice, it&apos;s a live filter on the board.
             </p>
           </div>
 
