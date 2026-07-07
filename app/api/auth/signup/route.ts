@@ -15,12 +15,19 @@ import { z } from 'zod'
 const Body = z.object({
   email: z.string().email(),
   password: z.string().min(8),
+  // T-136: server-side enforcement of the signup checkbox — z.literal(true)
+  // rejects anything but an explicit true, so hitting this route directly
+  // (skipping the client's checkbox UI) can't create an account either.
+  agreedToTerms: z.literal(true),
 })
 
 export async function POST(request: NextRequest) {
   const parsed = Body.safeParse(await request.json().catch(() => null))
   if (!parsed.success) {
-    return NextResponse.json({ error: 'A valid email and a password of at least 6 characters are required.' }, { status: 400 })
+    const message = parsed.error.issues.some((i) => i.path[0] === 'agreedToTerms')
+      ? 'You must agree to the Terms of Service and Privacy Policy to create an account.'
+      : 'A valid email and a password of at least 8 characters are required.'
+    return NextResponse.json({ error: message }, { status: 400 })
   }
   const { email, password } = parsed.data
 

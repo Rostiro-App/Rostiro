@@ -7,6 +7,7 @@ import AmbientStateSweep from '@/components/AmbientStateSweep'
 export default function SignupPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null)
 
@@ -24,7 +25,7 @@ export default function SignupPage() {
     const res = await fetch('/api/auth/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, agreedToTerms }),
     })
     const data = await res.json()
 
@@ -82,6 +83,28 @@ export default function SignupPage() {
               />
             </div>
 
+            {/* T-136: explicit clickwrap — an affirmative checkbox, not the
+                old passive "by creating an account, you agree..." footnote
+                nobody had to act on. Required client-side (blocks submit)
+                and server-side (app/api/auth/signup/route.ts rejects a
+                request without it), so it can't be bypassed by hitting the
+                API directly. */}
+            <label className="flex items-start gap-2 mt-4 text-xs leading-relaxed cursor-pointer" style={{ color: 'var(--t3)' }}>
+              <input
+                type="checkbox"
+                checked={agreedToTerms}
+                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                required
+                className="mt-0.5"
+              />
+              <span>
+                I agree to Rostiro&apos;s{' '}
+                <Link href="/terms" className="underline" style={{ color: 'var(--t2)' }}>Terms of Service</Link>
+                {' '}and{' '}
+                <Link href="/privacy" className="underline" style={{ color: 'var(--t2)' }}>Privacy Policy</Link>.
+              </span>
+            </label>
+
             {message && (
               <p
                 className="mt-3 text-sm"
@@ -93,19 +116,12 @@ export default function SignupPage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !agreedToTerms}
               className="mt-4 w-full font-semibold py-2.5 rounded-lg text-sm text-white disabled:opacity-50 transition-all hover:brightness-110"
               style={{ backgroundColor: 'var(--signal)' }}
             >
               {loading ? 'Creating account...' : 'Create free account →'}
             </button>
-
-            <p className="text-xs mt-3 text-center leading-relaxed" style={{ color: 'var(--t4)' }}>
-              By creating an account, you agree to Rostiro&apos;s{' '}
-              <Link href="/terms" className="underline" style={{ color: 'var(--t3)' }}>Terms of Service</Link>
-              {' '}and{' '}
-              <Link href="/privacy" className="underline" style={{ color: 'var(--t3)' }}>Privacy Policy</Link>.
-            </p>
           </form>
         </div>
 
