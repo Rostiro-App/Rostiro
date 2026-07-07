@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { browserClient } from '@/lib/supabase-browser'
 import Link from 'next/link'
 import AmbientStateSweep from '@/components/AmbientStateSweep'
 
@@ -11,26 +10,31 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null)
 
+  // T-135: routed through our own API rather than calling
+  // browserClient.auth.signUp() directly — that call always fires
+  // Supabase's own unbranded confirmation email with no per-call template
+  // override. The server route generates the same confirmation link via
+  // admin.generateLink and sends it through Resend with Rostiro's own
+  // branded template instead (lib/resend.ts).
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setMessage(null)
 
-    const { error } = await browserClient.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/api/auth/callback?next=/onboarding`,
-      },
+    const res = await fetch('/api/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
     })
+    const data = await res.json()
 
     setLoading(false)
-    if (error) {
-      setMessage({ type: 'error', text: error.message })
+    if (!res.ok) {
+      setMessage({ type: 'error', text: data.error ?? 'Could not create account.' })
     } else {
       setMessage({
         type: 'success',
-        text: 'Check your email to confirm, then your 7-day Starter trial begins automatically.',
+        text: data.warning ?? 'Check your email to confirm, then your 7-day Starter trial begins automatically.',
       })
     }
   }

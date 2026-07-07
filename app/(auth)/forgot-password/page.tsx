@@ -1,12 +1,16 @@
 'use client'
 
-// T-130: password reset, step 1 of 2 — request the email. Supabase sends a
-// recovery link pointed at /api/auth/callback (the same code-exchange route
-// magic link/OAuth already use), which lands the user on /reset-password
-// with a real session already established, ready to set a new password.
+// T-130: password reset, step 1 of 2 — request the email.
+// T-135: routed through our own API rather than calling
+// browserClient.auth.resetPasswordForEmail() directly — that call always
+// fires Supabase's own unbranded recovery email. The server route generates
+// the same recovery link via admin.generateLink and sends it through Resend
+// with Rostiro's own branded template instead (lib/resend.ts). The link
+// still points at /api/auth/callback (the same code-exchange route
+// magic link/OAuth already use), landing the user on /reset-password with a
+// real session already established, ready to set a new password.
 
 import { useState } from 'react'
-import { browserClient } from '@/lib/supabase-browser'
 import Link from 'next/link'
 import AmbientStateSweep from '@/components/AmbientStateSweep'
 
@@ -20,20 +24,20 @@ export default function ForgotPasswordPage() {
     setLoading(true)
     setMessage(null)
 
-    const { error } = await browserClient.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/api/auth/callback?next=/reset-password`,
+    const res = await fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
     })
+    const data = await res.json()
 
     setLoading(false)
     // Same message whether or not the email exists — don't let this form
     // become a way to probe which emails have Rostiro accounts.
-    if (error) {
-      setMessage({ type: 'error', text: error.message })
+    if (!res.ok) {
+      setMessage({ type: 'error', text: data.error ?? 'Something went wrong.' })
     } else {
-      setMessage({
-        type: 'success',
-        text: "If an account exists for that email, we've sent a link to reset your password.",
-      })
+      setMessage({ type: 'success', text: data.message })
     }
   }
 
