@@ -408,6 +408,14 @@ export interface LeagueHealth {
   topFlag: string | null // most actionable one-liner, e.g. "2 starters OUT"
 }
 
+// T-83: the personal playoff-intensity ladder — 'none' (regular season),
+// 'league_playoffs' (this league's real playoff window is open, per its
+// own Sleeper playoff_week_start), 'alive' (this roster won its most
+// recent bracket round), 'championship' (this roster is in the bracket's
+// final round). Computed in lib/playoffStatus.ts from Sleeper's real
+// winners_bracket — never inferred or guessed.
+export type PlayoffTier = 'none' | 'league_playoffs' | 'alive' | 'championship'
+
 export interface SystemStatusLeague {
   id: string // connected_leagues.id
   name: string
@@ -420,6 +428,7 @@ export interface SystemStatusLeague {
   teamId: string | null
   waiverCutoffDay: number | null
   waiverCutoffHour: number | null
+  playoffTier: PlayoffTier
 }
 
 export interface SystemDeadline {
@@ -475,6 +484,10 @@ export interface SystemStatus {
   // see lib/liveWindow.ts. Distinct from rostiroState, which is day-wide.
   liveUnlocked: boolean
   liveNextKickoff: { kickoffAt: string; homeTeam: string; awayTeam: string; label: string } | null
+  // T-83: the highest tier across every connected league — one league's
+  // championship run is exciting enough to drive the ambient System Bar/
+  // PulseMark treatment even if another league is already eliminated.
+  playoffTier: PlayoffTier
 }
 
 // ─── Error Classes ─────────────────────────────────────────────────────────────

@@ -163,6 +163,11 @@ interface SleeperLeague {
     // T-108: total FAAB budget for the league — verified live against a
     // real 2026 league (waiver_budget: 100).
     waiver_budget?: number
+    // T-83: real per-league playoff window — Sleeper's own field, not a
+    // hardcoded weeks 15-17 assumption (leagues configure this
+    // differently). playoff_teams is the bracket size (e.g. 4, 6).
+    playoff_week_start?: number
+    playoff_teams?: number
   }
   roster_positions: string[]
 }
@@ -290,6 +295,28 @@ export interface SleeperMatchup {
 
 export async function getSleeperMatchups(leagueId: string, week: number): Promise<SleeperMatchup[]> {
   return sleeperFetch<SleeperMatchup[]>(`/league/${leagueId}/matchups/${week}`)
+}
+
+// T-83: the championship-path bracket only — deliberately not
+// losers_bracket (Sleeper's separate consolation-bracket endpoint), since
+// this feature only cares about "did this roster make the championship,"
+// never a 3rd-place/toilet-bowl track. A round's t1/t2 are seeded directly
+// once known; a later round's side that isn't decided yet instead carries
+// t1_from/t2_from pointing at an earlier match's winner (w) or loser (l) —
+// real Sleeper API shape, resolved by lib/playoffStatus.ts.
+export interface SleeperBracketMatch {
+  r: number
+  m: number
+  t1: number | null
+  t2: number | null
+  t1_from?: { w?: number; l?: number }
+  t2_from?: { w?: number; l?: number }
+  w: number | null
+  l: number | null
+}
+
+export async function getSleeperWinnersBracket(leagueId: string): Promise<SleeperBracketMatch[]> {
+  return sleeperFetch<SleeperBracketMatch[]>(`/league/${leagueId}/winners_bracket`)
 }
 
 export interface FilmRoomResult {

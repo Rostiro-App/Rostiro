@@ -18,7 +18,7 @@ import HintAnchor from '@/components/hints/HintAnchor'
 import { openPlayerCard } from '@/lib/openPlayerCard'
 import PlayerSummaryLine from '@/components/players/PlayerSummaryLine'
 import { logTelemetryEvent } from '@/lib/telemetry'
-import type { LiveGameScore, PulseItem, PulseItemType, PulsePriority, RostiroState } from '@/types'
+import type { LiveGameScore, PlayoffTier, PulseItem, PulseItemType, PulsePriority, RostiroState } from '@/types'
 
 // ─── Priority + type config ────────────────────────────────────────────────────
 
@@ -134,6 +134,7 @@ export default function PulsePage() {
   const [totalLeagueCount, setTotalLeagueCount] = useState(0)
   const [filmRoomResults, setFilmRoomResults] = useState<FilmRoomLeagueResult[]>([])
   const [liveMatchups, setLiveMatchups] = useState<LiveMatchupSummary[]>([])
+  const [playoffTier, setPlayoffTier] = useState<PlayoffTier>('none')
 
   // T-94/T-90: Waiver Day Mission Briefing framing + Game Day live scores
   // (PRD 6.10/6.13). One-shot fetch — this page doesn't need the 60s
@@ -145,12 +146,13 @@ export default function PulsePage() {
     let cancelled = false
     fetch('/api/system/status')
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { rostiroState?: RostiroState; liveScores?: LiveGameScore[]; scoresGated?: boolean; leagues?: unknown[] } | null) => {
+      .then((data: { rostiroState?: RostiroState; liveScores?: LiveGameScore[]; scoresGated?: boolean; leagues?: unknown[]; playoffTier?: PlayoffTier } | null) => {
         if (cancelled || !data) return
         if (data.rostiroState) setRostiroState(data.rostiroState)
         setLiveScores(data.liveScores ?? [])
         setScoresGated(data.scoresGated ?? false)
         setTotalLeagueCount(data.leagues?.length ?? 0)
+        setPlayoffTier(data.playoffTier ?? 'none')
       })
       .catch(() => {})
     return () => {
@@ -344,6 +346,23 @@ export default function PulsePage() {
           opportunity-green tag, waiver-target count leads the subtext —
           only when there's actually a waiver item to brief on. */}
       <div className="mb-6">
+        {/* T-83: the boldest relabel in the app — same pattern as Game
+            Day's "Mission Control," but reserved for the one specific
+            roster that actually made its championship, never a blanket
+            "it's playoff time" label. Can coexist with Mission
+            Control/Mission Briefing below rather than replacing them. */}
+        {playoffTier === 'championship' && (
+          <span
+            className="mono-data inline-block text-[9.5px] tracking-[0.16em] px-2 py-0.5 rounded-full mb-2 mr-1.5"
+            style={{
+              color: '#F5C842',
+              border: '1px solid #F5C842',
+              backgroundColor: 'rgba(245,200,66,0.12)',
+            }}
+          >
+            🏆 CHAMPIONSHIP WEEK
+          </span>
+        )}
         {isMissionBriefing && (
           <span
             className="mono-data inline-block text-[9.5px] tracking-[0.16em] px-2 py-0.5 rounded-full mb-2"

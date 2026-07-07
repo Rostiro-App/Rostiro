@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from 'react'
 import { type Mode, ModeButton, ModeSwitcher } from './AppShell'
 import PulseMark from '@/components/PulseMark'
 import { useGameDayKickoffTransition } from '@/lib/gameDayTransition'
+import { useChampionshipReveal } from '@/lib/championshipReveal'
 import HintAnchor from '@/components/hints/HintAnchor'
 import PlayerSummaryLine from '@/components/players/PlayerSummaryLine'
 import type { LeagueHealthStatus, LiveGameScore, SystemStatus, UserPlan } from '@/types'
@@ -28,9 +29,9 @@ interface LiveMatchupSummary {
 
 // T-110: nothing in the UI showed plan at all — free deliberately gets no
 // badge (nothing to flaunt, and it avoids a naggy "FREE" label); paid tiers
-// get a real, visible marker. Gold matches PLAYOFFS_OVERLAY's championship
-// accent already established in brandTokens.ts — a deliberate reuse, not a
-// new color introduced just for this.
+// get a real, visible marker. Gold matches PLAYOFF_TIER_OVERLAY's
+// championship accent already established in brandTokens.ts — a
+// deliberate reuse, not a new color introduced just for this.
 const PLAN_LABEL: Record<UserPlan, string | null> = {
   free: null,
   starter: 'STARTER',
@@ -149,24 +150,28 @@ export default function SystemBar({
   // kickoff (rostiroState alone no longer means "live").
   const hasLiveGames = (status?.liveScores ?? []).some((g) => g.statusState !== 'pre')
   const kickoffSweeping = useGameDayKickoffTransition(status?.rostiroState ?? null, hasLiveGames)
+  // T-83: the boldest reveal in the app — plays once per season, the
+  // first moment this client notices the user made their championship.
+  const championshipSweeping = useChampionshipReveal(status?.playoffTier ?? null)
 
   return (
     <>
       <div
-        className={`glass-bar mono-data flex items-center gap-3 md:gap-5 px-3 md:px-4 flex-shrink-0 relative z-20 ${kickoffSweeping ? 'kickoff-sweep' : ''}`.trim()}
+        className={`glass-bar mono-data flex items-center gap-3 md:gap-5 px-3 md:px-4 flex-shrink-0 relative z-20 ${championshipSweeping ? 'championship-sweep' : kickoffSweeping ? 'kickoff-sweep' : ''}`.trim()}
         style={{ borderBottom: '1px solid var(--hairline)', height: '42px', fontSize: '11px' }}
       >
         {/* Pulse mark — the one element that visibly reflects the active
             Rostiro State (PRD 6.10 / brand kit §2-5). Defaults to Standard's
-            resting color until the first status poll resolves. */}
+            resting color until the first status poll resolves. T-83 layers
+            the personal playoff-intensity ladder on top via playoffTier. */}
         <span className="flex md:hidden items-center gap-1 flex-shrink-0">
           <span className="font-medium text-[13px]" style={{ color: 'var(--t1)' }}>R</span>
-          <PulseMark state={status?.rostiroState ?? 'standard'} />
+          <PulseMark state={status?.rostiroState ?? 'standard'} playoffTier={status?.playoffTier ?? 'none'} />
         </span>
 
         {/* Wordmark — desktop only (mobile keeps every pixel for state) */}
         <span className="hidden md:flex items-center gap-2.5 flex-shrink-0">
-          <PulseMark state={status?.rostiroState ?? 'standard'} />
+          <PulseMark state={status?.rostiroState ?? 'standard'} playoffTier={status?.playoffTier ?? 'none'} />
           <span aria-hidden="true" style={{ width: 1, height: 14, backgroundColor: 'var(--hairline)' }} />
           <span className="flex items-baseline gap-1.5">
             <span className="font-bold tracking-[0.18em] text-[11.5px]" style={{ color: 'var(--t1)' }}>
@@ -299,6 +304,19 @@ export default function SystemBar({
             }
           >
             {status.plan === 'commissioner' ? `★ ${PLAN_LABEL[status.plan]}` : PLAN_LABEL[status.plan]}
+          </span>
+        )}
+
+        {/* T-83: the boldest badge in the app — only for the specific
+            roster that made its championship, never a blanket "it's
+            playoffs" label for everyone (that's the PulseMark overlay's
+            job, kept quiet on purpose). */}
+        {status?.playoffTier === 'championship' && (
+          <span
+            className="hidden sm:inline text-[8.5px] font-bold tracking-[0.14em] px-1.5 py-0.5 rounded flex-shrink-0"
+            style={{ color: '#0D0800', backgroundColor: '#F5C842', boxShadow: '0 0 12px rgba(245,200,66,0.7)' }}
+          >
+            🏆 CHAMPIONSHIP
           </span>
         )}
 

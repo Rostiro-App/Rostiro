@@ -6,6 +6,7 @@
 // for 3 of 5 states if used as-is.
 
 import type { RostiroState } from '@/lib/rostiroState'
+import type { PlayoffTier } from '@/types'
 
 export interface StateConfig {
   color: string
@@ -69,15 +70,55 @@ export const STATE_CONFIG: Record<RostiroState, StateConfig> = {
   },
 }
 
-// Weeks 15-17 theming layer (PRD 6.10: "not an additional State" — a second
-// polyline rendered over the active State's, dimmed to 0.5 opacity, per
-// brand kit Section 3).
-export const PLAYOFFS_OVERLAY = {
-  color: '#F5C842', // championship gold
-  strokeWidth: 1.5,
-  strokeDasharray: '3,2',
-  opacity: 1,
-  dimActiveStateOpacityTo: 0.5,
-} as const
+// T-83: the personal playoff-intensity ladder (PRD 6.10: "not an
+// additional State" — a second gold polyline layered over whatever State
+// is active, per brand kit Section 3). Rescoped July 7, 2026 from a flat
+// weeks-15-17 on/off overlay into 3 escalating tiers, since the real ask
+// is personal ("when you make the championship, Rostiro gains a level of
+// intensity with you"), not calendar-flat: league_playoffs is this
+// league's real playoff window being open; alive is this specific roster
+// having won its most recent bracket round; championship is this roster
+// being in the bracket's final round — the boldest treatment in the app.
+export interface PlayoffOverlayConfig {
+  color: string
+  strokeWidth: number
+  strokeDasharray: string | undefined
+  opacity: number
+  dimActiveStateOpacityTo: number
+  // Added on top of the active State's own amplitude/cycleSec — 0 for the
+  // base tier (matches the original flat overlay's feel exactly).
+  extraAmplitude: number
+  cycleScale: number
+}
+
+export const PLAYOFF_TIER_OVERLAY: Record<Exclude<PlayoffTier, 'none'>, PlayoffOverlayConfig> = {
+  league_playoffs: {
+    color: '#F5C842', // championship gold
+    strokeWidth: 1.5,
+    strokeDasharray: '3,2',
+    opacity: 1,
+    dimActiveStateOpacityTo: 0.5,
+    extraAmplitude: 0,
+    cycleScale: 1,
+  },
+  alive: {
+    color: '#F5C842',
+    strokeWidth: 2,
+    strokeDasharray: undefined, // solid — no longer just a dashed accent
+    opacity: 1,
+    dimActiveStateOpacityTo: 0.65,
+    extraAmplitude: 2,
+    cycleScale: 0.85, // faster
+  },
+  championship: {
+    color: '#F5C842',
+    strokeWidth: 2.5,
+    strokeDasharray: undefined,
+    opacity: 1,
+    dimActiveStateOpacityTo: 0.8,
+    extraAmplitude: 4,
+    cycleScale: 0.7, // fastest — the boldest treatment in the app
+  },
+}
 
 export const STATE_TRANSITION_MS = 800

@@ -12,8 +12,9 @@
 // cycleSec to go rest -> peak -> rest, per state.
 
 import { useEffect, useRef, useState } from 'react'
-import { STATE_CONFIG, PLAYOFFS_OVERLAY, STATE_TRANSITION_MS } from '@/lib/brandTokens'
+import { STATE_CONFIG, PLAYOFF_TIER_OVERLAY, STATE_TRANSITION_MS } from '@/lib/brandTokens'
 import type { RostiroState } from '@/lib/rostiroState'
+import type { PlayoffTier } from '@/types'
 
 // Relative x-position (0-1) and envelope weight (-1..1) per point.
 const ENVELOPE: { x: number; weight: number }[] = [
@@ -28,15 +29,16 @@ const ENVELOPE: { x: number; weight: number }[] = [
 
 interface PulseMarkProps {
   state: RostiroState
-  /** NFL weeks 15-17 theming layer (PRD 6.10) — renders the gold overlay trace. */
-  playoffs?: boolean
+  /** T-83: the personal playoff-intensity ladder (PRD 6.10) — 'none' renders no overlay; the other three escalate the gold trace. */
+  playoffTier?: PlayoffTier
   /** 'nav' matches system-bar scale; 'hero' matches marketing/boot-sequence scale. */
   size?: 'nav' | 'hero'
   className?: string
 }
 
-export default function PulseMark({ state, playoffs = false, size = 'nav', className }: PulseMarkProps) {
+export default function PulseMark({ state, playoffTier = 'none', size = 'nav', className }: PulseMarkProps) {
   const config = STATE_CONFIG[state]
+  const overlay = playoffTier !== 'none' ? PLAYOFF_TIER_OVERLAY[playoffTier] : null
   const width = size === 'hero' ? 36 : 30
   const height = size === 'hero' ? 24 : 20
   const [reducedMotion, setReducedMotion] = useState(false)
@@ -52,26 +54,31 @@ export default function PulseMark({ state, playoffs = false, size = 'nav', class
     return () => mq.removeEventListener('change', onChange)
   }, [])
 
+  // T-83: 'alive'/'championship' pulse faster than the base State — the
+  // escalation is layered on top of whatever State is active, never a
+  // replacement for it.
+  const cycleSec = config.cycleSec * (overlay?.cycleScale ?? 1)
+
   useEffect(() => {
     if (reducedMotion) return
     startRef.current = null
     function tick(t: number) {
       if (startRef.current === null) startRef.current = t
       const elapsed = (t - startRef.current) / 1000
-      setPhase((elapsed % config.cycleSec) / config.cycleSec)
+      setPhase((elapsed % cycleSec) / cycleSec)
       rafRef.current = requestAnimationFrame(tick)
     }
     rafRef.current = requestAnimationFrame(tick)
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
     }
-  }, [reducedMotion, config.cycleSec])
+  }, [reducedMotion, cycleSec])
 
   const centerY = height / 2
   // Breathe factor goes 0 -> 1 -> 0 across each cycle (rest at the seams
   // between beats, full amplitude mid-cycle) rather than travelling forever.
   const breathe = reducedMotion ? 1 : Math.sin(phase * Math.PI)
-  const ampScale = config.amplitude * breathe
+  const ampScale = (config.amplitude + (overlay?.extraAmplitude ?? 0)) * breathe
 
   const points = ENVELOPE.map((p) => {
     const x = p.x * width
@@ -95,21 +102,21 @@ export default function PulseMark({ state, playoffs = false, size = 'nav', class
         strokeWidth={config.strokeWidth}
         strokeLinecap="round"
         strokeLinejoin="round"
-        opacity={playoffs ? PLAYOFFS_OVERLAY.dimActiveStateOpacityTo : 1}
+        opacity={overlay ? overlay.dimActiveStateOpacityTo : 1}
         style={{
           transition: `stroke ${STATE_TRANSITION_MS}ms ease-in-out, opacity ${STATE_TRANSITION_MS}ms ease-in-out`,
         }}
       />
-      {playoffs && (
+      {overlay && (
         <polyline
           points={points}
           fill="none"
-          stroke={PLAYOFFS_OVERLAY.color}
-          strokeWidth={PLAYOFFS_OVERLAY.strokeWidth}
-          strokeDasharray={PLAYOFFS_OVERLAY.strokeDasharray}
+          stroke={overlay.color}
+          strokeWidth={overlay.strokeWidth}
+          strokeDasharray={overlay.strokeDasharray}
           strokeLinecap="round"
           strokeLinejoin="round"
-          opacity={PLAYOFFS_OVERLAY.opacity}
+          opacity={overlay.opacity}
         />
       )}
     </svg>

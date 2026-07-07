@@ -12,8 +12,9 @@
 // against a real in-season league before we show a countdown to it.
 
 import { createSSRClient } from '@/lib/supabase'
-import { getSleeperDrafts, getSleeperRosters } from '@/lib/sleeper'
+import { getSleeperDrafts, getSleeperRosters, getSleeperLeague, getSleeperWinnersBracket } from '@/lib/sleeper'
 import { computeLeagueHealth, type HealthPlayer } from '@/lib/healthScore'
+import { computePlayoffTier } from '@/lib/playoffStatus'
 import { getRostiroState } from '@/lib/rostiroState'
 import { computeLiveWindow } from '@/lib/liveWindow'
 import { toNflverseTeamCode } from '@/lib/liveScores'
@@ -21,7 +22,9 @@ import { isFeatureEnabled } from '@/lib/featureFlags'
 import { isFreePlan } from '@/lib/usageLimits'
 import { simNow } from '@/lib/simTime'
 import { NextResponse } from 'next/server'
-import type { LeagueHealth, LiveGameScore, RelevantPlayer, SystemDeadline, SystemStatus, SystemStatusLeague, UserPlan } from '@/types'
+import type { LeagueHealth, LiveGameScore, PlayoffTier, RelevantPlayer, SystemDeadline, SystemStatus, SystemStatusLeague, UserPlan } from '@/types'
+
+const PLAYOFF_TIER_RANK: Record<PlayoffTier, number> = { none: 0, league_playoffs: 1, alive: 2, championship: 3 }
 
 interface LeagueRow {
   id: string
@@ -140,13 +143,28 @@ export async function GET() {
   const todayEtForDeadline = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(simDate)
   const { data: todaysGamesForDeadline } = await supabase
     .from('nfl_schedule')
-    .select('home_team, away_team, kickoff_at')
+    .select('home_team, away_team, kickoff_at, week')
     .eq('game_date', todayEtForDeadline)
   const kickoffByTeam = new Map<string, number>()
-  for (const g of (todaysGamesForDeadline ?? []) as { home_team: string; away_team: string; kickoff_at: string }[]) {
+  for (const g of (todaysGamesForDeadline ?? []) as { home_team: string; away_team: string; kickoff_at: string; week: number }[]) {
     const k = new Date(g.kickoff_at).getTime()
     kickoffByTeam.set(g.home_team, k)
     kickoffByTeam.set(g.away_team, k)
+  }
+
+  // T-83: the week whose games span "today" — same question
+  // lib/liveMatchupPoints.ts's currentNflWeek answers, reusing the
+  // schedule rows already fetched above rather than a second query.
+  let currentWeek: number | null = (todaysGamesForDeadline ?? [])[0]?.week ?? null
+  if (currentWeek === null) {
+    const { data: nearest } = await supabase
+      .from('nfl_schedule')
+      .select('week, kickoff_at')
+      .order('kickoff_at', { ascending: true })
+    const scheduleRows = (nearest ?? []) as { week: number; kickoff_at: string }[]
+    const nowMs = simDate.getTime()
+    const upcoming = scheduleRows.find((r) => new Date(r.kickoff_at).getTime() >= nowMs)
+    currentWeek = upcoming?.week ?? scheduleRows[scheduleRows.length - 1]?.week ?? null
   }
 
   const results = await Promise.allSettled(
@@ -156,6 +174,11 @@ export async function GET() {
         teamId: league.team_id,
         waiverCutoffDay: league.waiver_cutoff_day,
         waiverCutoffHour: league.waiver_cutoff_hour,
+        // T-83: overridden below once a real roster/bracket resolves —
+        // every early-return branch here (non-Sleeper, no roster) means
+        // there's no personal bracket standing to know, not that the
+        // league itself isn't in its playoffs.
+        playoffTier: 'none' as const,
       }
 
       // Health + deadlines are Sleeper-only until Yahoo/ESPN league sync is
@@ -248,7 +271,17 @@ export async function GET() {
         bestFreeAgentName: bestFreeAgent?.name ?? null,
       })
 
-      return { id: league.id, name: league.league_name, platform: 'sleeper', health, ...leagueMeta }
+      // T-83: only fetch the bracket once this league's real playoff week
+      // has actually arrived — an empty bracket every week of the regular
+      // season would be a wasted Sleeper call for every league, every poll.
+      const sleeperLeague = await getSleeperLeague(league.league_id).catch(() => null)
+      const playoffWeekStart = sleeperLeague?.settings?.playoff_week_start ?? null
+      const bracket = currentWeek !== null && playoffWeekStart !== null && currentWeek >= playoffWeekStart
+        ? await getSleeperWinnersBracket(league.league_id).catch(() => [])
+        : []
+      const playoffTier = computePlayoffTier({ currentWeek, playoffWeekStart, bracket, myRosterId: myRoster.roster_id })
+
+      return { id: league.id, name: league.league_name, platform: 'sleeper', health, ...leagueMeta, playoffTier }
     })
   )
 
@@ -264,7 +297,17 @@ export async function GET() {
           teamId: rows[i].team_id,
           waiverCutoffDay: rows[i].waiver_cutoff_day,
           waiverCutoffHour: rows[i].waiver_cutoff_hour,
+          playoffTier: 'none' as const,
         }
+  )
+
+  // T-83: the highest tier across every connected league drives the
+  // ambient System Bar/PulseMark treatment — one league's championship
+  // run is exciting enough to show even if another league already
+  // eliminated this user.
+  const playoffTier = statusLeagues.reduce<PlayoffTier>(
+    (best, l) => (PLAYOFF_TIER_RANK[l.playoffTier] > PLAYOFF_TIER_RANK[best] ? l.playoffTier : best),
+    'none'
   )
 
   deadlines.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
@@ -396,6 +439,7 @@ export async function GET() {
     plan,
     liveUnlocked: liveWindow.isOpen,
     liveNextKickoff: liveWindow.nextKickoff,
+    playoffTier,
   }
 
   return NextResponse.json(status)
