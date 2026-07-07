@@ -15,6 +15,17 @@ import HintAnchor from '@/components/hints/HintAnchor'
 import PlayerSummaryLine from '@/components/players/PlayerSummaryLine'
 import type { LeagueHealthStatus, LiveGameScore, SystemStatus, UserPlan } from '@/types'
 
+// T-101: real fantasy matchup scoring — same shape lib/liveRoster.ts's
+// buildLiveRoster returns via /api/live/status, previously LIVE-tab-only.
+interface LiveMatchupSummary {
+  leagueId: string
+  leagueName: string
+  myScore: number
+  myProjectedScore: number | null
+  opponentScore: number
+  opponentProjectedScore: number | null
+}
+
 // T-110: nothing in the UI showed plan at all — free deliberately gets no
 // badge (nothing to flaunt, and it avoids a naggy "FREE" label); paid tiers
 // get a real, visible marker. Gold matches PLAYOFFS_OVERLAY's championship
@@ -54,6 +65,7 @@ export default function SystemBar({
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(null)
   const [now, setNow] = useState(() => Date.now())
   const [switcherOpen, setSwitcherOpen] = useState(false)
+  const [liveMatchups, setLiveMatchups] = useState<LiveMatchupSummary[]>([])
   const failCount = useRef(0)
 
   useEffect(() => {
@@ -85,6 +97,36 @@ export default function SystemBar({
       clearInterval(interval)
     }
   }, [])
+
+  // T-101: real fantasy matchup scoring, previously LIVE-tab-only — same
+  // /api/live/status endpoint the LIVE tab already polls, just a second
+  // consumer of it here rather than duplicating buildLiveRoster's
+  // computation into this route's own poll. Only polls during Game Day;
+  // the render below (visibleMatchups) is what actually hides a stale
+  // score outside Game Day, so this effect never needs to synchronously
+  // clear state on exit.
+  useEffect(() => {
+    if (status?.rostiroState !== 'game_day') return
+    let cancelled = false
+    async function pollMatchups() {
+      try {
+        const res = await fetch('/api/live/status')
+        if (!res.ok) return
+        const data: { matchups?: LiveMatchupSummary[] } = await res.json()
+        if (!cancelled) setLiveMatchups(data.matchups ?? [])
+      } catch {
+        // Degrades to whatever was last known, same posture as the main poll.
+      }
+    }
+    pollMatchups()
+    const interval = setInterval(pollMatchups, POLL_INTERVAL_MS)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [status?.rostiroState])
+
+  const visibleMatchups = status?.rostiroState === 'game_day' ? liveMatchups : []
 
   // 1-second ticker for the sync label and countdown.
   useEffect(() => {
@@ -198,6 +240,12 @@ export default function SystemBar({
             this badge's. */}
         {status?.rostiroState === 'game_day' && (
           <LiveScoreBadge games={status.liveScores} gated={status.scoresGated} />
+        )}
+
+        {/* T-101: real fantasy matchup score — "who's actually winning,"
+            distinct from the real-NFL-score badge above. Same Pro gate. */}
+        {visibleMatchups.length > 0 && (
+          <LiveMatchupBadge matchups={visibleMatchups} gated={status?.scoresGated ?? false} />
         )}
 
         <span className="flex-1" />
@@ -347,6 +395,54 @@ function LiveScoreBadge({ games, gated }: { games: LiveGameScore[]; gated: boole
       )}
     </span>
   )
+}
+
+// T-101: same collapsing pattern as LiveScoreBadge above (one league shown
+// inline, multiple collapse to a count with a hover detail) — kept
+// consistent rather than inventing a second interaction style for what's
+// conceptually the same kind of badge.
+function LiveMatchupBadge({ matchups, gated }: { matchups: LiveMatchupSummary[]; gated: boolean }) {
+  if (matchups.length === 0) return null
+
+  return (
+    <span className="hidden lg:flex items-center gap-1.5 flex-shrink-0 relative group">
+      <span
+        className="breathe w-[5px] h-[5px] rounded-full flex-shrink-0"
+        style={{ backgroundColor: 'var(--signal)', boxShadow: '0 0 6px var(--signal)' }}
+      />
+      {matchups.length === 1 ? (
+        <span className="value-tick" style={{ color: 'var(--t1)', filter: gated ? 'blur(4px)' : 'none', userSelect: gated ? 'none' : 'auto' }}>
+          {matchupLabel(matchups[0])}
+        </span>
+      ) : (
+        <span className="value-tick" style={{ color: 'var(--t1)' }}>{matchups.length} MATCHUPS</span>
+      )}
+      {gated && (
+        <span
+          className="text-[8.5px] font-bold tracking-[0.12em] px-1 rounded flex-shrink-0"
+          style={{ color: 'var(--signal)', border: '1px solid rgba(75,163,245,0.45)' }}
+        >
+          PRO
+        </span>
+      )}
+      {matchups.length > 1 && (
+        <span
+          className="glass-heavy hidden group-hover:flex flex-col gap-1 absolute top-5 left-0 whitespace-nowrap text-[10.5px] px-2.5 py-1.5 rounded-lg z-50"
+          style={{ color: 'var(--t1)' }}
+        >
+          {matchups.map((m) => (
+            <span key={m.leagueId} style={{ filter: gated ? 'blur(4px)' : 'none' }}>
+              {matchupLabel(m)}
+            </span>
+          ))}
+        </span>
+      )}
+    </span>
+  )
+}
+
+function matchupLabel(m: LiveMatchupSummary): string {
+  return `${m.leagueName}: ${m.myScore.toFixed(1)}–${m.opponentScore.toFixed(1)}`
 }
 
 function gameLabel(g: LiveGameScore): string {

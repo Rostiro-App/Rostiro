@@ -17,6 +17,7 @@ import { computeLeagueHealth, type HealthPlayer } from '@/lib/healthScore'
 import { detectOpportunitySurges, type SurgeEvent } from '@/lib/opportunitySurge'
 import { generatePlayerNewsContext, generateOpportunitySurgeContext } from '@/lib/claude'
 import { pushToUser } from '@/lib/engagementTriggers'
+import { isFreePlan } from '@/lib/usageLimits'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AffectedLeague, PulseItem, PulseItemStatus, PulseItemType, PulsePriority } from '@/types'
 
@@ -109,6 +110,13 @@ export async function buildPulseItemsForUser(
   const rows = (leagues ?? []) as LeagueRow[]
   if (rows.length === 0) return { items: [], leagueCount: 0 }
 
+  // PRD Section 9: "full Waiver Day detail" is Pro's state depth — the
+  // base waiver_alert (name/ADP/unrostered) below stays free for everyone;
+  // only the FAAB-remaining and League Health projection deepening
+  // (T-98/T-108) is gated. Fail open (assume not-free) on a metering
+  // error — same posture as every other plan check in this codebase.
+  const free = await isFreePlan(supabase, userId).catch(() => false)
+
   // One free-agent pool query serves every league (same pattern as
   // /api/system/status): top of the ADP board, filtered per league.
   const { data: topPlayers } = await supabase
@@ -142,8 +150,26 @@ export async function buildPulseItemsForUser(
     .not('depth_chart_order', 'is', null)
   const surgeEvents = detectOpportunitySurges((depthRows ?? []) as DepthPlayer[])
 
+  // T-143: general notes (T-141) feed back into the one Claude-written
+  // signal in this file that's about a single player — a note left on a
+  // rostered player becomes extra context for that player's opportunity-
+  // surge reasoning. Best-effort: an empty result here (migration not run,
+  // or a genuine query error) just means no notes feed in, never blocks
+  // Pulse generation itself.
+  const { data: noteRows } = await supabase
+    .from('notes')
+    .select('player_id, body')
+    .eq('user_id', userId)
+    .eq('type', 'general')
+    .not('player_id', 'is', null)
+  const notesByPlayerId = new Map<string, string>()
+  for (const n of (noteRows ?? []) as { player_id: string; body: string }[]) {
+    const existing = notesByPlayerId.get(n.player_id)
+    notesByPlayerId.set(n.player_id, existing ? `${existing} ${n.body}` : n.body)
+  }
+
   const results = await Promise.allSettled(
-    rows.map((league) => buildLeagueItems(supabase, league, topPool, recentNews, surgeEvents))
+    rows.map((league) => buildLeagueItems(supabase, league, topPool, recentNews, surgeEvents, notesByPlayerId, free))
   )
 
   // One league failing (Sleeper down, league deleted) shouldn't blank the
@@ -161,7 +187,9 @@ async function buildLeagueItems(
   league: LeagueRow,
   topPool: CachedPlayer[],
   recentNews: NewsRow[],
-  surgeEvents: SurgeEvent[]
+  surgeEvents: SurgeEvent[],
+  notesByPlayerId: Map<string, string>,
+  free: boolean
 ): Promise<BuiltPulseItem[]> {
   const [rosters, drafts, sleeperLeague] = await Promise.all([
     getSleeperRosters(league.league_id),
@@ -368,15 +396,19 @@ async function buildLeagueItems(
     const totalBudget = sleeperLeague?.settings?.waiver_budget ?? null
     const remainingBudget = totalBudget !== null && myRosterFaab !== undefined ? totalBudget - myRosterFaab : null
 
-    const faabNote = remainingBudget !== null ? ` You have $${remainingBudget} of your $${totalBudget} FAAB budget left.` : ''
-    const healthNote = healthDelta !== null ? ` Adding them projects to ${healthDelta >= 0 ? '+' : ''}${healthDelta} on your League Health score.` : ''
+    // PRD Section 9: FAAB-remaining and League Health projection are the
+    // Pro-exclusive "full Waiver Day detail" — the base alert (name, ADP,
+    // unrostered) above this block stays free either way.
+    const faabNote = !free && remainingBudget !== null ? ` You have $${remainingBudget} of your $${totalBudget} FAAB budget left.` : ''
+    const healthNote = !free && healthDelta !== null ? ` Adding them projects to ${healthDelta >= 0 ? '+' : ''}${healthDelta} on your League Health score.` : ''
+    const upsellNote = free && (remainingBudget !== null || healthDelta !== null) ? ' Unlock FAAB and League Health impact with Pro.' : ''
 
     items.push({
       fingerprint: `waiver:${league.id}:${bestWaiver.player_id}`,
       type: 'waiver_alert',
       priority: bestWaiver.adp_sleeper! < 100 ? 'important' : 'info',
       headline: `${bestWaiver.name} is unrostered`,
-      reasoning: `${bestWaiver.name} (${bestWaiver.position}) has an ADP of ${Math.round(bestWaiver.adp_sleeper!)} and isn't on any roster in this league yet.${faabNote}${healthNote}`,
+      reasoning: `${bestWaiver.name} (${bestWaiver.position}) has an ADP of ${Math.round(bestWaiver.adp_sleeper!)} and isn't on any roster in this league yet.${faabNote}${healthNote}${upsellNote}`,
       affectedLeagues: [affectedLeague],
       deadline: null,
       actionUrl: leagueLink,
@@ -421,7 +453,7 @@ async function buildLeagueItems(
     const isFreeAgentHere = !rosteredIds.has(surge.beneficiaryPlayerId)
     if (!onMyBench && !isFreeAgentHere) continue
 
-    const reasoning = await getOrGenerateSurgeReasoning(supabase, surge)
+    const reasoning = await getOrGenerateSurgeReasoning(supabase, surge, notesByPlayerId.get(surge.beneficiaryPlayerId))
 
     items.push({
       fingerprint: `surge:${league.id}:${surge.outgoingPlayerId}:${surge.outgoingStatus}:${surge.beneficiaryPlayerId}`,
@@ -482,7 +514,28 @@ async function getOrGenerateNewsReasoning(
 // Same read-through cache pattern as above, keyed on the specific
 // (outgoing player, status, beneficiary) triple so a status change (e.g.
 // Doubtful -> Out) generates fresh reasoning rather than reusing stale text.
-async function getOrGenerateSurgeReasoning(supabase: SupabaseClient, surge: SurgeEvent): Promise<string> {
+//
+// T-143: player_context_cache is shared across every user who sees this
+// exact surge event — writing a note-influenced sentence into it would
+// leak one user's private note into every other user's identical card.
+// So a userNote bypasses the shared cache entirely (no read, no write) and
+// always asks Claude fresh; everyone else keeps hitting the shared,
+// note-free cache as before.
+async function getOrGenerateSurgeReasoning(supabase: SupabaseClient, surge: SurgeEvent, userNote?: string): Promise<string> {
+  const fallback = `${surge.beneficiaryName} is next in line at ${surge.beneficiaryPosition} for the ${surge.nflTeam} with ${surge.outgoingName} listed as ${surge.outgoingStatus.toLowerCase()}.`
+
+  if (userNote) {
+    return generateOpportunitySurgeContext({
+      outgoingName: surge.outgoingName,
+      outgoingStatus: surge.outgoingStatus,
+      beneficiaryName: surge.beneficiaryName,
+      beneficiaryPosition: surge.beneficiaryPosition,
+      nflTeam: surge.nflTeam,
+      mode: PULSE_MODE,
+      userNote,
+    }).catch(() => fallback)
+  }
+
   const sourceId = `${surge.outgoingPlayerId}:${surge.outgoingStatus}:${surge.beneficiaryPlayerId}`
   const { data: cached } = await supabase
     .from('player_context_cache')
@@ -494,7 +547,6 @@ async function getOrGenerateSurgeReasoning(supabase: SupabaseClient, surge: Surg
     .maybeSingle()
   if (cached) return cached.reasoning
 
-  const fallback = `${surge.beneficiaryName} is next in line at ${surge.beneficiaryPosition} for the ${surge.nflTeam} with ${surge.outgoingName} listed as ${surge.outgoingStatus.toLowerCase()}.`
   const reasoning = await generateOpportunitySurgeContext({
     outgoingName: surge.outgoingName,
     outgoingStatus: surge.outgoingStatus,

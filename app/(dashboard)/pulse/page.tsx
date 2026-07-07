@@ -83,6 +83,20 @@ interface FilmRoomUsageSignal {
   deltaPct: number
 }
 
+// T-101: real, live fantasy matchup scoring — same shape
+// lib/liveRoster.ts's buildLiveRoster already returns via /api/live/status,
+// which this page now also reads (previously LIVE-tab-only). Distinct from
+// FilmRoomLeagueResult below: that's the completed-week recap for Film Room
+// state, this is a currently-in-progress score.
+interface LiveMatchupSummary {
+  leagueId: string
+  leagueName: string
+  myScore: number
+  myProjectedScore: number | null
+  opponentScore: number
+  opponentProjectedScore: number | null
+}
+
 interface FilmRoomLeagueResult {
   leagueId: string
   leagueName: string
@@ -91,6 +105,7 @@ interface FilmRoomLeagueResult {
   won: boolean | null
   usageSignal: FilmRoomUsageSignal | null
   recap: string | null
+  recapGated: boolean
 }
 
 // ─── Pulse page ────────────────────────────────────────────────────────────────
@@ -116,6 +131,7 @@ export default function PulsePage() {
   // them Sleeper," which otherwise look identical and aren't.
   const [totalLeagueCount, setTotalLeagueCount] = useState(0)
   const [filmRoomResults, setFilmRoomResults] = useState<FilmRoomLeagueResult[]>([])
+  const [liveMatchups, setLiveMatchups] = useState<LiveMatchupSummary[]>([])
 
   // T-94/T-90: Waiver Day Mission Briefing framing + Game Day live scores
   // (PRD 6.10/6.13). One-shot fetch — this page doesn't need the 60s
@@ -158,6 +174,25 @@ export default function PulsePage() {
       cancelled = true
     }
   }, [rostiroState, mode])
+
+  // T-101: real fantasy matchup scoring, previously LIVE-tab-only —
+  // reuses that same endpoint/data (lib/liveRoster.ts's buildLiveRoster)
+  // rather than a second computation, just surfaced here too. Only
+  // fetched during Game Day, same gate as the LIVE tab's own reason for
+  // existing; a quiet standard/waiver day has nothing live to show.
+  useEffect(() => {
+    if (rostiroState !== 'game_day') return
+    let cancelled = false
+    fetch('/api/live/status')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { matchups?: LiveMatchupSummary[] } | null) => {
+        if (!cancelled && data) setLiveMatchups(data.matchups ?? [])
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [rostiroState])
 
   useEffect(() => {
     let cancelled = false
@@ -381,6 +416,55 @@ export default function PulsePage() {
         )}
       </div>
 
+      {/* T-101: Your Matchup — real fantasy scoring (myScore vs
+          opponentScore, both leagues' real starters), previously visible
+          only on the LIVE tab. Deliberately not gated on liveGames.length
+          the way "Live Now" below is — lib/liveRoster.ts's own matchup
+          rail stays populated between windows (an early game finished,
+          a later one hasn't started), so a real, already-accrued score
+          would otherwise go blank here for no reason. Same Pro gate as
+          the real-score card below — this is arguably the more valuable
+          number, not a lesser one. */}
+      {liveMatchups.length > 0 && (
+        <div
+          className="glass rounded-xl px-4 py-3 mb-4"
+          style={{ borderLeft: `2.5px solid ${STATE_CONFIG.game_day.color}`, boxShadow: `0 0 10px ${STATE_CONFIG.game_day.color}33` }}
+        >
+          <span
+            className="mono-data text-[9.5px] tracking-[0.16em]"
+            style={{ color: STATE_CONFIG.game_day.color }}
+          >
+            YOUR MATCHUP
+          </span>
+          <div className="mt-1.5 space-y-2">
+            {liveMatchups.map((m) => (
+              <div key={m.leagueId}>
+                <p className="text-[11px]" style={{ color: 'var(--t3)' }}>{m.leagueName}</p>
+                <div
+                  className="mono-data text-[14px] font-semibold"
+                  style={{ color: 'var(--t1)', filter: scoresGated ? 'blur(4px)' : 'none', userSelect: scoresGated ? 'none' : 'auto' }}
+                >
+                  {m.myScore.toFixed(1)} – {m.opponentScore.toFixed(1)}
+                </div>
+                {(m.myProjectedScore !== null || m.opponentProjectedScore !== null) && (
+                  <p
+                    className="mono-data text-[10px] mt-0.5"
+                    style={{ color: 'var(--t4)', filter: scoresGated ? 'blur(4px)' : 'none', userSelect: scoresGated ? 'none' : 'auto' }}
+                  >
+                    Proj. {m.myProjectedScore?.toFixed(1) ?? '—'} – {m.opponentProjectedScore?.toFixed(1) ?? '—'}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+          {scoresGated && (
+            <p className="mono-data text-[10px] mt-2" style={{ color: 'var(--signal)' }}>
+              Unlock live scores with Pro
+            </p>
+          )}
+        </div>
+      )}
+
       {/* T-90: Live Now — Game Day's live-score presence in Pulse (PRD 6.10/
           6.13). Roster-relevant only, matching Pulse's existing North Star
           rule; scores blur for free plan per 9's "unblurred live scores" as
@@ -456,6 +540,11 @@ export default function PulsePage() {
                 {r.recap && (
                   <p className="text-[12px] mt-1.5 leading-relaxed" style={{ color: 'var(--t2)' }}>
                     {r.recap}
+                  </p>
+                )}
+                {r.recapGated && (
+                  <p className="mono-data text-[10px] mt-1.5" style={{ color: 'var(--signal)' }}>
+                    Unlock the full recap with Pro
                   </p>
                 )}
                 {/* Buy-low/sell-high usage signal — deliberately understated
