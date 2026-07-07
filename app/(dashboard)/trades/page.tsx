@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMode } from '@/components/nav/AppShell'
 import { openPlayerCard } from '@/lib/openPlayerCard'
+import NotesPanel from '@/components/NotesPanel'
 import type { ADPPlayer, TradeAnalysis } from '@/types'
 
 const VERDICT_LABEL: Record<TradeAnalysis['verdict'], string> = {
@@ -29,12 +30,24 @@ export default function TradesPage() {
   const [analysis, setAnalysis] = useState<TradeAnalysis | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [leagues, setLeagues] = useState<{ id: string; name: string }[]>([])
 
   useEffect(() => {
     fetch('/api/draft/players')
       .then((res) => res.json())
       .then((data: { players: ADPPlayer[] }) => setPlayers(data.players))
       .catch(() => setError('Failed to load player list'))
+  }, [])
+
+  // T-141: this page isn't scoped to one league the way a LeagueCard is, so
+  // its NotesPanel needs a real league list to pick from instead of a fixed id.
+  useEffect(() => {
+    fetch('/api/settings')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { leagues?: { id: string; league_name: string }[] } | null) => {
+        if (data?.leagues) setLeagues(data.leagues.map((l) => ({ id: l.id, name: l.league_name })))
+      })
+      .catch(() => {})
   }, [])
 
   async function analyze() {
@@ -105,6 +118,8 @@ export default function TradesPage() {
       )}
 
       {analysis && <AnalysisCard analysis={analysis} mode={mode} />}
+
+      <NotesPanel leagues={leagues} />
     </div>
   )
 }

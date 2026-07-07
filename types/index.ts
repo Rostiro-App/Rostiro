@@ -276,6 +276,26 @@ export interface PulseItem {
   createdAt: string
 }
 
+// T-141: one shared table for both note types rather than two separate
+// features — `type` branches behavior. 'ask_copilot' (T-142) isn't built
+// yet; the type exists here so the schema/UI don't need a breaking change
+// when it ships.
+export type NoteType = 'general' | 'ask_copilot'
+
+export interface Note {
+  id: string
+  userId: string
+  leagueId: string | null
+  leagueName: string | null
+  playerId: string | null
+  playerName: string | null
+  type: NoteType
+  body: string
+  response: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 // ─── Weather ───────────────────────────────────────────────────────────────────
 
 export interface StadiumWeather {

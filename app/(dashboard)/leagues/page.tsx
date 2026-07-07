@@ -16,6 +16,7 @@
 import { useEffect, useState } from 'react'
 import { useMode } from '@/components/nav/AppShell'
 import { sleeperLeagueUrl, espnLeagueUrl, yahooLeagueUrl } from '@/lib/leagueLinks'
+import NotesPanel from '@/components/NotesPanel'
 import type { LeagueHealthFactor, LeagueHealthStatus, RostiroState, SystemStatus, SystemStatusLeague } from '@/types'
 
 // T-117: plain-language reference for the 5 Health Score factors (PRD 6.2)
@@ -290,6 +291,10 @@ function LeagueCard({
           ))}
         </div>
       )}
+
+      {/* T-141: scoped to this exact league (leagueId fixed) — no picker,
+          no cross-league list, just this league's own notes. */}
+      <NotesPanel leagueId={league.id} />
 
       {/* T-117: this page had zero league management — found via direct
           founder feedback ("no league management options here"). Deep-link
