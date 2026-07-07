@@ -14,5 +14,13 @@ import { NextResponse } from 'next/server'
 export async function POST(request: Request) {
   const supabase = await createSSRClient()
   await supabase.auth.signOut()
-  return NextResponse.redirect(new URL('/login', request.url))
+  // T-129: NextResponse.redirect() defaults to a 307, which per HTTP spec
+  // preserves the original request method at the new location — since the
+  // dock/BottomNav sign-out control is a real <form method="POST">, the
+  // browser was then re-issuing a POST to /login, a page route that only
+  // handles GET, hence the 405 (a manual refresh "fixed" it only because a
+  // reload defaults to a fresh GET, masking the real bug). 303 is the
+  // standard status for this exact Post/Redirect/Get pattern: it tells the
+  // browser to switch to GET regardless of the original method.
+  return NextResponse.redirect(new URL('/login', request.url), 303)
 }
