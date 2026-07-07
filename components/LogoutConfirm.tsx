@@ -9,6 +9,7 @@
 // out of sync between the three.
 
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 
 export default function LogoutConfirm({
   trigger,
@@ -24,45 +25,56 @@ export default function LogoutConfirm({
     <>
       {trigger(() => setConfirming(true))}
 
-      {confirming && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center px-4"
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={() => setConfirming(false)}
-        >
+      {confirming &&
+        createPortal(
+          // T-134: rendering this inline (a child of Sidebar's <aside>,
+          // which sets backdropFilter directly) meant "fixed, cover the
+          // whole viewport" was actually being contained by that <aside>'s
+          // own box — filter/backdrop-filter establish a new containing
+          // block for fixed-position descendants, same root cause as the
+          // Pulse detail drawer's earlier z-index bug (see that fix's own
+          // comment). Portaling to document.body escapes every ancestor's
+          // filter/transform/stacking context entirely, the same fix
+          // already established there.
           <div
-            className="rounded-xl p-6 max-w-sm w-full"
-            style={{ backgroundColor: 'var(--glass-solid)', border: '1px solid var(--hairline)' }}
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-50 flex items-center justify-center px-4"
+            style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+            onClick={() => setConfirming(false)}
           >
-            <p className="text-base font-semibold" style={{ color: 'var(--t1)' }}>
-              Log out of Rostiro?
-            </p>
-            <p className="text-sm mt-1.5" style={{ color: 'var(--t2)' }}>
-              You&apos;ll need to sign back in to see your leagues and Pulse.
-            </p>
-            <div className="flex gap-2 mt-5">
-              <button
-                type="button"
-                onClick={() => setConfirming(false)}
-                className="flex-1 py-2.5 rounded-lg text-sm font-medium transition-all"
-                style={{ border: '1px solid var(--hairline)', color: 'var(--t2)' }}
-              >
-                Cancel
-              </button>
-              <form action="/api/auth/signout" method="POST" className="flex-1">
+            <div
+              className="rounded-xl p-6 max-w-sm w-full"
+              style={{ backgroundColor: 'var(--glass-solid)', border: '1px solid var(--hairline)' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="text-base font-semibold" style={{ color: 'var(--t1)' }}>
+                Log out of Rostiro?
+              </p>
+              <p className="text-sm mt-1.5" style={{ color: 'var(--t2)' }}>
+                You&apos;ll need to sign back in to see your leagues and Pulse.
+              </p>
+              <div className="flex gap-2 mt-5">
                 <button
-                  type="submit"
-                  className="w-full py-2.5 rounded-lg text-sm font-semibold transition-all hover:brightness-110"
-                  style={{ backgroundColor: 'rgba(226,75,74,0.14)', border: '1px solid rgba(226,75,74,.35)', color: '#E8504A' }}
+                  type="button"
+                  onClick={() => setConfirming(false)}
+                  className="flex-1 py-2.5 rounded-lg text-sm font-medium transition-all"
+                  style={{ border: '1px solid var(--hairline)', color: 'var(--t2)' }}
                 >
-                  Log out
+                  Cancel
                 </button>
-              </form>
+                <form action="/api/auth/signout" method="POST" className="flex-1">
+                  <button
+                    type="submit"
+                    className="w-full py-2.5 rounded-lg text-sm font-semibold transition-all hover:brightness-110"
+                    style={{ backgroundColor: 'rgba(226,75,74,0.14)', border: '1px solid rgba(226,75,74,.35)', color: '#E8504A' }}
+                  >
+                    Log out
+                  </button>
+                </form>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </>
   )
 }
