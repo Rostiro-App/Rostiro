@@ -15,6 +15,19 @@
 
 ---
 
+## Readiness gates — check before any content in this plan goes out
+
+Two things in this plan are written as if already true. Confirm both before the relevant content runs, so this stays an honest plan instead of a revised one:
+
+1. **Stripe/billing must be live before any pricing or Founding 500 content posts.** This entire plan is written assuming real Stripe checkout exists (per the founder's own build plan, ahead of executing this). Everything in Sections 5, 8, and 9 that mentions specific pricing or "capped at 500, never returns" scarcity is a live-purchase claim, not a waitlist tease, once it posts. If Stripe isn't live yet when a specific day/post in the calendar comes up, hold that piece and either skip it or reframe it as "join the waitlist to be first in line" until it is.
+2. **Championship Mode (T-83) content should hold until it's been seen working against a real live playoff bracket.** It's fully built and passed every check, but no league has reached its real playoff week yet this season, so it's never fired against real data. Section 5 (Day 24) and Section 7 (script 11) both feature it as a ready-to-film hero moment. Don't film or post it as a proven "New:" feature until a real league's bracket confirms it actually works live. Everything else in this plan is both built and already tested live this session, this is the one exception.
+
+Nothing else in this document depends on something not yet true — the core feature claims (Pulse, Health Score, Draft Copilot, Trade Analyzer, Live Matchup Scoring, Notes, Interrupt Stack, the States system, the free-Pro-week mechanic) are real, shipped, and already confirmed working.
+
+**On pacing:** this plan was written with the brief's stated cadences (daily X, 3-5 TikToks/week) as a ceiling, not a mandate. The brief's own stated goal for this phase is awareness and trust, not conversion — treat the 30-day calendar in Section 5 as a menu to pull from at a sustainable pace, not a quota. A quieter, more honest posting rhythm beats a dense one that outruns what's actually ready to show. Skipping a day is fine; posting something before it's real isn't.
+
+---
+
 ## 0. Product audit — what's actually real (the source of truth for every claim below)
 
 **Positioning line the brief specifies, confirmed compatible with the product:** *Rostiro helps fantasy players manage all of their fantasy teams in one place.* This matches the product's own real architecture — Rostiro syncs multiple leagues across platforms into one account, one Pulse queue, one System Bar.
@@ -256,7 +269,7 @@ Starts from an assumed kickoff date of **today + 1 week** so the founder has a f
 | 21 | Discord | Weekly update | Same content | Text | — | none | Source: X |
 | 22 | LinkedIn | Founder post: building solo/small team | Honest note on what building Rostiro has actually been like | Text | — | none | — |
 | 23 | X | NFL news reaction | React to real news, tie to a real Rostiro surface (injury tracking, waiver alerts) | Text + screenshot | — | Screenshot | — |
-| 24 | TikTok | Championship/Playoff Intensity Ladder reveal | "The app itself changes when your team makes the championship" | Screen recording of the gold reveal | Want early access? | Screen recording of T-83 reveal | IG Reel, YT Short `[R]` |
+| 24 | TikTok | **[GATE: hold until verified live, see Readiness Gates]** Championship/Playoff Intensity Ladder reveal | "The app itself changes when your team makes the championship" | Screen recording of the gold reveal | Want early access? | Screen recording of T-83 reveal | IG Reel, YT Short `[R]` |
 | 24 | IG, YT | Repost Day 24 TikTok | same | same | same | same | Source: TikTok |
 | 25 | X | Product Hunt prep tease | "Launching on Product Hunt soon, here's a preview" | Screenshot/GIF | Follow for launch day | Hero asset | — |
 | 25 | IG | Carousel: feature roundup | 6-7 slides, one per major feature | Carousel | Join the waitlist | slide set | — |
@@ -347,7 +360,7 @@ Each reused as-is for Reels and Shorts unless noted.
 
 10. **Hook:** "This is everything I need to do today. Across every league I'm in." **Visual:** Full Pulse queue scroll. **On-screen text:** "One list. Every league." **VO:** Plain. **CTA:** "Looking for beta users." **Reuse:** Direct.
 
-11. **Hook:** "When your team makes the championship, the app itself gets more intense." **Visual:** T-83's gold championship reveal sweep. **On-screen text:** "Championship Mode." **VO:** "It changes with your season." **CTA:** "Want early access?" **Reuse:** Direct — this is a strong hero clip, worth a second post as a standalone X GIF too.
+11. **[GATE: hold until verified live, see Readiness Gates]** **Hook:** "When your team makes the championship, the app itself gets more intense." **Visual:** T-83's gold championship reveal sweep. **On-screen text:** "Championship Mode." **VO:** "It changes with your season." **CTA:** "Want early access?" **Reuse:** Direct, a strong hero clip once confirmed, worth a second post as a standalone X GIF too.
 
 12. **Hook:** "Free week during kickoff. Full access, no card." **Visual:** Screenshot of the free-Pro-week framing on signup. **On-screen text:** "Free during Week 1." **VO:** Explain the mechanic honestly (real free access during real Week 1 dates). **CTA:** "Join the waitlist." **Reuse:** Direct, time this one specifically for late August.
 
@@ -502,7 +515,7 @@ No em dashes anywhere in this section, per the brief.
 7. **"Ask Copilot in action"** — A real trade question, the real deterministic candidates it found, the explanation. CTA: Want early access?
 8. **"What Championship Mode looks like"** — The gold reveal, explained slide by slide. CTA: Reply if your league's in the playoffs.
 9. **"Managing 5 leagues, before Rostiro"** — Relatable chaos narrative across slides, resolves with the product. CTA: Would this help you?
-10. **"The pricing, plainly"** — Free / Pro $9.99/mo / Founder Season Pass $59 / Founding 500 $149 lifetime, one slide each, no fine print games. CTA: Join the waitlist.
+10. **"The pricing, plainly"** **[GATE: hold until Stripe checkout is live, see Readiness Gates]** — Free / Pro $9.99/mo / Founder Season Pass $59 / Founding 500 $149 lifetime, one slide each, no fine print games. CTA: Join the waitlist.
 11. **"What's live right now during your Sunday game"** — Live Matchup Scoring explained. CTA: Want early access?
 12. **"Notes that actually stick around"** — Notes + Save This Trade explained together. CTA: Try it free.
 13. **"One interrupt, not ten"** — Interrupt Stack explained with a real example. CTA: Want early access?
