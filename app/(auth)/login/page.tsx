@@ -72,11 +72,11 @@ export default function LoginPage() {
               />
             </div>
 
-            {/* T-130: no "Forgot password?" link yet — a real reset flow
-                (Supabase resetPasswordForEmail + a confirm page handling
-                the recovery session) doesn't exist in this codebase at
-                all. Deliberately not linking to a page that doesn't exist;
-                logged as its own task instead, see Rostiro_PRD_v5.md. */}
+            <p className="mt-2 text-right">
+              <Link href="/forgot-password" className="text-xs" style={{ color: 'var(--t3)' }}>
+                Forgot password?
+              </Link>
+            </p>
 
             {message && (
               <p
