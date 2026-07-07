@@ -23,6 +23,7 @@
 import { getSleeperRosters } from '@/lib/sleeper'
 import { toNflverseTeamCode } from '@/lib/liveScores'
 import { sendPushNotification } from '@/lib/onesignal'
+import { isFreePlan } from '@/lib/usageLimits'
 
 type AdminClient = { from: (table: string) => any }
 
@@ -77,9 +78,10 @@ export async function pushToUser(admin: AdminClient, userId: string, title: stri
   // cooking" layer; getting proactively pinged the instant it happens,
   // rather than finding out next time you open the app, is the upgrade
   // lever. This was already decided in Section 9 but never actually
-  // enforced until now (UX Behavior Spec Gap, 2026-07-04).
-  const { data: profile } = await admin.from('users').select('plan').eq('id', userId).maybeSingle()
-  if ((profile?.plan ?? 'free') === 'free') return
+  // enforced until now (UX Behavior Spec Gap, 2026-07-04). Routed through
+  // the same isFreePlan every other gate uses so the promo window/trial
+  // logic applies here too, instead of a second, independent plan check.
+  if (await isFreePlan(admin, userId)) return
 
   const { data } = await admin.from('push_subscriptions').select('onesignal_player_id').eq('user_id', userId)
   const ids = ((data ?? []) as { onesignal_player_id: string }[]).map((r) => r.onesignal_player_id)

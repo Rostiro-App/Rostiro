@@ -176,7 +176,7 @@ export default function ModeSelection({ onContinue }: { onContinue: (mode: Mode)
               {saving ? 'Saving…' : 'Continue →'}
             </button>
             <p className="text-xs" style={{ color: 'var(--t3)' }}>
-              Free for 7 days — no card required.
+              Free to start · Full Pro access when the season kicks off · No card required.
             </p>
           </div>
 

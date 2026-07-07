@@ -50,12 +50,18 @@ export async function GET() {
   // override, so "current plan" always reflects what production code
   // itself would see right now.
   const { data: founder } = await admin.from('users').select('plan').eq('email', process.env.ADMIN_EMAIL).maybeSingle()
+  // Real, persistent production setting — deliberately read from its own
+  // table (promo_windows), never sim_state, so "Clear simulation" below
+  // can never accidentally wipe it.
+  const { data: promo } = await admin.from('promo_windows').select('starts_at, ends_at').eq('id', 1).maybeSingle()
   return NextResponse.json({
     isActive: data?.is_active ?? false,
     simTimestamp: data?.sim_timestamp ?? null,
     forcedState: data?.forced_state ?? null,
     activeScenario: data?.active_scenario ?? null,
     currentPlan: founder?.plan ?? null,
+    promoStartsAt: promo?.starts_at ?? null,
+    promoEndsAt: promo?.ends_at ?? null,
   })
 }
 
@@ -65,7 +71,7 @@ export async function POST(request: NextRequest) {
   // to anyone who isn't already the founder.
   if (!user) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  let body: { action?: string; timestamp?: string; state?: string | null; scenario?: string; plan?: string }
+  let body: { action?: string; timestamp?: string; state?: string | null; scenario?: string; plan?: string; startsAt?: string; endsAt?: string }
   try {
     body = await request.json()
   } catch {
@@ -132,8 +138,28 @@ export async function POST(request: NextRequest) {
         await clearSimulation(admin)
         break
       }
+      // Real, persistent production lever (lib/usageLimits.ts's isFreePlan)
+      // — not a dev/test scenario, so it's a separate table (promo_windows)
+      // rather than a sim_state field, and 'clear' above never touches it.
+      case 'set_promo_window': {
+        if (!body.startsAt || Number.isNaN(new Date(body.startsAt).getTime())) {
+          return NextResponse.json({ error: 'startsAt must be a valid ISO string' }, { status: 400 })
+        }
+        if (!body.endsAt || Number.isNaN(new Date(body.endsAt).getTime())) {
+          return NextResponse.json({ error: 'endsAt must be a valid ISO string' }, { status: 400 })
+        }
+        if (new Date(body.endsAt) <= new Date(body.startsAt)) {
+          return NextResponse.json({ error: 'endsAt must be after startsAt' }, { status: 400 })
+        }
+        await admin.from('promo_windows').upsert({ id: 1, starts_at: body.startsAt, ends_at: body.endsAt, updated_at: new Date().toISOString() })
+        return NextResponse.json({ ok: true })
+      }
+      case 'clear_promo_window': {
+        await admin.from('promo_windows').update({ starts_at: null, ends_at: null, updated_at: new Date().toISOString() }).eq('id', 1)
+        return NextResponse.json({ ok: true })
+      }
       default:
-        return NextResponse.json({ error: 'action must be one of set_time, force_state, force_plan, run_scenario, clear' }, { status: 400 })
+        return NextResponse.json({ error: 'action must be one of set_time, force_state, force_plan, run_scenario, clear, set_promo_window, clear_promo_window' }, { status: 400 })
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'

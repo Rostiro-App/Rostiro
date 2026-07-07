@@ -18,6 +18,7 @@ import { getRostiroState } from '@/lib/rostiroState'
 import { computeLiveWindow } from '@/lib/liveWindow'
 import { toNflverseTeamCode } from '@/lib/liveScores'
 import { isFeatureEnabled } from '@/lib/featureFlags'
+import { isFreePlan } from '@/lib/usageLimits'
 import { simNow } from '@/lib/simTime'
 import { NextResponse } from 'next/server'
 import type { LeagueHealth, LiveGameScore, RelevantPlayer, SystemDeadline, SystemStatus, SystemStatusLeague, UserPlan } from '@/types'
@@ -378,7 +379,10 @@ export async function GET() {
         }
       })
 
-      scoresGated = plan === 'free'
+      // Routed through isFreePlan (not a raw plan === 'free' check) so the
+      // global promo window / personal fallback trial (lib/usageLimits.ts)
+      // unlock live scores the same way every other gate does.
+      scoresGated = await isFreePlan(supabase, user.id).catch(() => plan === 'free')
     }
   }
 

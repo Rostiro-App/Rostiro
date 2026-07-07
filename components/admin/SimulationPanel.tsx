@@ -17,6 +17,8 @@ interface SimStatus {
   forcedState: RostiroState | null
   activeScenario: string | null
   currentPlan: string | null
+  promoStartsAt: string | null
+  promoEndsAt: string | null
 }
 
 // Real users.plan values (types/index.ts) — the aspirational T-85/T-112
@@ -88,6 +90,8 @@ export default function SimulationPanel() {
   const [busy, setBusy] = useState(false)
   const [lastNote, setLastNote] = useState<string | null>(null)
   const [timeInput, setTimeInput] = useState('')
+  const [promoStartInput, setPromoStartInput] = useState('')
+  const [promoEndInput, setPromoEndInput] = useState('')
 
   function resetAnimations() {
     const today = todayEtKey()
@@ -214,6 +218,68 @@ export default function SimulationPanel() {
                 {p.label}
               </button>
             ))}
+          </div>
+
+          {/* Real, persistent production setting — not a dev/test scenario
+              like everything else in this panel, so it lives in its own
+              table (promo_windows) and its own color (gold, matching
+              Founder/pricing accents elsewhere) to visually separate it
+              from the Dev Simulation Suite around it. "Clear simulation"
+              at the bottom never touches this. */}
+          <p className="mono-data text-[9px] tracking-[0.12em] mt-4 mb-2" style={{ color: '#F5C842' }}>
+            PROMO WINDOW (LIVE, NOT SIMULATED)
+          </p>
+          {status?.promoStartsAt && status?.promoEndsAt ? (
+            <p className="text-[10.5px] mb-2" style={{ color: 'var(--t2)' }}>
+              Active: {new Date(status.promoStartsAt).toLocaleString()} → {new Date(status.promoEndsAt).toLocaleString()}
+            </p>
+          ) : (
+            <p className="text-[10.5px] mb-2" style={{ color: 'var(--t3)' }}>Not set — every free user is gated normally.</p>
+          )}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] w-9 flex-shrink-0" style={{ color: 'var(--t3)' }}>Start</span>
+              <input
+                type="datetime-local"
+                value={promoStartInput}
+                onChange={(e) => setPromoStartInput(e.target.value)}
+                className="flex-1 min-w-0 text-[11px] px-2 py-1.5 rounded-lg mono-data"
+                style={{ backgroundColor: 'var(--glass-solid)', border: '1px solid var(--hairline)', color: 'var(--t1)' }}
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] w-9 flex-shrink-0" style={{ color: 'var(--t3)' }}>End</span>
+              <input
+                type="datetime-local"
+                value={promoEndInput}
+                onChange={(e) => setPromoEndInput(e.target.value)}
+                className="flex-1 min-w-0 text-[11px] px-2 py-1.5 rounded-lg mono-data"
+                style={{ backgroundColor: 'var(--glass-solid)', border: '1px solid var(--hairline)', color: 'var(--t1)' }}
+              />
+            </div>
+            <div className="flex gap-1.5">
+              <button
+                disabled={busy || !promoStartInput || !promoEndInput}
+                onClick={() =>
+                  runAction(
+                    { action: 'set_promo_window', startsAt: new Date(promoStartInput).toISOString(), endsAt: new Date(promoEndInput).toISOString() },
+                    'Promo window saved — every free user gets full Pro depth during that window, real production behavior starting now.'
+                  )
+                }
+                className="flex-1 text-[11px] font-medium px-2 py-1.5 rounded-lg disabled:opacity-50"
+                style={{ color: '#F5C842', border: '1px solid rgba(245,200,66,0.5)' }}
+              >
+                Save
+              </button>
+              <button
+                disabled={busy}
+                onClick={() => runAction({ action: 'clear_promo_window' }, 'Promo window cleared — free users are gated normally again.')}
+                className="flex-1 text-[11px] font-medium px-2 py-1.5 rounded-lg disabled:opacity-50"
+                style={{ color: 'var(--t3)', border: '1px solid var(--hairline)' }}
+              >
+                Clear
+              </button>
+            </div>
           </div>
 
           <p className="mono-data text-[9px] tracking-[0.12em] mt-4 mb-2" style={{ color: 'var(--t3)' }}>TIME OVERRIDE</p>

@@ -35,7 +35,7 @@ export default function SignupPage() {
     } else {
       setMessage({
         type: 'success',
-        text: data.warning ?? 'Check your email to confirm, then your 7-day Starter trial begins automatically.',
+        text: data.warning ?? 'Check your email to confirm — free Pro access unlocks for everyone when the season kicks off.',
       })
     }
   }
@@ -57,7 +57,7 @@ export default function SignupPage() {
 
         <div className="rounded-xl p-6" style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', border: '1.5px solid var(--hairline)' }}>
           <p className="text-xs mb-5" style={{ color: 'var(--t2)' }}>
-            Free to start · 7-day Starter trial included · No card required
+            Free to start · Full Pro access when the season kicks off · No card required
           </p>
 
           <form onSubmit={handleSignup}>
