@@ -4,9 +4,10 @@
 // computed locally (lib/draftBoard.ts computeBestAvailable) from data it
 // already has cached; this route's only job is the Claude call.
 
-import { generateDraftPickRecommendations } from '@/lib/claude'
+import { generateDraftPickRecommendations, type DraftPickRecommendation } from '@/lib/claude'
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
-import { createAdminClient } from '@/lib/supabase'
+import { isFreePlan } from '@/lib/usageLimits'
+import { createAdminClient, createSSRClient } from '@/lib/supabase'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
@@ -56,6 +57,31 @@ export async function POST(request: Request) {
   const parsed = Body.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+  }
+
+  // PRD Section 9: "Limited Draft Copilot" (Free) vs "Full Draft Copilot
+  // (pre-fetched reasoning)" (Pro) — this route stayed deliberately
+  // unauthenticated for the no-signup Draft Kit (T-76, PRD 6.3), so a
+  // logged-out caller here is never plan-gated (there's no plan to check,
+  // and the Draft Kit is a top-of-funnel trial experience, not a metered
+  // one). A real in-app draft session (app/draft/session/[id]/page.tsx)
+  // calls this exact same route with a real cookie session, so a
+  // best-effort auth check here is what actually distinguishes the two —
+  // an authenticated Free-plan user gets the real, deterministic candidate
+  // order without Claude's written reasoning; the pre-fetched explanation
+  // text itself is the Pro-exclusive depth.
+  const supabase = await createSSRClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const isFree = user ? await isFreePlan(admin, user.id).catch(() => false) : false
+
+  if (isFree) {
+    const recommendations: DraftPickRecommendation[] = parsed.data.candidates.map((c) => ({
+      playerId: c.playerId,
+      reasoning: c.isNeeded
+        ? `ADP ${Math.round(c.adp)} — fills an open roster need. Upgrade to Pro for Copilot's full pre-fetched reasoning.`
+        : `ADP ${Math.round(c.adp)} — best remaining value. Upgrade to Pro for Copilot's full pre-fetched reasoning.`,
+    }))
+    return NextResponse.json({ recommendations })
   }
 
   try {

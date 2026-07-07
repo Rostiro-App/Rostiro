@@ -9,6 +9,7 @@ import { createSSRClient, createAdminClient } from '@/lib/supabase'
 import { getSleeperMatchups, computeFilmRoomResult, getSleeperRosters, SEASON } from '@/lib/sleeper'
 import { computeTopUsageSignal, type RosterUsageRow, type UsageSignal } from '@/lib/filmRoomSignals'
 import { generateFilmRoomRecap } from '@/lib/claude'
+import { isFreePlan } from '@/lib/usageLimits'
 import { getForcedState } from '@/lib/simTime'
 import { NextResponse, type NextRequest } from 'next/server'
 import type { Mode } from '@/components/nav/AppShell'
@@ -21,6 +22,10 @@ interface FilmRoomLeagueResult {
   won: boolean | null
   usageSignal: UsageSignal | null
   recap: string | null
+  // T-101 gating pass: true for a Free-plan user whose recap was
+  // deliberately skipped (not attempted and failed) — lets the client
+  // show an upgrade nudge instead of just silently having no recap.
+  recapGated: boolean
 }
 
 const VALID_MODES: Mode[] = ['focused', 'balanced', 'savant']
@@ -32,6 +37,14 @@ export async function GET(request: NextRequest) {
 
   const modeParam = request.nextUrl.searchParams.get('mode')
   const mode: Mode = VALID_MODES.includes(modeParam as Mode) ? (modeParam as Mode) : 'balanced'
+
+  // PRD Section 9: "full Film Room recap" is listed as Pro's state depth —
+  // the real score/won-loss/usage signal below are all deterministic and
+  // stay free for everyone; only the Claude-narrated recap paragraph is
+  // gated. Fail open (never Claude) on a metering error, same posture as
+  // every other plan check in this codebase.
+  const admin = createAdminClient()
+  const free = await isFreePlan(admin, user.id).catch(() => false)
 
   const { data: leagues } = await supabase
     .from('connected_leagues')
@@ -54,17 +67,19 @@ export async function GET(request: NextRequest) {
     const results: FilmRoomLeagueResult[] = await Promise.all(
       rows.map(async (l) => {
         let recap: string | null = null
-        try {
-          recap = await generateFilmRoomRecap({
-            leagueName: l.league_name,
-            won: true,
-            myScore: 132.4,
-            opponentScore: 118.6,
-            usageSignal: demoSignal,
-            mode,
-          })
-        } catch {
-          // Recap is additive — a Claude failure shouldn't blank the score card.
+        if (!free) {
+          try {
+            recap = await generateFilmRoomRecap({
+              leagueName: l.league_name,
+              won: true,
+              myScore: 132.4,
+              opponentScore: 118.6,
+              usageSignal: demoSignal,
+              mode,
+            })
+          } catch {
+            // Recap is additive — a Claude failure shouldn't blank the score card.
+          }
         }
         return {
           leagueId: l.id,
@@ -74,13 +89,13 @@ export async function GET(request: NextRequest) {
           won: true,
           usageSignal: demoSignal,
           recap,
+          recapGated: free,
         }
       })
     )
     return NextResponse.json({ results })
   }
 
-  const admin = createAdminClient()
   const week = await mostRecentCompletedWeek(admin)
   if (week === null) return NextResponse.json({ results: [] })
 
@@ -95,17 +110,19 @@ export async function GET(request: NextRequest) {
       const usageSignal = await computeLeagueUsageSignal(admin, league.league_id, Number(league.team_id), week)
 
       let recap: string | null = null
-      try {
-        recap = await generateFilmRoomRecap({
-          leagueName: league.league_name,
-          won: result.won,
-          myScore: result.myScore,
-          opponentScore: result.opponentScore,
-          usageSignal,
-          mode,
-        })
-      } catch {
-        // Recap is additive — a Claude failure shouldn't blank the score card.
+      if (!free) {
+        try {
+          recap = await generateFilmRoomRecap({
+            leagueName: league.league_name,
+            won: result.won,
+            myScore: result.myScore,
+            opponentScore: result.opponentScore,
+            usageSignal,
+            mode,
+          })
+        } catch {
+          // Recap is additive — a Claude failure shouldn't blank the score card.
+        }
       }
 
       results.push({
@@ -116,6 +133,7 @@ export async function GET(request: NextRequest) {
         won: result.won,
         usageSignal,
         recap,
+        recapGated: free,
       })
     } catch {
       // One league's Sleeper call failing shouldn't blank the others.
