@@ -10,6 +10,7 @@ import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import { useLiveUnlocked } from '@/lib/useLiveUnlocked'
 import { useLiveUnlockTransition } from '@/lib/useLiveUnlockTransition'
+import LogoutConfirm from '@/components/LogoutConfirm'
 
 const NAV_ITEMS = [
   {
@@ -166,15 +167,21 @@ export default function BottomNav() {
               })}
             </div>
             <div style={{ height: '1px', backgroundColor: 'var(--hairline)', margin: '10px 4px' }} />
-            <form action="/api/auth/signout" method="POST">
-              <button
-                type="submit"
-                className="w-full text-left px-4 py-3 rounded-xl text-sm"
-                style={{ color: 'var(--t3)', background: 'none', border: 'none' }}
-              >
-                Sign out
-              </button>
-            </form>
+            <LogoutConfirm
+              trigger={(open) => (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMoreOpen(false)
+                    open()
+                  }}
+                  className="w-full text-left px-4 py-3 rounded-xl text-sm"
+                  style={{ color: 'var(--t3)', background: 'none', border: 'none' }}
+                >
+                  Sign out
+                </button>
+              )}
+            />
           </div>
         </div>
       )}

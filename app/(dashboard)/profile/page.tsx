@@ -13,6 +13,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { browserClient } from '@/lib/supabase-browser'
+import LogoutConfirm from '@/components/LogoutConfirm'
 
 interface ProfileData {
   email: string
@@ -274,15 +275,18 @@ export default function ProfilePage() {
         )}
 
         <Section title="Session">
-          <form action="/api/auth/signout" method="POST">
-            <button
-              type="submit"
-              className="w-full text-sm font-semibold py-3 rounded-xl transition-all hover:brightness-110"
-              style={{ backgroundColor: 'rgba(226,75,74,0.12)', border: '1px solid rgba(226,75,74,0.35)', color: '#E8504A' }}
-            >
-              Log out
-            </button>
-          </form>
+          <LogoutConfirm
+            trigger={(open) => (
+              <button
+                type="button"
+                onClick={open}
+                className="w-full text-sm font-semibold py-3 rounded-xl transition-all hover:brightness-110"
+                style={{ backgroundColor: 'rgba(226,75,74,0.12)', border: '1px solid rgba(226,75,74,0.35)', color: '#E8504A' }}
+              >
+                Log out
+              </button>
+            )}
+          />
         </Section>
       </div>
     </div>

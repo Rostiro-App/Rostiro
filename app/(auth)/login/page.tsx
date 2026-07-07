@@ -8,7 +8,6 @@ import AmbientStateSweep from '@/components/AmbientStateSweep'
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [authMode, setAuthMode] = useState<'password' | 'magic'>('password')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null)
 
@@ -36,26 +35,6 @@ export default function LoginPage() {
     window.location.href = '/pulse'
   }
 
-  async function handleMagicLink(e: React.FormEvent) {
-    e.preventDefault()
-    setLoading(true)
-    setMessage(null)
-
-    const { error } = await browserClient.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/api/auth/callback?next=/pulse`,
-      },
-    })
-
-    setLoading(false)
-    if (error) {
-      setMessage({ type: 'error', text: error.message })
-    } else {
-      setMessage({ type: 'success', text: 'Check your email for a login link.' })
-    }
-  }
-
   return (
     <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: 'var(--void)', position: 'relative' }}>
       <AmbientStateSweep />
@@ -71,27 +50,7 @@ export default function LoginPage() {
 
         <div className="rounded-xl p-6" style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', border: '1.5px solid var(--hairline)' }}>
 
-          {/* Mode toggle */}
-          <div
-            className="flex gap-1 mb-6 p-1 rounded-lg"
-            style={{ backgroundColor: 'rgba(6, 11, 19, 0.55)' }}
-          >
-            {(['password', 'magic'] as const).map((m) => (
-              <button
-                key={m}
-                onClick={() => setAuthMode(m)}
-                className="flex-1 py-2 text-sm rounded-md font-medium transition-all"
-                style={{
-                  backgroundColor: authMode === m ? 'var(--hairline)' : 'transparent',
-                  color: authMode === m ? '#C8DCF0' : 'var(--t3)',
-                }}
-              >
-                {m === 'password' ? 'Password' : 'Magic Link'}
-              </button>
-            ))}
-          </div>
-
-          <form onSubmit={authMode === 'password' ? handlePasswordLogin : handleMagicLink}>
+          <form onSubmit={handlePasswordLogin}>
             <div className="space-y-3">
               <input
                 type="email"
@@ -102,18 +61,22 @@ export default function LoginPage() {
                 className="w-full rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none"
                 style={{ backgroundColor: 'rgba(6, 11, 19, 0.55)', border: '1.5px solid var(--hairline)' }}
               />
-              {authMode === 'password' && (
-                <input
-                  type="password"
-                  placeholder="Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="w-full rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none"
-                  style={{ backgroundColor: 'rgba(6, 11, 19, 0.55)', border: '1.5px solid var(--hairline)' }}
-                />
-              )}
+              <input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="w-full rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none"
+                style={{ backgroundColor: 'rgba(6, 11, 19, 0.55)', border: '1.5px solid var(--hairline)' }}
+              />
             </div>
+
+            {/* T-130: no "Forgot password?" link yet — a real reset flow
+                (Supabase resetPasswordForEmail + a confirm page handling
+                the recovery session) doesn't exist in this codebase at
+                all. Deliberately not linking to a page that doesn't exist;
+                logged as its own task instead, see Rostiro_PRD_v5.md. */}
 
             {message && (
               <p
@@ -130,7 +93,7 @@ export default function LoginPage() {
               className="mt-4 w-full font-semibold py-2.5 rounded-lg text-sm text-white disabled:opacity-50 transition-all hover:brightness-110"
               style={{ backgroundColor: 'var(--signal)' }}
             >
-              {loading ? 'Loading...' : authMode === 'password' ? 'Sign in →' : 'Send link →'}
+              {loading ? 'Loading...' : 'Sign in →'}
             </button>
           </form>
         </div>

@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useLiveUnlocked } from '@/lib/useLiveUnlocked'
 import { useLiveUnlockTransition } from '@/lib/useLiveUnlockTransition'
+import LogoutConfirm from '@/components/LogoutConfirm'
 
 const NAV_ITEMS = [
   {
@@ -225,20 +226,23 @@ export default function Sidebar() {
       </span>
 
       <span className="relative group">
-        <form action="/api/auth/signout" method="POST">
-          <button
-            type="submit"
-            aria-label="Sign out"
-            className="flex items-center justify-center w-9 h-9 rounded-[10px] transition-all hover:bg-[rgba(232,80,74,0.08)]"
-            style={{ color: 'var(--t3)' }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-          </button>
-        </form>
+        <LogoutConfirm
+          trigger={(open) => (
+            <button
+              type="button"
+              onClick={open}
+              aria-label="Sign out"
+              className="flex items-center justify-center w-9 h-9 rounded-[10px] transition-all hover:bg-[rgba(232,80,74,0.08)]"
+              style={{ color: 'var(--t3)' }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+            </button>
+          )}
+        />
         <DockTip>Sign out</DockTip>
       </span>
     </aside>
