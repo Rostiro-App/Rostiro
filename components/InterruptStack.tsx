@@ -81,6 +81,24 @@ export default function InterruptStack() {
     }).catch(() => {})
   }
 
+  // T-144: same PATCH action the persistent Action-layer queue already
+  // used (app/api/pulse/items/[id]/route.ts) — a critical interrupt like
+  // lineup_lock persists until acted on, so unlike dismiss (gone for good)
+  // this brings it back in 24h via /api/pulse/interrupts' own read-time
+  // revival check, rather than losing it entirely.
+  function snooze(id: string) {
+    setLeaving(true)
+    window.setTimeout(() => {
+      setItems((prev) => prev.filter((i) => i.id !== id))
+      setLeaving(false)
+    }, 340)
+    fetch(`/api/pulse/items/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'snooze' }),
+    }).catch(() => {})
+  }
+
   if (!current) return null
 
   const color = PRIORITY_COLOR[current.priority]
@@ -106,14 +124,24 @@ export default function InterruptStack() {
           {typeLabel}
         </span>
         {current.priority === 'critical' && (
-          <button
-            onClick={() => dismiss(current.id)}
-            aria-label="Dismiss"
-            className="text-[13px] leading-none -mt-0.5"
-            style={{ color: 'var(--t3)' }}
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-2.5 -mt-0.5">
+            <button
+              onClick={() => snooze(current.id)}
+              aria-label="Snooze for 24 hours"
+              className="text-[10px] font-semibold tracking-wide uppercase hover:brightness-125"
+              style={{ color: 'var(--t3)' }}
+            >
+              Snooze
+            </button>
+            <button
+              onClick={() => dismiss(current.id)}
+              aria-label="Dismiss"
+              className="text-[13px] leading-none"
+              style={{ color: 'var(--t3)' }}
+            >
+              ✕
+            </button>
+          </div>
         )}
       </div>
       <p className="text-[13px] font-semibold mt-1" style={{ color: 'var(--t1)' }}>

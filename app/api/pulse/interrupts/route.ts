@@ -16,12 +16,19 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const nowIso = new Date().toISOString()
+
+  // T-144: a snoozed interrupt (PATCH /api/pulse/items/[id] with
+  // action: 'snooze', same endpoint the persistent Action-layer queue
+  // already used — no new column, no new table) wakes back up here once
+  // snoozed_until has passed, same as it always has for the ordinary
+  // queue's own read path.
   const { data, error } = await supabase
     .from('pulse_items')
-    .select('id, user_id, type, priority, headline, reasoning, affected_leagues_json, deadline, action_url, platform, status, created_at')
+    .select('id, user_id, type, priority, headline, reasoning, affected_leagues_json, deadline, action_url, platform, status, snoozed_until, created_at')
     .eq('user_id', user.id)
     .eq('layer', 'interrupt')
-    .eq('status', 'open')
+    .or(`status.eq.open,and(status.eq.snoozed,snoozed_until.lte.${nowIso})`)
     .order('created_at', { ascending: true })
 
   if (error) {
@@ -32,8 +39,11 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  const items = ((data ?? []) as PulseItemRow[])
-    .map(rowToPulseItem)
+  const items = ((data ?? []) as (PulseItemRow & { snoozed_until: string | null })[])
+    // A woken snoozed item reads as 'open' again — the row itself keeps its
+    // real history (status stays 'snoozed' in the DB until the user acts on
+    // it again), this is a read-time presentation only.
+    .map((row) => rowToPulseItem(row.status === 'snoozed' ? { ...row, status: 'open' } : row))
     .sort((a, b) => (PRIORITY_RANK[a.priority] ?? 2) - (PRIORITY_RANK[b.priority] ?? 2))
 
   return NextResponse.json({ items })
