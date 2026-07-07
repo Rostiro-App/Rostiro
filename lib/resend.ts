@@ -11,7 +11,18 @@
 
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// Lazy, not module-top-level — the last three Vercel deployments failed
+// build entirely ("Missing API key. Pass it to the constructor") because
+// `new Resend(...)` at import time runs during Next's page-data collection
+// step, which imports every route module regardless of whether the
+// RESEND_API_KEY build-time env var is actually populated in that
+// environment. Constructing it only when a send actually happens (same
+// posture as lib/supabase.ts's createAdminClient) means a missing key
+// only fails the one request that needed it, never the whole build.
+function getResendClient(): Resend {
+  return new Resend(process.env.RESEND_API_KEY)
+}
+
 const FROM = `Rostiro <${process.env.RESEND_FROM_EMAIL ?? 'noreply@rostiro.com'}>`
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://rostiro.com'
 
@@ -93,7 +104,7 @@ export async function sendSignupConfirmationEmail(to: string, confirmUrl: string
     footerNote: "Didn't create a Rostiro account? You can safely ignore this email.",
   })
 
-  const { error } = await resend.emails.send({
+  const { error } = await getResendClient().emails.send({
     from: FROM,
     to,
     subject: 'Confirm your Rostiro account',
@@ -113,7 +124,7 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string): Prom
     footerNote: "Didn't request this? Your password is unchanged, no action needed.",
   })
 
-  const { error } = await resend.emails.send({
+  const { error } = await getResendClient().emails.send({
     from: FROM,
     to,
     subject: 'Reset your Rostiro password',
