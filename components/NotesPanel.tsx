@@ -17,15 +17,20 @@ const MAX_LENGTH = 500
 export default function NotesPanel({
   leagueId,
   leagues,
+  defaultExpanded,
 }: {
   /** Fixed league context (e.g. rendered inside a specific LeagueCard) — hides the league picker. */
   leagueId?: string
   /** Selectable leagues, used only when `leagueId` isn't fixed (e.g. the Trades page). */
   leagues?: { id: string; name: string }[]
+  /** T-146: Profile's "My Notes" is the dedicated full-list surface, not a
+   * small contextual annex — starts open instead of behind a "+ Add note"
+   * toggle nobody would think to click on a page that's just a list. */
+  defaultExpanded?: boolean
 }) {
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(defaultExpanded ?? false)
   const [notes, setNotes] = useState<Note[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(defaultExpanded ?? false)
   const [body, setBody] = useState('')
   const [selectedLeagueId, setSelectedLeagueId] = useState<string>(leagueId ?? '')
   const [saving, setSaving] = useState(false)

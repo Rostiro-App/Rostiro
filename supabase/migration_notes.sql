@@ -3,10 +3,9 @@
 --
 -- One shared table for both note types (`type` column) rather than two
 -- separate features. 'general' (T-141): plain scratchpad, no AI cost at
--- write time. 'ask_copilot' (T-142, not built yet): a structured question
--- Claude answers, using `response`/`status` — those columns exist now so
--- shipping T-142 later is additive, not a migration that touches existing
--- rows.
+-- write time. 'ask_copilot' (T-142): a structured question Claude answers,
+-- using `response`/`status` — no schema change was needed to ship T-142,
+-- since those columns already existed here.
 
 create table if not exists public.notes (
   id          uuid primary key default gen_random_uuid(),

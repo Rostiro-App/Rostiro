@@ -98,11 +98,15 @@ export async function generateStartSitReasoning(input: StartSitReasoningInput): 
 }
 
 interface TradeReasoningInput {
-  give: Array<{ name: string; position: string; adp: number }>
-  receive: Array<{ name: string; position: string; adp: number }>
+  give: Array<{ name: string; position: string; adp: number; pointsPerGame?: number | null }>
+  receive: Array<{ name: string; position: string; adp: number; pointsPerGame?: number | null }>
   verdict: 'win' | 'lose' | 'even'
   netValue: number
   mode: Mode
+  // T-143: general notes (T-141) the manager left on the league this trade
+  // belongs to — extra context only, never a replacement for the ADP
+  // numbers the verdict is actually computed from.
+  leagueNotes?: string[]
 }
 
 // Same split as generateStartSitReasoning: verdict and value are computed
@@ -110,8 +114,18 @@ interface TradeReasoningInput {
 // app/api/trades/analyze/route.ts) — Claude explains the numbers, it doesn't
 // decide the trade.
 export async function generateTradeReasoning(input: TradeReasoningInput): Promise<string> {
+  // T-148 sub-scope 1: pointsPerGame is only set once real season games
+  // have accumulated (app/api/trades/analyze/route.ts's blendValue) —
+  // included here so Claude can explain the real-performance half of the
+  // blend for a player who has one, without inventing it for a player who
+  // doesn't.
   const describe = (side: TradeReasoningInput['give']) =>
-    side.map((p) => `${p.name} (${p.position}, ADP ${Math.round(p.adp)})`).join(', ')
+    side
+      .map((p) => `${p.name} (${p.position}, ADP ${Math.round(p.adp)}${p.pointsPerGame != null ? `, ${p.pointsPerGame.toFixed(1)} real fantasy points/game this season` : ''})`)
+      .join(', ')
+
+  const hasNotes = !!input.leagueNotes && input.leagueNotes.length > 0
+  const hasSeasonPoints = [...input.give, ...input.receive].some((p) => p.pointsPerGame != null)
 
   const message = await createMessage({
     model: MODEL,
@@ -119,11 +133,49 @@ export async function generateTradeReasoning(input: TradeReasoningInput): Promis
     thinking: { type: 'disabled' },
     output_config: { effort: 'low' },
     system:
-      `You write short, factual fantasy football trade evaluations. Use only the numbers given to you. Never invent stats, injuries, team needs, or league context that was not provided. Three to five sentences. ${toneInstruction(input.mode)}`,
+      `You write short, factual fantasy football trade evaluations. Use only the numbers given to you. Never invent stats, injuries, team needs, or league context that was not provided. Three to five sentences. ${hasSeasonPoints ? 'The computed value already blends ADP with real season-to-date points-per-game where available — explain using both numbers for a player that has real points, not just ADP.' : ''} ${hasNotes ? "The manager also left notes on this league — weave them in only where actually relevant, and never let them override or contradict the computed verdict." : ''} ${toneInstruction(input.mode)}`,
     messages: [
       {
         role: 'user',
-        content: `A manager is considering trading away ${describe(input.give)} to receive ${describe(input.receive)}. Based on ADP-implied value, this trade nets a ${input.netValue >= 0 ? '+' : ''}${input.netValue} point swing in the manager's favor, and the computed verdict is "${input.verdict}". Explain why, based only on these ADP numbers.`,
+        content: `A manager is considering trading away ${describe(input.give)} to receive ${describe(input.receive)}. Based on this value (ADP, blended with real season-to-date points-per-game where a player has enough games played), this trade nets a ${input.netValue >= 0 ? '+' : ''}${input.netValue} point swing in the manager's favor, and the computed verdict is "${input.verdict}". Explain why, based only on these numbers.${hasNotes ? ` The manager's notes on this league: ${input.leagueNotes!.map((n) => `"${n}"`).join(', ')}` : ''}`,
+      },
+    ],
+  })
+
+  const textBlock = message.content.find((b) => b.type === 'text')
+  if (!textBlock || textBlock.type !== 'text') {
+    throw new ClaudeAPIError('Claude returned no text content')
+  }
+  return textBlock.text.trim()
+}
+
+interface AskCopilotReasoningInput {
+  askText: string
+  anchor: { name: string; position: string; adp: number }
+  candidates: Array<{ name: string; position: string; adp: number; teamName: string }>
+  mode: Mode
+}
+
+// T-142: same split as every other generate* here — the candidate-finder
+// (app/api/notes/ask-copilot/route.ts) has already found real players on
+// real rosters in this exact league before Claude ever sees them. Claude
+// only explains why these specific, already-found players fit the ask; it
+// is never the thing deciding who the candidates are.
+export async function generateAskCopilotReasoning(input: AskCopilotReasoningInput): Promise<string> {
+  const describeCandidate = (c: AskCopilotReasoningInput['candidates'][number]) =>
+    `${c.name} (${c.position}, ADP ${Math.round(c.adp)}, rostered by ${c.teamName})`
+
+  const message = await createMessage({
+    model: MODEL,
+    max_tokens: 300,
+    thinking: { type: 'disabled' },
+    output_config: { effort: 'low' },
+    system:
+      `You write short, factual fantasy football trade-candidate explanations. A manager asked a question about trading a specific player; a deterministic system already searched their real league rosters and found the candidates listed below by comparable ADP-implied value at the requested position — you are only explaining why these already-found players are reasonable trade targets, never suggesting a player that isn't in the list. Use only the ADP numbers and names given to you. Never invent stats, injuries, team needs, or league context that was not provided. Three to five sentences. ${toneInstruction(input.mode)}`,
+    messages: [
+      {
+        role: 'user',
+        content: `The manager asked: "${input.askText}". The player they're trading away is ${input.anchor.name} (${input.anchor.position}, ADP ${Math.round(input.anchor.adp)}). Real candidates found in their league, matched by comparable ADP-implied value at the target position: ${input.candidates.map(describeCandidate).join('; ')}. Explain why each is a reasonable target based only on these ADP numbers.`,
       },
     ],
   })
@@ -355,6 +407,12 @@ interface OpportunitySurgeContextInput {
   beneficiaryPosition: string
   nflTeam: string
   mode: Mode
+  // T-143: a general note (T-141) the manager left on this exact player —
+  // extra context only, never a replacement for the real depth-chart
+  // signal above. Only ever set for the one user who wrote it (see
+  // lib/pulse.ts's getOrGenerateSurgeReasoning — a note bypasses the
+  // shared reasoning cache so it's never leaked into another user's card).
+  userNote?: string
 }
 
 // T-99: the outgoing/beneficiary pairing itself is fully deterministic
@@ -369,11 +427,11 @@ export async function generateOpportunitySurgeContext(input: OpportunitySurgeCon
     thinking: { type: 'disabled' },
     output_config: { effort: 'low' },
     system:
-      `You write one short, factual sentence explaining a fantasy football opportunity: a starter is sidelined and a teammate is next in line for their role. Use only the names, status, position, and team given to you — never invent snap counts, stats, or timelines not provided. ${toneInstruction(input.mode)}`,
+      `You write one short, factual sentence explaining a fantasy football opportunity: a starter is sidelined and a teammate is next in line for their role. Use only the names, status, position, and team given to you — never invent snap counts, stats, or timelines not provided. ${input.userNote ? "The manager also left a note about this player — weave it in only if it's actually relevant to this opportunity, and never let it override or contradict the real depth-chart signal." : ''} ${toneInstruction(input.mode)}`,
     messages: [
       {
         role: 'user',
-        content: `${input.outgoingName} is listed as ${input.outgoingStatus} for the ${input.nflTeam}. ${input.beneficiaryName} (${input.beneficiaryPosition}) is next on the team's real depth chart at that spot. Write one sentence on why this makes ${input.beneficiaryName} worth a look.`,
+        content: `${input.outgoingName} is listed as ${input.outgoingStatus} for the ${input.nflTeam}. ${input.beneficiaryName} (${input.beneficiaryPosition}) is next on the team's real depth chart at that spot.${input.userNote ? ` The manager's note on ${input.beneficiaryName}: "${input.userNote}"` : ''} Write one sentence on why this makes ${input.beneficiaryName} worth a look.`,
       },
     ],
   })

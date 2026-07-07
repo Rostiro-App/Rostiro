@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useMode } from '@/components/nav/AppShell'
 import { openPlayerCard } from '@/lib/openPlayerCard'
 import NotesPanel from '@/components/NotesPanel'
+import AskCopilotPanel from '@/components/AskCopilotPanel'
 import type { ADPPlayer, TradeAnalysis } from '@/types'
 
 const VERDICT_LABEL: Record<TradeAnalysis['verdict'], string> = {
@@ -31,6 +32,18 @@ export default function TradesPage() {
   const [analyzing, setAnalyzing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [leagues, setLeagues] = useState<{ id: string; name: string }[]>([])
+  // T-143: optional — which league's general notes (T-141) should feed
+  // this trade's reasoning. Not required to analyze a trade at all, unlike
+  // Ask Copilot's league select, since the deterministic verdict/value
+  // never depended on a league to begin with.
+  const [notesLeagueId, setNotesLeagueId] = useState('')
+  // T-147: "Save this trade" — the analysis card only ever holds component
+  // state today (unlike a typed note in NotesPanel, which does persist),
+  // gone the moment the page navigates away. Saved as an ordinary general
+  // note (type: 'general'), reusing T-141's schema/route rather than a
+  // second one.
+  const [savingTrade, setSavingTrade] = useState(false)
+  const [tradeSaved, setTradeSaved] = useState(false)
 
   useEffect(() => {
     fetch('/api/draft/players')
@@ -62,15 +75,38 @@ export default function TradesPage() {
           give: give.map((p) => p.playerId),
           receive: receive.map((p) => p.playerId),
           mode,
+          leagueId: notesLeagueId || undefined,
         }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Failed to analyze trade')
       setAnalysis(data.analysis)
+      setTradeSaved(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to analyze trade')
     } finally {
       setAnalyzing(false)
+    }
+  }
+
+  async function saveTrade() {
+    if (!analysis) return
+    setSavingTrade(true)
+    setError(null)
+    try {
+      const body = `Give: ${give.map((p) => p.name).join(', ')} → Receive: ${receive.map((p) => p.name).join(', ')}. Verdict: ${VERDICT_LABEL[analysis.verdict]}. ${analysis.rosValueComparison}`.slice(0, 500)
+      const res = await fetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'general', body, leagueId: notesLeagueId || null }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Could not save this trade')
+      setTradeSaved(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save this trade')
+    } finally {
+      setSavingTrade(false)
     }
   }
 
@@ -102,6 +138,20 @@ export default function TradesPage() {
         />
       </div>
 
+      {leagues.length > 0 && (
+        <select
+          value={notesLeagueId}
+          onChange={(e) => setNotesLeagueId(e.target.value)}
+          className="w-full text-xs mb-4 rounded-lg px-2.5 py-2 outline-none"
+          style={{ backgroundColor: 'rgba(6, 11, 19, 0.55)', border: '1px solid var(--hairline)', color: 'white' }}
+        >
+          <option value="">No specific league (notes won&apos;t be used)</option>
+          {leagues.map((l) => (
+            <option key={l.id} value={l.id}>{l.name} — use my notes on this league</option>
+          ))}
+        </select>
+      )}
+
       <button
         onClick={analyze}
         disabled={!canAnalyze}
@@ -117,9 +167,18 @@ export default function TradesPage() {
         </div>
       )}
 
-      {analysis && <AnalysisCard analysis={analysis} mode={mode} />}
+      {analysis && (
+        <AnalysisCard
+          analysis={analysis}
+          mode={mode}
+          onSave={saveTrade}
+          saving={savingTrade}
+          saved={tradeSaved}
+        />
+      )}
 
       <NotesPanel leagues={leagues} />
+      <AskCopilotPanel leagues={leagues} mode={mode} />
     </div>
   )
 }
@@ -228,7 +287,19 @@ function PlayerPicker({
 // by default, tap 'why' to expand" — the value-comparison/roster-impact
 // detail rows are exactly the kind of supporting stat Balanced/Savant show
 // inline and Focused doesn't.
-function AnalysisCard({ analysis, mode }: { analysis: TradeAnalysis; mode: string }) {
+function AnalysisCard({
+  analysis,
+  mode,
+  onSave,
+  saving,
+  saved,
+}: {
+  analysis: TradeAnalysis
+  mode: string
+  onSave: () => void
+  saving: boolean
+  saved: boolean
+}) {
   const color = VERDICT_COLOR[analysis.verdict]
   const showDetail = mode !== 'focused'
 
@@ -237,12 +308,23 @@ function AnalysisCard({ analysis, mode }: { analysis: TradeAnalysis; mode: strin
       className="rounded-xl p-4 mt-4"
       style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', border: '1px solid var(--hairline)', borderLeft: `3px solid ${color}` }}
     >
-      <span
-        className="inline-block text-[10px] font-semibold tracking-widest uppercase px-1.5 py-0.5 rounded mb-3"
-        style={{ backgroundColor: `${color}18`, color }}
-      >
-        {VERDICT_LABEL[analysis.verdict]}
-      </span>
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <span
+          className="inline-block text-[10px] font-semibold tracking-widest uppercase px-1.5 py-0.5 rounded"
+          style={{ backgroundColor: `${color}18`, color }}
+        >
+          {VERDICT_LABEL[analysis.verdict]}
+        </span>
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={saving || saved}
+          className="text-xs font-semibold flex-shrink-0 hover:brightness-125 disabled:opacity-60"
+          style={{ color: saved ? 'var(--live)' : 'var(--signal)' }}
+        >
+          {saved ? 'Saved ✓' : saving ? 'Saving...' : 'Save this trade'}
+        </button>
+      </div>
       <p className="text-sm mb-3" style={{ color: 'var(--t2)' }}>{analysis.reasoning}</p>
       {showDetail && (
         <div className="space-y-1">

@@ -14,6 +14,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { browserClient } from '@/lib/supabase-browser'
 import LogoutConfirm from '@/components/LogoutConfirm'
+import NotesPanel from '@/components/NotesPanel'
 
 interface ProfileData {
   email: string
@@ -21,6 +22,7 @@ interface ProfileData {
   plan: string
   foundingNumber: number | null
   createdAt: string
+  leagues?: { id: string; league_name: string }[]
 }
 
 const PLAN_LABEL: Record<string, string> = {
@@ -210,6 +212,17 @@ export default function ProfilePage() {
           </p>
         </Section>
 
+        {/* T-146: centralized "My Notes" — /api/notes GET already returns
+            every note for the user regardless of league; NotesPanel with
+            no leagueId already shows the unfiltered full list, this was a
+            UI-only gap. */}
+        <Section title="My Notes">
+          <NotesPanel
+            leagues={(data.leagues ?? []).map((l) => ({ id: l.id, name: l.league_name }))}
+            defaultExpanded
+          />
+        </Section>
+
         {/* T-111: Founding 500 recognition — visible only to actual Founders
             (plan === 'commissioner'), not a generic upsell panel. */}
         {data.plan === 'commissioner' && (
@@ -235,6 +248,16 @@ export default function ProfilePage() {
               <li>✓ Priority feedback access (below)</li>
               <li style={{ color: 'var(--t4)' }}>○ Early feature previews — coming soon</li>
             </ul>
+
+            {/* T-145: admin-only, so it's tucked inside the same
+                commissioner-gated panel rather than a new nav item. */}
+            <Link
+              href="/admin/errors"
+              className="inline-block text-xs font-semibold mt-3 hover:brightness-125"
+              style={{ color: '#F5C842' }}
+            >
+              View error log →
+            </Link>
 
             <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(245,200,66,0.2)' }}>
               <p className="text-xs font-medium mb-2" style={{ color: 'var(--t2)' }}>Send feedback directly</p>

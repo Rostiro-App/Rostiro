@@ -256,6 +256,21 @@ export async function getSleeperRosters(leagueId: string): Promise<SleeperRoster
   return sleeperFetch<SleeperRoster[]>(`/league/${leagueId}/rosters`)
 }
 
+export interface SleeperLeagueUser {
+  user_id: string
+  display_name: string
+  metadata?: { team_name?: string }
+}
+
+// T-142: Ask Copilot's candidate-finder needs a human-readable team name
+// for "who else in your league has this player" — roster_id alone means
+// nothing to a manager. metadata.team_name is the custom name a manager
+// set in Sleeper; falls back to display_name when absent (confirmed both
+// shapes occur live — not every manager renames their team).
+export async function getSleeperLeagueUsers(leagueId: string): Promise<SleeperLeagueUser[]> {
+  return sleeperFetch<SleeperLeagueUser[]>(`/league/${leagueId}/users`)
+}
+
 // T-108: two rosters sharing the same matchup_id are opponents that week.
 // matchup_id is null for a roster on a bye (no opponent) — confirmed shape
 // from Sleeper's own docs; verified live against a real 2026 league (empty
