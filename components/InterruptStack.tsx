@@ -12,6 +12,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { PulseItem, PulseItemType, PulsePriority } from '@/types'
+import { logTelemetryEvent } from '@/lib/telemetry'
 
 const POLL_MS = 30_000
 const AUTO_DISMISS_MS = 7_000
@@ -60,15 +61,22 @@ export default function InterruptStack() {
       autoDismissRef.current = null
     }
     setLeaving(false)
-    if (!current || current.priority === 'critical') return
-    autoDismissRef.current = window.setTimeout(() => dismiss(current.id), AUTO_DISMISS_MS)
+    if (!current) return
+    // T-100: "P0 alert action rate" (7.1) — shown is the denominator;
+    // a critical interrupt never auto-dismisses, so any interrupt_action
+    // logged for one is always a real user response, never a timeout.
+    logTelemetryEvent('interrupt_shown', { type: current.type, priority: current.priority })
+    if (current.priority === 'critical') return
+    autoDismissRef.current = window.setTimeout(() => dismiss(current.id, 'auto'), AUTO_DISMISS_MS)
     return () => {
       if (autoDismissRef.current) window.clearTimeout(autoDismissRef.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.id])
 
-  function dismiss(id: string) {
+  function dismiss(id: string, trigger: 'manual' | 'auto' = 'manual') {
+    const item = items.find((i) => i.id === id)
+    if (item) logTelemetryEvent('interrupt_action', { type: item.type, priority: item.priority, action: 'dismiss', trigger })
     setLeaving(true)
     window.setTimeout(() => {
       setItems((prev) => prev.filter((i) => i.id !== id))
@@ -87,6 +95,8 @@ export default function InterruptStack() {
   // this brings it back in 24h via /api/pulse/interrupts' own read-time
   // revival check, rather than losing it entirely.
   function snooze(id: string) {
+    const item = items.find((i) => i.id === id)
+    if (item) logTelemetryEvent('interrupt_action', { type: item.type, priority: item.priority, action: 'snooze', trigger: 'manual' })
     setLeaving(true)
     window.setTimeout(() => {
       setItems((prev) => prev.filter((i) => i.id !== id))

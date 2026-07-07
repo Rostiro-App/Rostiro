@@ -17,6 +17,7 @@ import { useFocusTrap } from '@/lib/useFocusTrap'
 import HintAnchor from '@/components/hints/HintAnchor'
 import { openPlayerCard } from '@/lib/openPlayerCard'
 import PlayerSummaryLine from '@/components/players/PlayerSummaryLine'
+import { logTelemetryEvent } from '@/lib/telemetry'
 import type { LiveGameScore, PulseItem, PulseItemType, PulsePriority, RostiroState } from '@/types'
 
 // ─── Priority + type config ────────────────────────────────────────────────────
@@ -112,6 +113,7 @@ interface FilmRoomLeagueResult {
 
 export default function PulsePage() {
   const mode = useMode()
+  const gameDaySessionStart = useRef<number | null>(null)
   const [items, setItems] = useState<PulseItem[]>([])
   const [leaving, setLeaving] = useState<Set<string>>(new Set())
   const [leagueCount, setLeagueCount] = useState(0)
@@ -247,6 +249,11 @@ export default function PulsePage() {
       })
     }, 340)
 
+    // T-100: every done/dismiss/snooze on an ordinary Pulse item — the
+    // "notification mute/dismiss rate" 7.1 asks for. Fire-and-forget,
+    // never gates the optimistic UI above.
+    logTelemetryEvent('pulse_item_action', { itemType: item.type, action })
+
     try {
       const res = await fetch(`/api/pulse/items/${item.id}`, {
         method: 'PATCH',
@@ -277,6 +284,32 @@ export default function PulsePage() {
   // lineup before it locks — that's what the reorder below surfaces.
   const isMissionControl = rostiroState === 'game_day' && liveGames.length > 0
   const isPregameRamp = rostiroState === 'game_day' && liveGames.length === 0
+
+  // T-100: Game Day session opens + time-in-state — "the day every user
+  // is looking at Rostiro at once" (10.2) is exactly the session worth
+  // measuring for retention. gameDaySessionStart lives across renders in
+  // a ref since it tracks wall-clock time, not render state.
+  useEffect(() => {
+    if (isMissionControl && gameDaySessionStart.current === null) {
+      gameDaySessionStart.current = Date.now()
+      logTelemetryEvent('game_day_session_open')
+    } else if (!isMissionControl && gameDaySessionStart.current !== null) {
+      const durationMs = Date.now() - gameDaySessionStart.current
+      gameDaySessionStart.current = null
+      logTelemetryEvent('game_day_session_close', { durationMs })
+    }
+  }, [isMissionControl])
+
+  // Covers a full page unmount/navigation while still in Mission Control —
+  // the effect above only catches a state transition while mounted.
+  useEffect(() => {
+    return () => {
+      if (gameDaySessionStart.current !== null) {
+        logTelemetryEvent('game_day_session_close', { durationMs: Date.now() - gameDaySessionStart.current })
+        gameDaySessionStart.current = null
+      }
+    }
+  }, [])
 
   // Waiver Day / pregame ramp: priority items lead the queue, ahead of
   // same-priority-tier items — a stable reorder, not a re-sort, so nothing
