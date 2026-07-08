@@ -17,6 +17,20 @@ export function getStripeClient(): Stripe {
 
 export type PaidPlan = 'pro' | 'starter' | 'commissioner'
 
+// Tier hierarchy for the "can a user move to this plan" checks — commissioner
+// (Founding 500, $149 one-time lifetime) is the permanent top tier, so it must
+// rank highest even though it's cheaper than pro's recurring price. Used at
+// checkout-creation time (app/api/stripe/checkout/route.ts) and again at
+// webhook time (app/api/stripe/webhook/route.ts) as defense-in-depth, so a
+// paid user can never accidentally downgrade themselves by paying for a
+// lower tier.
+export const PLAN_RANK: Record<'free' | PaidPlan, number> = {
+  free: 0,
+  starter: 1,
+  pro: 2,
+  commissioner: 3,
+}
+
 // One Stripe Price ID per paid plan — new, distinct env var names from the
 // stale v4 STRIPE_PRICE_*_MONTHLY/ANNUAL vars in .env.example, which belong
 // to the four-tier + Intelligence add-on model PRD v5 replaced.

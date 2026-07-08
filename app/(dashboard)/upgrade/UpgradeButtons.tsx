@@ -15,6 +15,20 @@ const TIERS: Tier[] = [
   { plan: 'commissioner', name: 'Founding 500', price: '$149', description: 'One-time — lifetime access, founder badge, capped at 500.' },
 ]
 
+// Local copy of lib/stripe.ts's PLAN_RANK — not imported directly because
+// lib/stripe.ts has a top-level `import Stripe from 'stripe'`, which would
+// pull the whole (Node-only) Stripe SDK into this client bundle. Small,
+// duplicated map beats that risk. Keep in sync with lib/stripe.ts if the
+// tier hierarchy ever changes. commissioner (Founding 500, one-time
+// lifetime) is the permanent top tier, ranked above pro despite its lower
+// one-time price.
+const PLAN_RANK: Record<'free' | Tier['plan'], number> = {
+  free: 0,
+  starter: 1,
+  pro: 2,
+  commissioner: 3,
+}
+
 export default function UpgradeButtons({
   currentPlan,
   foundingRemaining,
@@ -50,6 +64,8 @@ export default function UpgradeButtons({
       )}
       {TIERS.map((tier) => {
         const isCurrent = currentPlan === tier.plan
+        const currentRank = PLAN_RANK[currentPlan as keyof typeof PLAN_RANK] ?? 0
+        const isIncluded = !isCurrent && PLAN_RANK[tier.plan] <= currentRank
         const soldOut = tier.plan === 'commissioner' && foundingRemaining <= 0
         return (
           <div key={tier.plan} className="rounded-xl p-4" style={{ backgroundColor: 'var(--glass-solid)', border: '1px solid var(--hairline)' }}>
@@ -67,11 +83,11 @@ export default function UpgradeButtons({
                 <p className="text-sm font-semibold text-white mb-2">{tier.price}</p>
                 <button
                   onClick={() => choosePlan(tier.plan)}
-                  disabled={isCurrent || soldOut || loadingPlan !== null}
+                  disabled={isCurrent || isIncluded || soldOut || loadingPlan !== null}
                   className="text-xs font-semibold px-3 py-2 rounded-lg disabled:opacity-60"
                   style={{ backgroundColor: 'var(--signal)', color: 'white' }}
                 >
-                  {isCurrent ? 'Current plan' : soldOut ? 'Sold out' : loadingPlan === tier.plan ? 'Loading…' : 'Choose plan'}
+                  {isCurrent ? 'Current plan' : isIncluded ? 'Included in your plan' : soldOut ? 'Sold out' : loadingPlan === tier.plan ? 'Loading…' : 'Choose plan'}
                 </button>
               </div>
             </div>

@@ -5,7 +5,7 @@
 // unlike the old Pages Router bodyParser: false convention).
 
 import { createAdminClient } from '@/lib/supabase'
-import { getStripeClient, SEASON_PASS_EXPIRES_AT, type PaidPlan } from '@/lib/stripe'
+import { getStripeClient, SEASON_PASS_EXPIRES_AT, PLAN_RANK, type PaidPlan } from '@/lib/stripe'
 import { assignFoundingNumber } from '@/lib/founderRecognition'
 import { logAppError } from '@/lib/errorLog'
 import { NextResponse, type NextRequest } from 'next/server'
@@ -50,6 +50,29 @@ export async function POST(request: NextRequest) {
         const priceId = lineItems.data[0]?.price?.id
         const plan = priceId ? priceIdToPlan(priceId) : null
         if (!plan) break
+
+        // Tier-hierarchy defense-in-depth: app/api/stripe/checkout/route.ts
+        // already rejects a downgrade checkout at creation time, but this
+        // is a rare race (two tabs, or Stripe redelivering a stale event)
+        // worth guarding here too, same posture as the Founding-500
+        // sold-out check just below. Equal rank (re-buying the same plan)
+        // is still allowed through normally — only strictly-lower is blocked.
+        const { data: currentUserRow } = await admin
+          .from('users')
+          .select('plan')
+          .eq('id', userId)
+          .maybeSingle()
+        const currentPlan = (currentUserRow?.plan ?? 'free') as keyof typeof PLAN_RANK
+        const currentRank = PLAN_RANK[currentPlan] ?? 0
+        if (currentRank > PLAN_RANK[plan]) {
+          await logAppError('stripe/webhook', new Error('Rejected downgrade at webhook time'), {
+            userId,
+            sessionId: session.id,
+            currentPlan,
+            attemptedPlan: plan,
+          })
+          break // do not overwrite a higher-ranked plan with a lower one
+        }
 
         if (plan === 'commissioner') {
           const foundingNumber = await assignFoundingNumber(admin, userId)

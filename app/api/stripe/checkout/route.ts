@@ -3,7 +3,7 @@
 // createSSRClient() pattern as every other route in app/api.
 
 import { createSSRClient, createAdminClient } from '@/lib/supabase'
-import { getStripeClient, getPriceId, getOrCreateStripeCustomer, type PaidPlan } from '@/lib/stripe'
+import { getStripeClient, getPriceId, getOrCreateStripeCustomer, PLAN_RANK, type PaidPlan } from '@/lib/stripe'
 import { getFoundingCount } from '@/lib/founderRecognition'
 import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
@@ -27,6 +27,22 @@ export async function POST(request: NextRequest) {
 
   try {
     const admin = createAdminClient()
+
+    // Tier-hierarchy guard: reject a checkout that would move the user to
+    // an equal-or-lower plan (e.g. a Founding 500 member buying Pro or the
+    // Season Pass) before a single Stripe object is created. Missing/
+    // unrecognized current plan defensively treated as 'free' (rank 0),
+    // same ?? 'free' fallback pattern as isFreePlan in lib/usageLimits.ts.
+    const { data: currentUserRow } = await admin
+      .from('users')
+      .select('plan')
+      .eq('id', user.id)
+      .maybeSingle()
+    const currentPlan = (currentUserRow?.plan ?? 'free') as keyof typeof PLAN_RANK
+    const currentRank = PLAN_RANK[currentPlan] ?? 0
+    if (currentRank >= PLAN_RANK[plan]) {
+      return NextResponse.json({ error: 'You already have this plan or better' }, { status: 409 })
+    }
 
     if (plan === 'commissioner') {
       const count = await getFoundingCount(admin)
