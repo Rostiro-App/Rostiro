@@ -45,11 +45,12 @@ export async function getOrCreateStripeCustomer(
   userId: string,
   email: string
 ): Promise<string> {
-  const { data } = await admin
+  const { data, error: lookupError } = await admin
     .from('users')
     .select('stripe_customer_id')
     .eq('id', userId)
     .maybeSingle()
+  if (lookupError) throw new Error(lookupError.message)
 
   if (data?.stripe_customer_id) return data.stripe_customer_id
 
