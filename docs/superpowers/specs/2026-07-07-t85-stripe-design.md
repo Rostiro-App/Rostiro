@@ -25,6 +25,16 @@ founder badge + founding number). This spec reuses that enum as-is rather than m
 it, mapping `starter` → Founder Season Pass. No existing check constraint or gating code
 needs to change names, only what each value is sold as.
 
+**Stale v4 leftovers, not used by this spec:** `.env.example` still lists
+`STRIPE_PRICE_STARTER_MONTHLY/ANNUAL`, `STRIPE_PRICE_PRO_MONTHLY/ANNUAL`,
+`STRIPE_PRICE_COMMISSIONER_MONTHLY/ANNUAL`, and `STRIPE_PRICE_INTELLIGENCE_ADDON_MONTHLY/ANNUAL`,
+and `users.intelligence_addon` is a real column — both are artifacts of the four-tier
+Scout/Starter/Pro/Commissioner + Intelligence add-on model that PRD v5 (Section 9 changelog,
+`Rostiro_PRD_v5.md:82`) explicitly replaced with the confirmed model above. This spec does
+not use the addon column or those annual/addon env var names. It's not this pass's job to
+delete them (out of scope, and `intelligence_addon` may still be read elsewhere) — implementation
+should add new, distinctly-named price env vars (see below) rather than repurpose the stale ones.
+
 Two related tickets depend on this work but are explicitly out of scope here:
 - **T-112** (marketing landing page pricing section) — reads current plan model, doesn't
   need any of the code built in this spec.
@@ -41,32 +51,29 @@ Two related tickets depend on this work but are explicitly out of scope here:
 |---|---|---|---|---|---|
 | `free` | Free | $0 | n/a | n/a | n/a |
 | `pro` | Rostiro Pro | $9.99/mo | `subscription` | yes | n/a — active while subscription is active |
-| `starter` | Founder Season Pass | $59 | `payment` (one-time) | no | `users.plan_expires_at`, enforced by cron-style check |
+| `starter` | Founder Season Pass | $59 | `payment` (one-time) | no | `users.season_pass_expires_at`, enforced by cron-style check |
 | `commissioner` | Founding 500 | $149 | `payment` (one-time) | no | none (lifetime), capped at 500 total |
 
 Each plan corresponds to one Stripe Price ID, created in the Stripe Dashboard (test mode)
-and referenced via env vars (`STRIPE_PRICE_PRO`, `STRIPE_PRICE_STARTER`,
-`STRIPE_PRICE_COMMISSIONER`) rather than hardcoded IDs in source, so switching from test to
-live mode is an env change only.
+and referenced via new env vars — `STRIPE_PRICE_PRO`, `STRIPE_PRICE_STARTER`,
+`STRIPE_PRICE_COMMISSIONER` — deliberately distinct names from the stale v4
+`STRIPE_PRICE_*_MONTHLY/ANNUAL` vars above, so switching from test to live mode later is an
+env change only and doesn't collide with the unused old names.
 
 ## Schema changes
 
-New migration `supabase/migration_stripe_billing.sql`:
-
-```sql
-alter table public.users
-  add column if not exists stripe_customer_id text unique,
-  add column if not exists stripe_subscription_id text,
-  add column if not exists plan_expires_at timestamptz;
-```
+**None needed.** `supabase/schema.sql` already has `stripe_customer_id`, `stripe_subscription_id`,
+and `season_pass_expires_at` on `public.users` (added ahead of this spec, presumably
+alongside the v4→v5 pricing rewrite). This spec uses those exact existing column names:
 
 - `stripe_customer_id` — set on first checkout, reused for the Customer Portal and future
   checkouts so a user never ends up with duplicate Stripe customers.
 - `stripe_subscription_id` — set for Pro subscribers only; used to look up subscription
   status if ever needed outside webhook events.
-- `plan_expires_at` — set only for `starter` (Season Pass); null for every other plan.
-  Reuses the same "date-driven downgrade" shape as T-150's `promo_windows` table rather
-  than inventing a new pattern.
+- `season_pass_expires_at` — set only for `starter` (Season Pass); null for every other
+  plan. Reuses the same "date-driven downgrade" shape as T-150's `promo_windows` table
+  rather than inventing a new pattern. (Every other reference to "plan_expires_at" elsewhere
+  in this doc means this column — naming corrected after checking the real schema.)
 
 No changes to the `plan` check constraint. `founding_number` / `founding_number_seq` /
 `assign_founding_number()` already exist from T-111 and are called from here, not
@@ -104,7 +111,7 @@ redefined.
     very first checkout before a customer id exists on the user row). Sets `users.plan`
     based on which price was purchased:
     - `pro` → `plan = 'pro'`, `stripe_subscription_id` from the session.
-    - `starter` → `plan = 'starter'`, `plan_expires_at` = end of current NFL season
+    - `starter` → `plan = 'starter'`, `season_pass_expires_at` = end of current NFL season
       (config value, not hardcoded per-request — see "Season end date" below).
     - `commissioner` → `plan = 'commissioner'`, then calls
       `assign_founding_number(user_id)`. If that raises (race: sold out between the
@@ -162,8 +169,8 @@ Replace the current placeholder text ("Billing management arrives with Stripe ch
 
 - A check, following the same shape as the existing promo-window logic in
   `lib/usageLimits.ts`: on relevant reads (or via the existing cron route in
-  `app/api/cron`), if `plan === 'starter'` and `plan_expires_at` is in the past, downgrade
-  to `plan = 'free'` and clear `plan_expires_at`. Exact call site (lazy check-on-read vs.
+  `app/api/cron`), if `plan === 'starter'` and `season_pass_expires_at` is in the past, downgrade
+  to `plan = 'free'` and clear `season_pass_expires_at`. Exact call site (lazy check-on-read vs.
   a dedicated cron entry) to be decided during implementation planning by following
   whichever existing pattern (`isFreePlan`'s promo-window check, or `app/api/cron`'s
   scheduled jobs) fits with the least new plumbing.
