@@ -2,6 +2,7 @@
 // Exchanges the code for a session and redirects to onboarding or dashboard.
 
 import { createSSRClient } from '@/lib/supabase'
+import { sendWelcomeEmail } from '@/lib/resend'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function GET(request: NextRequest) {
@@ -11,8 +12,20 @@ export async function GET(request: NextRequest) {
 
   if (code) {
     const supabase = await createSSRClient()
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
+      // next=/onboarding only ever comes from app/api/auth/signup/route.ts's
+      // redirectTo — every other caller of this shared callback (password
+      // reset, any future OAuth flow) uses a different `next`, so this is
+      // the one reliable signal that this is a fresh signup confirmation,
+      // not just "a session now exists."
+      if (next === '/onboarding' && data.user?.email) {
+        try {
+          await sendWelcomeEmail(data.user.email)
+        } catch {
+          // A welcome email failing to send must never block onboarding.
+        }
+      }
       return NextResponse.redirect(`${origin}${next}`)
     }
   }
