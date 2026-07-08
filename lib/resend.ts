@@ -38,6 +38,20 @@ const COLOR = {
   signal: '#378ADD',
 }
 
+// Escapes user-supplied free text before it goes into an email body —
+// emailShell()'s bodyHtml is inserted as raw HTML with no sanitization,
+// so anything a user typed (e.g. the founder-feedback message, Task 7)
+// must be escaped here first, or it could break the email's markup or
+// inject arbitrary HTML into an email sent from rostiro.com.
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 interface EmailShellInput {
   previewText: string
   heading: string
@@ -45,6 +59,7 @@ interface EmailShellInput {
   ctaLabel: string
   ctaUrl: string
   footerNote: string
+  accentColor?: string
 }
 
 // Table-based layout, inline styles only — the two things that actually
@@ -52,7 +67,7 @@ interface EmailShellInput {
 // Brand kit's marketing wordmark treatment (white text, tagline allowed)
 // applies here rather than the in-product one: an email is a hero surface
 // outside the app shell, not an in-product screen.
-function emailShell({ previewText, heading, bodyHtml, ctaLabel, ctaUrl, footerNote }: EmailShellInput): string {
+function emailShell({ previewText, heading, bodyHtml, ctaLabel, ctaUrl, footerNote, accentColor = COLOR.signal }: EmailShellInput): string {
   return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
@@ -74,7 +89,7 @@ function emailShell({ previewText, heading, bodyHtml, ctaLabel, ctaUrl, footerNo
               <div style="font-size:14px; line-height:1.6; color:${COLOR.textMuted};">${bodyHtml}</div>
               <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:24px;">
                 <tr>
-                  <td style="border-radius:10px; background-color:${COLOR.signal};">
+                  <td style="border-radius:10px; background-color:${accentColor};">
                     <a href="${ctaUrl}" style="display:inline-block; padding:12px 24px; font-size:14px; font-weight:600; color:#FFFFFF; text-decoration:none;">${ctaLabel} →</a>
                   </td>
                 </tr>
@@ -130,6 +145,167 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string): Prom
     subject: 'Reset your Rostiro password',
     html,
     text: `Reset your Rostiro password: ${resetUrl}`,
+  })
+  if (error) throw new Error(error.message)
+}
+
+export async function sendWelcomeEmail(to: string): Promise<void> {
+  const html = emailShell({
+    previewText: 'Your Rostiro OS is live.',
+    heading: "You're in.",
+    bodyHtml: 'Your Rostiro OS is live. Connect a league to get your first Pulse briefing.',
+    ctaLabel: 'Go to Rostiro',
+    ctaUrl: `${APP_URL}/pulse`,
+    footerNote: "You're receiving this because you just confirmed your Rostiro account.",
+  })
+  const { error } = await getResendClient().emails.send({
+    from: FROM, to, subject: 'Welcome to Rostiro', html,
+    text: `Welcome to Rostiro. Go to your dashboard: ${APP_URL}/pulse`,
+  })
+  if (error) throw new Error(error.message)
+}
+
+export async function sendProStartedEmail(to: string): Promise<void> {
+  const html = emailShell({
+    previewText: "You're on Rostiro Pro.",
+    heading: 'Welcome to Pro',
+    bodyHtml: 'Unlimited leagues, full Pulse depth, and unlimited AI are live on your account now.',
+    ctaLabel: 'Open Rostiro',
+    ctaUrl: `${APP_URL}/pulse`,
+    footerNote: 'Manage your subscription anytime from Profile → Manage billing.',
+  })
+  const { error } = await getResendClient().emails.send({
+    from: FROM, to, subject: "You're on Rostiro Pro", html,
+    text: `You're on Rostiro Pro. Open Rostiro: ${APP_URL}/pulse`,
+  })
+  if (error) throw new Error(error.message)
+}
+
+export async function sendSeasonPassPurchasedEmail(to: string): Promise<void> {
+  const html = emailShell({
+    previewText: 'Your Founder Season Pass is active.',
+    heading: 'Season Pass activated',
+    bodyHtml: 'Full access is unlocked through the end of the season — no recurring charge.',
+    ctaLabel: 'Open Rostiro',
+    ctaUrl: `${APP_URL}/pulse`,
+    footerNote: "Your pass expires at the end of the season; we'll email you before it does.",
+  })
+  const { error } = await getResendClient().emails.send({
+    from: FROM, to, subject: 'Your Founder Season Pass is active', html,
+    text: `Your Founder Season Pass is active. Open Rostiro: ${APP_URL}/pulse`,
+  })
+  if (error) throw new Error(error.message)
+}
+
+export async function sendFoundingWelcomeEmail(to: string, foundingNumber: number): Promise<void> {
+  const html = emailShell({
+    previewText: 'Welcome to the Founding 500.',
+    heading: `You're Founding Member #${foundingNumber}`,
+    bodyHtml: 'Lifetime access, locked in for good. Thank you for backing Rostiro from the start.',
+    ctaLabel: 'View your Founder badge',
+    ctaUrl: `${APP_URL}/profile`,
+    footerNote: 'Founding 500 membership is permanent and non-transferable.',
+    accentColor: '#F5C842',
+  })
+  const { error } = await getResendClient().emails.send({
+    from: FROM, to, subject: 'Welcome to the Founding 500', html,
+    text: `You're Founding Member #${foundingNumber} of 500. View your badge: ${APP_URL}/profile`,
+  })
+  if (error) throw new Error(error.message)
+}
+
+export async function sendSubscriptionCanceledEmail(to: string): Promise<void> {
+  const html = emailShell({
+    previewText: 'Your Rostiro Pro subscription was canceled.',
+    heading: 'Subscription canceled',
+    bodyHtml: 'Your account has moved to the Free plan. You can resubscribe anytime.',
+    ctaLabel: 'View plans',
+    ctaUrl: `${APP_URL}/upgrade`,
+    footerNote: "If this wasn't you, contact support right away.",
+  })
+  const { error } = await getResendClient().emails.send({
+    from: FROM, to, subject: 'Your Rostiro Pro subscription was canceled', html,
+    text: `Your Rostiro Pro subscription was canceled. View plans: ${APP_URL}/upgrade`,
+  })
+  if (error) throw new Error(error.message)
+}
+
+export async function sendSeasonPassExpiringEmail(to: string): Promise<void> {
+  const html = emailShell({
+    previewText: 'Your Season Pass expires in about a week.',
+    heading: 'Your Season Pass is ending soon',
+    bodyHtml: 'Your Founder Season Pass access ends soon. Upgrade to Rostiro Pro or Founding 500 to keep full access without interruption.',
+    ctaLabel: 'View plans',
+    ctaUrl: `${APP_URL}/upgrade`,
+    footerNote: "No action needed if you're fine reverting to Free.",
+  })
+  const { error } = await getResendClient().emails.send({
+    from: FROM, to, subject: 'Your Season Pass expires in about a week', html,
+    text: `Your Season Pass expires soon. View plans: ${APP_URL}/upgrade`,
+  })
+  if (error) throw new Error(error.message)
+}
+
+export async function sendSeasonPassExpiredEmail(to: string): Promise<void> {
+  const html = emailShell({
+    previewText: 'Your Season Pass has ended.',
+    heading: 'Your Season Pass has ended',
+    bodyHtml: 'Your account is back on the Free plan. Upgrade anytime to unlock full access again.',
+    ctaLabel: 'View plans',
+    ctaUrl: `${APP_URL}/upgrade`,
+    footerNote: 'Thanks for being a Founder Season Pass member this season.',
+  })
+  const { error } = await getResendClient().emails.send({
+    from: FROM, to, subject: 'Your Season Pass has ended', html,
+    text: `Your Season Pass has ended. View plans: ${APP_URL}/upgrade`,
+  })
+  if (error) throw new Error(error.message)
+}
+
+export async function sendAccountDeletedEmail(to: string): Promise<void> {
+  const html = emailShell({
+    previewText: 'Your Rostiro account has been deleted.',
+    heading: 'Account deleted',
+    bodyHtml: 'Your account and all associated data have been permanently deleted, per your request.',
+    ctaLabel: 'Learn more',
+    ctaUrl: APP_URL,
+    footerNote: "If you didn't request this, contact support immediately.",
+  })
+  const { error } = await getResendClient().emails.send({
+    from: FROM, to, subject: 'Your Rostiro account has been deleted', html,
+    text: 'Your Rostiro account and all associated data have been permanently deleted, per your request.',
+  })
+  if (error) throw new Error(error.message)
+}
+
+export async function sendFeedbackReceivedEmail(to: string): Promise<void> {
+  const html = emailShell({
+    previewText: 'We received your feedback.',
+    heading: 'Thanks for the feedback',
+    bodyHtml: 'Your message went straight to the founder, flagged as priority. We read every Founding 500 submission.',
+    ctaLabel: 'Back to Rostiro',
+    ctaUrl: `${APP_URL}/profile`,
+    footerNote: 'This is a one-time confirmation — no reply is expected unless the founder follows up directly.',
+  })
+  const { error } = await getResendClient().emails.send({
+    from: FROM, to, subject: 'We received your feedback', html,
+    text: 'We received your feedback. It went straight to the founder, flagged as priority.',
+  })
+  if (error) throw new Error(error.message)
+}
+
+export async function sendFeedbackNotificationEmail(founderEmail: string, memberEmail: string, message: string): Promise<void> {
+  const html = emailShell({
+    previewText: 'New Founding 500 feedback received.',
+    heading: 'New feedback received',
+    bodyHtml: `From: ${escapeHtml(memberEmail)}<br/><br/>${escapeHtml(message)}`,
+    ctaLabel: 'Open Rostiro',
+    ctaUrl: APP_URL,
+    footerNote: 'Sent because a Founding 500 member submitted feedback.',
+  })
+  const { error } = await getResendClient().emails.send({
+    from: FROM, to: founderEmail, subject: 'New Founding 500 feedback', html,
+    text: `New feedback from ${memberEmail}: ${message}`,
   })
   if (error) throw new Error(error.message)
 }
