@@ -200,7 +200,7 @@ export async function sendSeasonPassPurchasedEmail(to: string): Promise<void> {
 export async function sendFoundingWelcomeEmail(to: string, foundingNumber: number): Promise<void> {
   const html = emailShell({
     previewText: 'Welcome to the Founding 500.',
-    heading: `You're Founding Member #${foundingNumber}`,
+    heading: `★ FOUNDER — You're Founding Member #${foundingNumber}`,
     bodyHtml: 'Lifetime access, locked in for good. Thank you for backing Rostiro from the start.',
     ctaLabel: 'View your Founder badge',
     ctaUrl: `${APP_URL}/profile`,
@@ -209,7 +209,7 @@ export async function sendFoundingWelcomeEmail(to: string, foundingNumber: numbe
   })
   const { error } = await getResendClient().emails.send({
     from: FROM, to, subject: 'Welcome to the Founding 500', html,
-    text: `You're Founding Member #${foundingNumber} of 500. View your badge: ${APP_URL}/profile`,
+    text: `★ FOUNDER — You're Founding Member #${foundingNumber} of 500. View your badge: ${APP_URL}/profile`,
   })
   if (error) throw new Error(error.message)
 }
