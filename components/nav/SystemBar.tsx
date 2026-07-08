@@ -34,7 +34,7 @@ interface LiveMatchupSummary {
 // deliberate reuse, not a new color introduced just for this.
 const PLAN_LABEL: Record<UserPlan, string | null> = {
   free: null,
-  starter: 'STARTER',
+  starter: 'SEASON PASS',
   pro: 'PRO',
   commissioner: 'FOUNDER',
 }
