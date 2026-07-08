@@ -73,21 +73,21 @@ function emailShell({ previewText, heading, bodyHtml, ctaLabel, ctaUrl, footerNo
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
 <body style="margin:0; padding:0; background-color:${COLOR.page}; font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;">
   <div style="display:none; max-height:0; overflow:hidden; opacity:0;">${previewText}</div>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:${COLOR.page};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%; background-color:${COLOR.page};">
     <tr>
-      <td align="center" style="padding:40px 16px;">
-        <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px; width:100%;">
+      <td align="center" style="text-align:center; padding:40px 16px;">
+        <table role="presentation" width="480" align="center" cellpadding="0" cellspacing="0" style="max-width:480px; width:100%;">
           <tr>
-            <td align="center" style="padding-bottom:28px;">
-              <img src="${APP_URL}/notification-icon.png" width="40" height="40" alt="Rostiro" style="display:block; border-radius:9px;" />
+            <td align="center" style="text-align:center; padding-bottom:28px;">
+              <img src="${APP_URL}/notification-icon.png" width="40" height="40" alt="Rostiro" style="display:block; margin:0 auto; border-radius:9px;" />
               <div style="margin-top:10px; font-size:13px; font-weight:500; letter-spacing:-0.5px; color:#FFFFFF; text-transform:uppercase;">ROSTIRO</div>
             </td>
           </tr>
           <tr>
-            <td style="background-color:${COLOR.card}; border:1px solid ${COLOR.border}; border-radius:12px; padding:32px;">
-              <h1 style="margin:0 0 12px; font-size:20px; font-weight:600; color:${COLOR.textPrimary};">${heading}</h1>
-              <div style="font-size:14px; line-height:1.6; color:${COLOR.textMuted};">${bodyHtml}</div>
-              <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:24px;">
+            <td align="center" style="text-align:center; background-color:${COLOR.card}; border:1px solid ${COLOR.border}; border-radius:12px; padding:32px;">
+              <h1 style="margin:0 0 12px; font-size:20px; font-weight:600; color:${COLOR.textPrimary}; text-align:center;">${heading}</h1>
+              <div style="font-size:14px; line-height:1.6; color:${COLOR.textMuted}; text-align:center;">${bodyHtml}</div>
+              <table role="presentation" align="center" cellpadding="0" cellspacing="0" style="margin:24px auto 0;">
                 <tr>
                   <td style="border-radius:10px; background-color:${accentColor};">
                     <a href="${ctaUrl}" style="display:inline-block; padding:12px 24px; font-size:14px; font-weight:600; color:#FFFFFF; text-decoration:none;">${ctaLabel} →</a>
@@ -97,7 +97,7 @@ function emailShell({ previewText, heading, bodyHtml, ctaLabel, ctaUrl, footerNo
             </td>
           </tr>
           <tr>
-            <td style="padding-top:20px;">
+            <td align="center" style="text-align:center; padding-top:20px;">
               <p style="margin:0; font-size:12px; line-height:1.6; color:${COLOR.textMuted};">${footerNote}</p>
             </td>
           </tr>
@@ -200,7 +200,7 @@ export async function sendSeasonPassPurchasedEmail(to: string): Promise<void> {
 export async function sendFoundingWelcomeEmail(to: string, foundingNumber: number): Promise<void> {
   const html = emailShell({
     previewText: 'Welcome to the Founding 500.',
-    heading: `★ FOUNDER — You're Founding Member #${foundingNumber}`,
+    heading: `<span style="display:block; font-size:11px; font-weight:700; letter-spacing:1px; color:#F5C842; margin-bottom:6px;">★ FOUNDER</span>You're Founding Member #${foundingNumber}`,
     bodyHtml: 'Lifetime access, locked in for good. Thank you for backing Rostiro from the start.',
     ctaLabel: 'View your Founder badge',
     ctaUrl: `${APP_URL}/profile`,
