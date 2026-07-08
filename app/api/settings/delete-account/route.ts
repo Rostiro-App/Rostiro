@@ -11,6 +11,7 @@
 // re-submitted request or client bug shouldn't be able to trigger it silently.
 
 import { createAdminClient, createSSRClient } from '@/lib/supabase'
+import { sendAccountDeletedEmail } from '@/lib/resend'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
@@ -31,6 +32,15 @@ export async function POST(request: Request) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  if (user.email) {
+    try {
+      await sendAccountDeletedEmail(user.email)
+    } catch {
+      // Deletion already succeeded — a failed confirmation email must not
+      // surface as an error to a user whose account is genuinely gone.
+    }
   }
 
   return NextResponse.json({ ok: true })
