@@ -21,3 +21,22 @@ export async function assignFoundingNumber(
   }
   return data as number
 }
+
+// Current count of assigned Founding numbers — used to show remaining
+// slots on /upgrade and to reject new Founding 500 checkouts early once
+// sold out (the hard enforcement is still assign_founding_number()'s own
+// exception; this is just a friendlier pre-check, same one function
+// backing both call sites so they can never disagree).
+export async function getFoundingCount(admin: SupabaseClient): Promise<number> {
+  const { count, error } = await admin
+    .from('users')
+    .select('id', { count: 'exact', head: true })
+    .not('founding_number', 'is', null)
+  if (error) {
+    // 42703: founding_number column doesn't exist yet (migration not run) —
+    // degrade to 0 rather than 500ing, same posture as assignFoundingNumber.
+    if (error.code === '42703') return 0
+    throw new Error(error.message)
+  }
+  return count ?? 0
+}
