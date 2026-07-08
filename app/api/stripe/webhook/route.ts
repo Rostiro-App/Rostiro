@@ -8,6 +8,7 @@ import { createAdminClient } from '@/lib/supabase'
 import { getStripeClient, SEASON_PASS_EXPIRES_AT, PLAN_RANK, type PaidPlan } from '@/lib/stripe'
 import { assignFoundingNumber } from '@/lib/founderRecognition'
 import { logAppError } from '@/lib/errorLog'
+import { sendProStartedEmail, sendSeasonPassPurchasedEmail, sendFoundingWelcomeEmail } from '@/lib/resend'
 import { NextResponse, type NextRequest } from 'next/server'
 import type Stripe from 'stripe'
 
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
         // is still allowed through normally — only strictly-lower is blocked.
         const { data: currentUserRow } = await admin
           .from('users')
-          .select('plan')
+          .select('plan, email')
           .eq('id', userId)
           .maybeSingle()
         const currentPlan = (currentUserRow?.plan ?? 'free') as keyof typeof PLAN_RANK
@@ -74,8 +75,9 @@ export async function POST(request: NextRequest) {
           break // do not overwrite a higher-ranked plan with a lower one
         }
 
+        let foundingNumber: number | null = null
         if (plan === 'commissioner') {
-          const foundingNumber = await assignFoundingNumber(admin, userId)
+          foundingNumber = await assignFoundingNumber(admin, userId)
           if (foundingNumber === null) {
             await logAppError('stripe/webhook', new Error('Founding 500 sold out or migration missing at webhook time'), { userId, sessionId: session.id })
             break // do not set plan = 'commissioner' — support handles refund manually
@@ -92,6 +94,22 @@ export async function POST(request: NextRequest) {
 
         const { error } = await admin.from('users').update(update).eq('id', userId)
         if (error) throw new Error(error.message)
+
+        const email = currentUserRow?.email
+        if (email) {
+          try {
+            if (plan === 'pro') await sendProStartedEmail(email)
+            if (plan === 'starter') await sendSeasonPassPurchasedEmail(email)
+            if (plan === 'commissioner') {
+              // foundingNumber is guaranteed non-null here — the `break`
+              // a few lines up already returns early when it's null.
+              await sendFoundingWelcomeEmail(email, foundingNumber!)
+            }
+          } catch {
+            // A purchase email failing to send must never fail the webhook
+            // — the plan is already correctly persisted at this point.
+          }
+        }
         break
       }
 
