@@ -11,18 +11,20 @@ export async function POST() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const admin = createAdminClient()
-  const { data } = await admin
-    .from('users')
-    .select('stripe_customer_id')
-    .eq('id', user.id)
-    .maybeSingle()
-
-  if (!data?.stripe_customer_id) {
-    return NextResponse.json({ error: 'No billing account yet' }, { status: 400 })
-  }
-
   try {
+    const admin = createAdminClient()
+    const { data, error: lookupError } = await admin
+      .from('users')
+      .select('stripe_customer_id')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (lookupError) throw new Error(lookupError.message)
+
+    if (!data?.stripe_customer_id) {
+      return NextResponse.json({ error: 'No billing account yet' }, { status: 400 })
+    }
+
     const stripe = getStripeClient()
     const appUrl = process.env.NEXT_PUBLIC_APP_URL
     if (!appUrl) throw new Error('NEXT_PUBLIC_APP_URL is not set')
