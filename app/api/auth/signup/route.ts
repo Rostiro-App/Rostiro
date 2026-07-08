@@ -4,8 +4,15 @@
 // per-call way to swap in a different template short of Custom SMTP +
 // dashboard-edited templates. admin.generateLink only *generates* the
 // confirmation link; it creates the user but sends nothing, which is what
-// lets Resend (lib/resend.ts) be the only thing that actually emails
-// anyone here.
+// lets Resend (lib/resend.ts) be the one actually emailing anyone here.
+//
+// We email our OWN callback URL (with token_hash + type) rather than
+// Supabase's action_link: action_link points at Supabase's hosted
+// /auth/v1/verify, which — since generateLink is a server-to-server admin
+// call with no client code_verifier — can only redirect back using an
+// implicit-flow token in the URL fragment, which a server route handler
+// can never read. token_hash + verifyOtp (in app/api/auth/callback)
+// sidesteps that entirely and works server-side.
 
 import { createAdminClient } from '@/lib/supabase'
 import { sendSignupConfirmationEmail } from '@/lib/resend'
@@ -50,8 +57,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 400 })
   }
 
+  const confirmUrl = `${new URL(request.url).origin}/api/auth/callback?token_hash=${encodeURIComponent(data.properties.hashed_token)}&type=signup&next=/onboarding`
+
   try {
-    await sendSignupConfirmationEmail(email, data.properties.action_link)
+    await sendSignupConfirmationEmail(email, confirmUrl)
   } catch {
     // The account exists either way — a delivery failure here shouldn't
     // read as signup itself having failed. Founder can resend via a

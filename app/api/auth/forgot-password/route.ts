@@ -2,6 +2,10 @@
 // supabase.auth.resetPasswordForEmail() directly, same reasoning as
 // app/api/auth/signup/route.ts — admin.generateLink generates the recovery
 // link without sending anything, so Resend is the one actually emailing it.
+// Also same token_hash reasoning as signup/route.ts: we email our own
+// callback URL rather than Supabase's action_link, since generateLink can't
+// produce a PKCE code and the implicit-flow fragment it redirects with
+// can't be read server-side.
 
 import { createAdminClient } from '@/lib/supabase'
 import { sendPasswordResetEmail } from '@/lib/resend'
@@ -29,9 +33,10 @@ export async function POST(request: NextRequest) {
   // Same response whether the account exists, sending failed, or
   // generateLink itself errored — this form must never be usable to check
   // which emails have a Rostiro account.
-  if (!error && data.properties?.action_link) {
+  if (!error && data.properties?.hashed_token) {
+    const resetUrl = `${new URL(request.url).origin}/api/auth/callback?token_hash=${encodeURIComponent(data.properties.hashed_token)}&type=recovery&next=/reset-password`
     try {
-      await sendPasswordResetEmail(email, data.properties.action_link)
+      await sendPasswordResetEmail(email, resetUrl)
     } catch {
       // Best-effort — a Resend outage shouldn't leak "this account exists"
       // via a different response shape than the generic one below.
