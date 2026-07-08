@@ -16,7 +16,13 @@ export async function assignFoundingNumber(
     // equivalent schema-cache miss) both mean migration_founder_recognition.sql
     // hasn't run yet — degrade honestly, same pattern as every other
     // not-yet-migrated column check in this codebase, rather than 500ing.
-    if (error.code === '42883' || error.code === 'PGRST202') return null
+    // P0001 is the SQLSTATE for the RPC's own unqualified `raise exception`
+    // ("Founding 500 is sold out") — also a null-return case, not a throw:
+    // the caller (stripe/webhook) already knows how to turn a null into a
+    // graceful 200 no-op via its `if (foundingNumber === null)` branch.
+    // Throwing here instead would 500 the webhook and Stripe would retry
+    // for up to ~3 days, burning another sequence value on every retry.
+    if (error.code === '42883' || error.code === 'PGRST202' || error.code === 'P0001') return null
     throw new Error(error.message)
   }
   return data as number
