@@ -22,14 +22,15 @@ interface ProfileData {
   plan: string
   foundingNumber: number | null
   createdAt: string
+  hasBilling: boolean
   leagues?: { id: string; league_name: string }[]
 }
 
 const PLAN_LABEL: Record<string, string> = {
   free: 'Free',
-  starter: 'Starter',
-  pro: 'Pro',
-  commissioner: 'Founder',
+  starter: 'Founder Season Pass',
+  pro: 'Rostiro Pro',
+  commissioner: 'Founding 500',
 }
 
 export default function ProfilePage() {
@@ -42,6 +43,7 @@ export default function ProfilePage() {
   const [feedback, setFeedback] = useState('')
   const [sendingFeedback, setSendingFeedback] = useState(false)
   const [feedbackSent, setFeedbackSent] = useState(false)
+  const [openingPortal, setOpeningPortal] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -76,6 +78,18 @@ export default function ProfilePage() {
       setTimeout(() => setError(null), 4000)
     } finally {
       setSavingName(false)
+    }
+  }
+
+  async function openBillingPortal() {
+    setOpeningPortal(true)
+    try {
+      const res = await fetch('/api/stripe/portal', { method: 'POST' })
+      const body = await res.json()
+      if (!res.ok) throw new Error(body.error ?? 'Failed to open billing portal')
+      window.location.href = body.url
+    } catch {
+      setOpeningPortal(false)
     }
   }
 
@@ -207,9 +221,20 @@ export default function ProfilePage() {
               {(PLAN_LABEL[data.plan] ?? data.plan).toUpperCase()}
             </span>
           </div>
-          <p className="text-xs mt-3" style={{ color: 'var(--t4)' }}>
-            Billing management arrives with Stripe checkout (T-85) — nothing to manage yet on the Free plan.
-          </p>
+          {data.plan === 'free' ? (
+            <Link href="/upgrade" className="inline-block text-xs font-semibold mt-3" style={{ color: 'var(--signal)' }}>
+              View plans →
+            </Link>
+          ) : data.hasBilling ? (
+            <button
+              onClick={openBillingPortal}
+              disabled={openingPortal}
+              className="text-xs font-semibold mt-3 disabled:opacity-60"
+              style={{ color: 'var(--signal)' }}
+            >
+              {openingPortal ? 'Opening…' : 'Manage billing →'}
+            </button>
+          ) : null}
         </Section>
 
         {/* T-146: centralized "My Notes" — /api/notes GET already returns

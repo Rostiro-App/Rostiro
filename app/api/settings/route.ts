@@ -40,7 +40,7 @@ export async function GET() {
   const [{ data: profile, error: profileError }, { data: leagues, error: leaguesError }, { data: founderRow, error: founderError }] = await Promise.all([
     supabase
       .from('users')
-      .select('email, plan, push_enabled, mode, seen_hints, created_at')
+      .select('email, plan, push_enabled, mode, seen_hints, created_at, stripe_customer_id')
       .eq('id', user.id)
       .maybeSingle(),
     supabase
@@ -87,7 +87,7 @@ export async function GET() {
     modeAvailable = false
     const { data: fallback } = await supabase
       .from('users')
-      .select('email, plan, push_enabled, created_at')
+      .select('email, plan, push_enabled, created_at, stripe_customer_id')
       .eq('id', user.id)
       .maybeSingle()
     row = fallback ? { ...fallback, mode: null, seen_hints: [] } : null
@@ -101,6 +101,7 @@ export async function GET() {
     email: row.email,
     fullName,
     plan: row.plan,
+    hasBilling: !!row.stripe_customer_id,
     foundingNumber,
     pushEnabled: row.push_enabled,
     mode: modeAvailable ? row.mode : null,
