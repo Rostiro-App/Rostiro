@@ -8,7 +8,7 @@ import { createAdminClient } from '@/lib/supabase'
 import { getStripeClient, SEASON_PASS_EXPIRES_AT, PLAN_RANK, type PaidPlan } from '@/lib/stripe'
 import { assignFoundingNumber } from '@/lib/founderRecognition'
 import { logAppError } from '@/lib/errorLog'
-import { sendProStartedEmail, sendSeasonPassPurchasedEmail, sendFoundingWelcomeEmail } from '@/lib/resend'
+import { sendProStartedEmail, sendSeasonPassPurchasedEmail, sendFoundingWelcomeEmail, sendSubscriptionCanceledEmail } from '@/lib/resend'
 import { NextResponse, type NextRequest } from 'next/server'
 import type Stripe from 'stripe'
 
@@ -116,11 +116,21 @@ export async function POST(request: NextRequest) {
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription
         const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id
-        const { error } = await admin
+        const { data: updatedRows, error } = await admin
           .from('users')
           .update({ plan: 'free', stripe_subscription_id: null })
           .eq('stripe_customer_id', customerId)
+          .select('email')
         if (error) throw new Error(error.message)
+
+        const email = updatedRows?.[0]?.email
+        if (email) {
+          try {
+            await sendSubscriptionCanceledEmail(email)
+          } catch {
+            // Must never fail the webhook — the downgrade already succeeded.
+          }
+        }
         break
       }
 
