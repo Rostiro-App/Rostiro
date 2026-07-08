@@ -4,6 +4,7 @@
 // courtesy anyone could bypass.
 
 import { createSSRClient } from '@/lib/supabase'
+import { sendFeedbackReceivedEmail, sendFeedbackNotificationEmail } from '@/lib/resend'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
@@ -38,6 +39,23 @@ export async function POST(request: Request) {
       )
     }
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  if (user.email) {
+    try {
+      await sendFeedbackReceivedEmail(user.email)
+    } catch {
+      // Feedback is already saved — a failed confirmation email is not an error.
+    }
+    const adminEmail = process.env.ADMIN_EMAIL
+    if (adminEmail) {
+      try {
+        await sendFeedbackNotificationEmail(adminEmail, user.email, parsed.data.message)
+      } catch {
+        // Same posture — the founder notification is a courtesy, not a
+        // requirement for the feedback submission itself to succeed.
+      }
+    }
   }
 
   return NextResponse.json({ ok: true })
