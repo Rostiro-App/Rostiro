@@ -10,6 +10,14 @@
 // 500. The old Scout/Starter/Pro/Commissioner copy matched neither the
 // shipped code nor the PRD's target.
 
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Rostiro: The Operating System for Fantasy Football',
+  description: "Rostiro brings every league you're in, across ESPN, Yahoo, and Sleeper, into one ranked daily action list. One health score per team, reshaped around the real fantasy calendar from draft day through your league's real championship. Free to start.",
+  alternates: { canonical: 'https://www.rostiro.com' },
+}
+
 import Link from 'next/link'
 import PublicHeader from '@/components/marketing/PublicHeader'
 import PublicFooter from '@/components/marketing/PublicFooter'

@@ -12,6 +12,7 @@ import PublicFooter from '@/components/marketing/PublicFooter'
 
 export const metadata = {
   title: 'Privacy Policy | Rostiro',
+  alternates: { canonical: 'https://www.rostiro.com/privacy' },
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {

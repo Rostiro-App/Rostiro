@@ -14,6 +14,7 @@ import PublicFooter from '@/components/marketing/PublicFooter'
 
 export const metadata = {
   title: 'Terms of Service · Rostiro',
+  alternates: { canonical: 'https://www.rostiro.com/terms' },
 }
 
 function Section({ number, title, children }: { number: string; title: string; children: React.ReactNode }) {

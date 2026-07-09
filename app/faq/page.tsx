@@ -10,6 +10,7 @@ import FaqAccordion, { type FaqItem } from '@/components/marketing/FaqAccordion'
 export const metadata = {
   title: 'FAQ · Rostiro',
   description: 'Answers on how Rostiro works with ESPN, Yahoo, and Sleeper, what Focused/Balanced/Savant modes mean, and how your league credentials are secured.',
+  alternates: { canonical: 'https://www.rostiro.com/faq' },
 }
 
 interface FaqGroup {

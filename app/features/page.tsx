@@ -23,6 +23,7 @@ import { getPublicRostiroState } from '@/lib/publicRostiroState'
 export const metadata = {
   title: 'Features · Rostiro',
   description: 'The operating system for fantasy sports: one Pulse across every league, a weekly cycle that reshapes itself, and Game Day Mission Control.',
+  alternates: { canonical: 'https://www.rostiro.com/features' },
 }
 
 export default async function FeaturesPage() {

@@ -15,6 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://www.rostiro.com'),
   title: "Rostiro: Run Every League.",
   description: "The operating system for fantasy sports. Manage every league in one place.",
 };
