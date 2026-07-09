@@ -16,6 +16,7 @@
 
 import { createAdminClient } from '@/lib/supabase'
 import { sendSignupConfirmationEmail } from '@/lib/resend'
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
 import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 
@@ -28,7 +29,21 @@ const Body = z.object({
   agreedToTerms: z.literal(true),
 })
 
+// Unauthenticated by nature (that's the whole point of signup) — same
+// abuse posture as the Draft Kit routes in lib/rateLimit.ts's own
+// reasoning: nothing else stands between this and a scripted loop that
+// creates accounts or spams confirmation emails at a real inbox.
+const RATE_LIMIT = 5
+const RATE_WINDOW_SECONDS = 60 * 60
+
 export async function POST(request: NextRequest) {
+  const admin = createAdminClient()
+  const ip = getClientIp(request)
+  const { allowed } = await checkRateLimit(admin, `signup:${ip}`, RATE_LIMIT, RATE_WINDOW_SECONDS)
+  if (!allowed) {
+    return NextResponse.json({ error: 'Too many signup attempts — try again later.' }, { status: 429 })
+  }
+
   const parsed = Body.safeParse(await request.json().catch(() => null))
   if (!parsed.success) {
     const message = parsed.error.issues.some((i) => i.path[0] === 'agreedToTerms')
@@ -37,8 +52,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 400 })
   }
   const { email, password } = parsed.data
-
-  const admin = createAdminClient()
   const redirectTo = `${new URL(request.url).origin}/api/auth/callback?next=/onboarding`
 
   const { data, error } = await admin.auth.admin.generateLink({

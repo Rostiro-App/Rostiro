@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { browserClient } from '@/lib/supabase-browser'
 import Link from 'next/link'
 import AmbientStateSweep from '@/components/AmbientStateSweep'
 
@@ -24,10 +23,15 @@ export default function LoginPage() {
     setLoading(true)
     setMessage(null)
 
-    const { error } = await browserClient.auth.signInWithPassword({ email, password })
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+    const data = await res.json().catch(() => ({ error: 'Something went wrong. Try again.' }))
 
-    if (error) {
-      setMessage({ type: 'error', text: error.message })
+    if (!res.ok) {
+      setMessage({ type: 'error', text: data.error ?? 'Something went wrong. Try again.' })
       setLoading(false)
       return
     }

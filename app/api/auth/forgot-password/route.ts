@@ -9,19 +9,43 @@
 
 import { createAdminClient } from '@/lib/supabase'
 import { sendPasswordResetEmail } from '@/lib/resend'
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
 import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 
 const Body = z.object({ email: z.string().email() })
 
+// Two separate keys: IP-keyed stops a scripted loop hitting this route
+// generally, email-keyed stops someone email-bombing one specific inbox
+// with reset links from many different IPs — the two abuse shapes need
+// different keys to actually be caught.
+const RATE_LIMIT = 5
+const RATE_WINDOW_SECONDS = 60 * 60
+
 export async function POST(request: NextRequest) {
+  const admin = createAdminClient()
+  const ip = getClientIp(request)
+  const ipCheck = await checkRateLimit(admin, `forgot-password:ip:${ip}`, RATE_LIMIT, RATE_WINDOW_SECONDS)
+  if (!ipCheck.allowed) {
+    return NextResponse.json({ error: 'Too many requests — try again later.' }, { status: 429 })
+  }
+
   const parsed = Body.safeParse(await request.json().catch(() => null))
   if (!parsed.success) {
     return NextResponse.json({ error: 'A valid email is required.' }, { status: 400 })
   }
   const { email } = parsed.data
 
-  const admin = createAdminClient()
+  const emailCheck = await checkRateLimit(admin, `forgot-password:email:${email.toLowerCase()}`, RATE_LIMIT, RATE_WINDOW_SECONDS)
+  if (!emailCheck.allowed) {
+    // Same generic response as "account doesn't exist" below — a distinct
+    // message here would leak that this address is being rate-limited,
+    // which is itself a signal an attacker could use.
+    return NextResponse.json({
+      ok: true,
+      message: "If an account exists for that email, we've sent a link to reset your password.",
+    })
+  }
   const redirectTo = `${new URL(request.url).origin}/api/auth/callback?next=/reset-password`
 
   const { data, error } = await admin.auth.admin.generateLink({

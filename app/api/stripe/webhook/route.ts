@@ -8,7 +8,7 @@ import { createAdminClient } from '@/lib/supabase'
 import { getStripeClient, SEASON_PASS_EXPIRES_AT, PLAN_RANK, type PaidPlan } from '@/lib/stripe'
 import { assignFoundingNumber } from '@/lib/founderRecognition'
 import { logAppError } from '@/lib/errorLog'
-import { sendProStartedEmail, sendSeasonPassPurchasedEmail, sendFoundingWelcomeEmail, sendSubscriptionCanceledEmail } from '@/lib/resend'
+import { sendProStartedEmail, sendSeasonPassPurchasedEmail, sendFoundingWelcomeEmail, sendSubscriptionCanceledEmail, sendPaymentFailedEmail } from '@/lib/resend'
 import { NextResponse, type NextRequest } from 'next/server'
 import type Stripe from 'stripe'
 
@@ -129,6 +129,40 @@ export async function POST(request: NextRequest) {
             await sendSubscriptionCanceledEmail(email)
           } catch {
             // Must never fail the webhook — the downgrade already succeeded.
+          }
+        }
+        break
+      }
+
+      case 'invoice.payment_failed': {
+        // Renewal-only signal, not a downgrade trigger: Stripe retries a
+        // failed renewal per its Smart Retries schedule and only fires
+        // customer.subscription.deleted once it gives up — that event
+        // already handles the plan/free downgrade above. This case exists
+        // purely so the subscriber hears about the decline immediately
+        // instead of discovering it days later when access disappears.
+        const invoice = event.data.object as Stripe.Invoice
+        // This API version (2026-06-24.dahlia) moved the subscription
+        // reference off the invoice's top level and under
+        // parent.subscription_details — `invoice.subscription` no longer
+        // exists here (see stripe/esm/resources/Invoices.d.ts).
+        if (!invoice.parent?.subscription_details?.subscription) break // one-time charge, not a Pro renewal
+
+        const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id
+        if (!customerId) break
+
+        const { data: userRow } = await admin
+          .from('users')
+          .select('email')
+          .eq('stripe_customer_id', customerId)
+          .maybeSingle()
+
+        if (userRow?.email) {
+          try {
+            await sendPaymentFailedEmail(userRow.email)
+          } catch {
+            // Best-effort — a notification failing to send must never fail
+            // the webhook; Stripe's own retry schedule is unaffected either way.
           }
         }
         break

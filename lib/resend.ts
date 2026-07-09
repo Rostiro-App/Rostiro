@@ -230,6 +230,23 @@ export async function sendSubscriptionCanceledEmail(to: string): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
+export async function sendPaymentFailedEmail(to: string): Promise<void> {
+  const html = emailShell({
+    previewText: 'We couldn\'t process your Rostiro Pro payment.',
+    heading: 'Payment failed',
+    bodyHtml: "Your card was declined on renewal. Stripe will retry automatically, but you may want to update your payment method to avoid losing Pro access.",
+    ctaLabel: 'Update payment method',
+    ctaUrl: `${APP_URL}/settings`,
+    footerNote: "If you've already updated your card, no action is needed.",
+    accentColor: '#D9534F',
+  })
+  const { error } = await getResendClient().emails.send({
+    from: FROM, to, subject: "We couldn't process your Rostiro Pro payment", html,
+    text: `Your card was declined on renewal. Update your payment method: ${APP_URL}/settings`,
+  })
+  if (error) throw new Error(error.message)
+}
+
 export async function sendSeasonPassExpiringEmail(to: string): Promise<void> {
   const html = emailShell({
     previewText: 'Your Season Pass expires in about a week.',
