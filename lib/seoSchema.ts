@@ -43,3 +43,16 @@ export const softwareApplicationSchema = {
     },
   ],
 }
+
+// No `sameAs` — the marketing plan's social handles (X/TikTok/Instagram/
+// YouTube) are all [PLACEHOLDER], not yet claimed. Add sameAs once real,
+// live accounts exist; fabricating them here would violate this
+// codebase's real-fields-only rule for structured data.
+export const organizationSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: 'Rostiro',
+  url: 'https://www.rostiro.com',
+  logo: 'https://www.rostiro.com/notification-icon.png',
+  description: 'The operating system for fantasy football.',
+}
