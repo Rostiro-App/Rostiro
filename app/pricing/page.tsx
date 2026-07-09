@@ -6,6 +6,7 @@
 import PublicHeader from '@/components/marketing/PublicHeader'
 import PublicFooter from '@/components/marketing/PublicFooter'
 import PricingSection from '@/components/marketing/PricingSection'
+import { softwareApplicationSchema } from '@/lib/seoSchema'
 
 export const metadata = {
   title: 'Pricing · Rostiro',
@@ -16,6 +17,10 @@ export const metadata = {
 export default function PricingPage() {
   return (
     <div style={{ backgroundColor: 'var(--void)', position: 'relative' }}>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareApplicationSchema) }}
+      />
       <div className="ambient-ground" aria-hidden="true" />
       <div style={{ position: 'relative', zIndex: 1 }}>
         <PublicHeader />

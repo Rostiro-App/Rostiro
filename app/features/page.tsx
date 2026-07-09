@@ -19,6 +19,7 @@ import InterruptStackDemo from '@/components/marketing/InterruptStackDemo'
 import PulseMark from '@/components/PulseMark'
 import { STATE_CONFIG } from '@/lib/brandTokens'
 import { getPublicRostiroState } from '@/lib/publicRostiroState'
+import { softwareApplicationSchema } from '@/lib/seoSchema'
 
 export const metadata = {
   title: 'Features · Rostiro',
@@ -33,6 +34,10 @@ export default async function FeaturesPage() {
 
   return (
     <div style={{ backgroundColor: 'var(--void)', position: 'relative' }}>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareApplicationSchema) }}
+      />
       <div className="ambient-ground" aria-hidden="true" />
       <div style={{ position: 'relative', zIndex: 1 }}>
         <PublicHeader />
