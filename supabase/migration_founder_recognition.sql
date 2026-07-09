@@ -61,3 +61,19 @@ create table if not exists public.founder_feedback (
 
 create index if not exists founder_feedback_user_id_idx on public.founder_feedback(user_id);
 create index if not exists founder_feedback_status_idx on public.founder_feedback(status);
+
+-- Added 2026-07-08 (found while verifying the email suite): this table was
+-- missing RLS policies and grants.sql access from day one — RLS was
+-- enabled (likely via the dashboard's Security Advisor) with zero
+-- policies attached, which is deny-all, so every real feedback submission
+-- failed with a permission error. Every other table in this codebase
+-- follows this same enable-RLS + policy + grant pattern (see
+-- supabase/schema.sql); this one was the one exception. Safe to re-run —
+-- idempotent.
+alter table public.founder_feedback enable row level security;
+
+drop policy if exists "Users can manage their own founder feedback" on public.founder_feedback;
+create policy "Users can manage their own founder feedback" on public.founder_feedback
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+grant select, insert on public.founder_feedback to authenticated;
