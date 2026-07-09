@@ -39,6 +39,7 @@ const GROUPS: FaqGroup[] = [
             </p>
           </>
         ),
+        answerText: "No, and that's deliberate. Rostiro doesn't run your league, score your matchups, or host your draft. ESPN, Yahoo, and Sleeper still do all of that. Rostiro watches all three at once and tells you what to do about what it sees. For Yahoo leagues, Rostiro can also set your lineup, claim a waiver, or propose a trade directly, since Yahoo's API supports that. For ESPN and Sleeper, Rostiro deep-links you to the exact right screen on their own site to make the move yourself.",
       },
       {
         question: 'Which platforms and league types are supported?',
@@ -51,6 +52,7 @@ const GROUPS: FaqGroup[] = [
             draft pick valuations.
           </p>
         ),
+        answerText: "ESPN, Yahoo, and Sleeper today. Standard, half-PPR, full-PPR, TE premium, and Superflex/2QB formats are all read correctly from your league's real scoring settings. Dynasty and keeper leagues work the same way rosters and waivers already do, though Rostiro doesn't yet have dynasty-specific features like rookie draft pick valuations.",
       },
       {
         question: 'Is this sports betting advice?',
@@ -64,6 +66,7 @@ const GROUPS: FaqGroup[] = [
             for the full disclaimer.
           </p>
         ),
+        answerText: "No. Rostiro is a decision-support tool for skill-based season-long and weekly fantasy leagues. It doesn't place bets, doesn't set lines, and doesn't make picks against a spread. Nothing in the product is financial, investment, or betting advice, and Rostiro never guarantees a result in your league.",
       },
     ],
   },
@@ -89,10 +92,12 @@ const GROUPS: FaqGroup[] = [
             </p>
           </>
         ),
+        answerText: "It's a density choice, not a skill level. Focused: tell me what to do, five decisions max, the verdict before any reasoning. Balanced: show me the key stuff, the call plus the context that produced it. Savant: give me everything, the full data layer with nothing hidden. Mode changes what every screen in the product shows, not just one page.",
       },
       {
         question: 'Can I switch modes later?',
         answer: <p>Anytime, from the mode chip in the System Bar or from Settings. Nothing about your account or history changes when you switch.</p>,
+        answerText: "Anytime, from the mode chip in the System Bar or from Settings. Nothing about your account or history changes when you switch.",
       },
     ],
   },
@@ -118,6 +123,7 @@ const GROUPS: FaqGroup[] = [
             </p>
           </>
         ),
+        answerText: "Rostiro connects to your leagues read-mostly, and encrypts anything sensitive it has to store. Sleeper: public, read-only API, no credentials stored at all. Yahoo: official OAuth 2.0, Rostiro never sees your password, only a scoped access token encrypted at rest with AES-256-GCM. ESPN: a browser cookie handshake for private leagues, encrypted at rest the same way and used only to read your league's own data.",
       },
       {
         question: 'Can Rostiro make changes to my team without me knowing?',
@@ -129,6 +135,7 @@ const GROUPS: FaqGroup[] = [
             always deep-link you to that platform&apos;s own site to finish the action yourself.
           </p>
         ),
+        answerText: "Only where a platform's own API allows it, and only when you tap to confirm. Yahoo is the one platform where Rostiro can submit a lineup, waiver claim, or trade proposal directly, and every one of those is a deliberate action you take, never automatic. ESPN and Sleeper moves always deep-link you to that platform's own site to finish the action yourself.",
       },
       {
         question: 'Can I delete my data?',
@@ -139,6 +146,7 @@ const GROUPS: FaqGroup[] = [
             immediately and can&apos;t be undone.
           </p>
         ),
+        answerText: "Yes, anytime, from Settings, then Data & privacy. Export everything Rostiro has on your account, or permanently delete your account and every row tied to it. Deletion takes effect immediately and can't be undone.",
       },
     ],
   },
@@ -162,6 +170,7 @@ const GROUPS: FaqGroup[] = [
             </p>
           </>
         ),
+        answerText: "Most fantasy apps show every score whether it matters to you or not. Rostiro filters through a portfolio-relevance rule first: it only interrupts you if a live event directly touches your own roster, your opponent's roster, or the waiver wire in a league you're actually in.",
       },
       {
         question: 'Will Rostiro spam me with notifications during a live game?',
@@ -173,6 +182,7 @@ const GROUPS: FaqGroup[] = [
             still sees the same events inside the app the next time you open it.
           </p>
         ),
+        answerText: "No, there's a hard rate ceiling regardless of how many games or leagues are live at once, and events are deduplicated across leagues. Push notifications for live events are a Pro feature; every plan still sees the same events inside the app the next time you open it.",
       },
     ],
   },
@@ -182,22 +192,44 @@ const GROUPS: FaqGroup[] = [
       {
         question: 'Is there a free plan?',
         answer: <p>Yes, forever: one league, Draft Kit, a daily Pulse, and a limited number of AI-assisted start/sit and trade calls per week. No credit card required to start.</p>,
+        answerText: "Yes, forever: one league, Draft Kit, a daily Pulse, and a limited number of AI-assisted start/sit and trade calls per week. No credit card required to start.",
       },
       {
         question: 'Can I cancel anytime?',
         answer: <p>Yes. Rostiro Pro is a standard monthly subscription with no lock-in. Cancel from Settings and it stays active through the end of the current billing period.</p>,
+        answerText: "Yes. Rostiro Pro is a standard monthly subscription with no lock-in. Cancel from Settings and it stays active through the end of the current billing period.",
       },
       {
         question: 'What happens to the Founder tiers after launch?',
         answer: <p>The 2026 Founder Season Pass and the Founding 500 lifetime tier are launch-window pricing. Once the window closes, or the first 500 sell out, neither is offered again at that price.</p>,
+        answerText: "The 2026 Founder Season Pass and the Founding 500 lifetime tier are launch-window pricing. Once the window closes, or the first 500 sell out, neither is offered again at that price.",
       },
     ],
   },
 ]
 
+const faqPageSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: GROUPS.flatMap((group) =>
+    group.items.map((item) => ({
+      '@type': 'Question',
+      name: item.question,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: item.answerText,
+      },
+    }))
+  ),
+}
+
 export default function FaqPage() {
   return (
     <div style={{ backgroundColor: 'var(--void)', position: 'relative' }}>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqPageSchema) }}
+      />
       <div className="ambient-ground" aria-hidden="true" />
       <div style={{ position: 'relative', zIndex: 1 }}>
         <PublicHeader />

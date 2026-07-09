@@ -12,6 +12,12 @@ import { useState } from 'react'
 export interface FaqItem {
   question: string
   answer: React.ReactNode
+  // Plain-text version of `answer`, used only for FAQPage JSON-LD (Task 6
+  // of docs/superpowers/plans/2026-07-08-seo-llm-crawlability.md) — schema.org
+  // requires plain text, but `answer` is JSX (sometimes with inline links).
+  // Keep this in sync manually when editing an answer; FAQ content changes
+  // rarely.
+  answerText: string
 }
 
 export default function FaqAccordion({ items }: { items: FaqItem[] }) {
