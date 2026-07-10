@@ -13,6 +13,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PulseItem, PulseItemType, PulsePriority } from '@/types'
 import { logTelemetryEvent } from '@/lib/telemetry'
+import { InterruptCardView } from '@/components/interrupt/InterruptCardView'
 
 const POLL_MS = 30_000
 const AUTO_DISMISS_MS = 7_000
@@ -115,51 +116,16 @@ export default function InterruptStack() {
   const typeLabel = TYPE_LABEL[current.type] ?? current.type.toUpperCase()
 
   return (
-    <div
+    <InterruptCardView
       key={current.id}
-      className={`glass-heavy fixed rounded-xl px-4 py-3 ${leaving ? 'card-leave' : 'panel-enter'}`}
-      style={{
-        top: '52px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        width: 'min(360px, calc(100vw - 24px))',
-        zIndex: 40,
-        borderLeft: `2.5px solid ${color}`,
-        boxShadow: `0 12px 32px rgba(0,0,0,.35), 0 0 20px ${color}22`,
-      }}
-      role={current.priority === 'critical' ? 'alert' : 'status'}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <span className="mono-data text-[9px] tracking-[0.16em]" style={{ color }}>
-          {typeLabel}
-        </span>
-        {current.priority === 'critical' && (
-          <div className="flex items-center gap-2.5 -mt-0.5">
-            <button
-              onClick={() => snooze(current.id)}
-              aria-label="Snooze for 24 hours"
-              className="text-[10px] font-semibold tracking-wide uppercase hover:brightness-125"
-              style={{ color: 'var(--t3)' }}
-            >
-              Snooze
-            </button>
-            <button
-              onClick={() => dismiss(current.id)}
-              aria-label="Dismiss"
-              className="text-[13px] leading-none"
-              style={{ color: 'var(--t3)' }}
-            >
-              ✕
-            </button>
-          </div>
-        )}
-      </div>
-      <p className="text-[13px] font-semibold mt-1" style={{ color: 'var(--t1)' }}>
-        {current.headline}
-      </p>
-      <p className="text-[12px] mt-1 leading-snug" style={{ color: 'var(--t2)' }}>
-        {current.reasoning}
-      </p>
-    </div>
+      typeLabel={typeLabel}
+      headline={current.headline}
+      reasoning={current.reasoning}
+      color={color}
+      priority={current.priority}
+      leaving={leaving}
+      onSnooze={() => snooze(current.id)}
+      onDismiss={() => dismiss(current.id)}
+    />
   )
 }
