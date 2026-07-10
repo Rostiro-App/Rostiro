@@ -3,11 +3,14 @@ import { useMemo, useState } from 'react'
 import players from '@/app/demo/fixtures/players.json'
 import { prefillInterruptMetrics, type InterruptSimEvent, type SimMetricRow } from '../lib/simEvents'
 import { SURFACE_PACKS, type StudioStateKind } from '../lib/studioPacks'
+import { LiveAuthorForm } from './live/LiveAuthorForm'
+import type { LiveScenario } from '@/app/demo/lib/liveScenario'
 
-type PanelState = StudioStateKind | 'game_day'
+type PanelState = StudioStateKind | 'game_day' | 'live'
 const STATES: { key: PanelState; label: string }[] = [
   { key: 'standard', label: 'Standard' }, { key: 'waiver_day', label: 'Waiver Day' },
   { key: 'game_day', label: 'Game Day' }, { key: 'film_room', label: 'Film Room' },
+  { key: 'live', label: 'Live' },
 ]
 interface DemoPlayerLite { id: string; name: string; pos: string; nflTeam: string }
 const POOL = players as DemoPlayerLite[]
@@ -30,7 +33,7 @@ export function StudioPanel({ state, onState, event, onChange, onFire, packConte
     onChange({ ...event, metrics: event.metrics.map((m, j) => (j === i ? { ...m, ...patch } : m)) })
   }
   const input = { width: '100%', background: 'rgba(8,15,26,.6)', border: '1px solid var(--hairline)', borderRadius: 8, padding: '6px 8px', color: 'var(--t1)', fontSize: 13 } as const
-  const pack = state !== 'game_day' ? SURFACE_PACKS[state] : undefined
+  const pack = state !== 'game_day' && state !== 'live' ? SURFACE_PACKS[state] : undefined
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -81,6 +84,8 @@ export function StudioPanel({ state, onState, event, onChange, onFire, packConte
           </div>
           <button onClick={onFire} style={{ background: 'var(--signal)', color: '#fff', fontWeight: 600, padding: '10px', borderRadius: 10, fontSize: 14 }}>Fire ⚡</button>
         </>
+      ) : state === 'live' ? (
+        <LiveAuthorForm content={packContent as LiveScenario} onChange={onPackChange as (s: LiveScenario) => void} />
       ) : pack ? (
         <pack.AuthorForm content={packContent} onChange={onPackChange} />
       ) : null}

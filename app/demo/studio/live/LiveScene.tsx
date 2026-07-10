@@ -11,7 +11,7 @@ const SWEEP_START = 90, SWEEP_END = 144, OPEN_END = 240
 
 export function LiveScene({ scenario, aspect, frame }: { scenario: LiveScenario; aspect: '16:9' | '9:16'; frame?: number }) {
   return (
-    <SceneStage durationFrames={DURATION} caption="Rostiro LIVE — your second-screen companion." staticFrame={500} frame={frame}>
+    <SceneStage durationFrames={DURATION} caption="Rostiro LIVE — your second-screen companion." staticFrame={500} frame={frame} aspect={aspect}>
       {(f) => {
         const sweeping = f >= SWEEP_START && f < SWEEP_END
         const live = f >= OPEN_END
