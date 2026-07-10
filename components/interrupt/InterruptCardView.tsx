@@ -1,12 +1,5 @@
 'use client'
-import type { PulsePriority } from '@/types'
-
-export interface InterruptMetricRow {
-  leagueName: string
-  label: string
-  value: string
-  deltaPositive?: boolean
-}
+import type { PulsePriority, InterruptMetricRow } from '@/types'
 
 export function InterruptCardView({
   typeLabel, headline, reasoning, color, priority,

@@ -260,6 +260,13 @@ export interface AffectedLeague {
 // (done/dismiss/snooze) survives regeneration instead of resurrecting daily.
 export type PulseItemStatus = 'open' | 'done' | 'dismissed' | 'snoozed'
 
+export interface InterruptMetricRow {
+  leagueName: string
+  label: string
+  value: string
+  deltaPositive?: boolean
+}
+
 export interface PulseItem {
   id: string
   userId: string
@@ -268,6 +275,7 @@ export interface PulseItem {
   headline: string
   reasoning: string
   affectedLeagues: AffectedLeague[]
+  metrics?: InterruptMetricRow[]
   deadline: string | null
   actionUrl: string | null
   platform: Platform | null
