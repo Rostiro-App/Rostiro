@@ -15,13 +15,13 @@ export const filmPack: StatePack<FilmContent> = {
   defaultContent: () => ({ leagueName: "Lawrence's Legends League", won: true, myScore: 0, oppScore: 0, recap: '', usage: null }),
   prefill: () => {
     const lg = DEMO_LEAGUES[0]
-    const p = P[20] // a real mid-tier player as the buy-low signal
+    const p = P[95] // a real mid-tier player as the buy-low signal
     return {
       leagueName: lg.name,
       won: lg.matchup.myScore > lg.matchup.oppScore,
       myScore: lg.matchup.myScore,
       oppScore: lg.matchup.oppScore,
-      recap: 'Came down to the last flex. Your RB core carried it.',
+      recap: 'Came down to the last flex — just couldn\'t complete the comeback.',
       usage: { name: p.name, position: p.pos, direction: 'buy_low', deltaPct: 15 },
     }
   },
