@@ -67,9 +67,9 @@ function PulseCard({ item, isFirst }: { item: DemoPulseItem; isFirst: boolean })
   )
 }
 
-export function StandardState() {
+export function StandardState({ items: itemsProp }: { items?: DemoPulseItem[] } = {}) {
   const hr = useMemo(() => demoHealth(), [])
-  const items = useMemo(() => buildPulseFeed(hr), [hr])
+  const items = useMemo(() => itemsProp ?? buildPulseFeed(hr), [hr, itemsProp])
   const estMinutes = items.length * 2
 
   return (
