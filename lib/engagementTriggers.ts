@@ -24,8 +24,16 @@ import { getSleeperRosters } from '@/lib/sleeper'
 import { toNflverseTeamCode } from '@/lib/liveScores'
 import { sendPushNotification } from '@/lib/onesignal'
 import { isFreePlan } from '@/lib/usageLimits'
+import { buildLiveRoster } from '@/lib/liveRoster'
+import { computeLeagueWinProbs } from '@/lib/liveWinProb'
+import type { createAdminClient } from '@/lib/supabase'
+import type { InterruptMetricRow } from '@/types'
 
-type AdminClient = { from: (table: string) => any }
+// Was a minimal structural `{ from: (table: string) => any }` until this file
+// started calling buildLiveRoster (T-115), which needs the real Supabase
+// client shape — every real caller already passes createAdminClient()'s
+// result, so this is a type-only tightening, not a behavior change.
+type AdminClient = ReturnType<typeof createAdminClient>
 
 interface SleeperLeagueRow {
   id: string
@@ -100,6 +108,7 @@ async function insertPulseItem(
     headline: string
     reasoning: string
     affectedLeagues: { leagueId: string; leagueName: string; platform: 'sleeper' }[]
+    metrics?: InterruptMetricRow[]
     // T-106 / PRD 7.1: 'interrupt' routes through components/InterruptStack.tsx
     // (transient, one slot at a time) instead of the persistent Action-layer
     // Pulse queue. Defaults to 'action' — mission_complete stays there,
@@ -121,6 +130,7 @@ async function insertPulseItem(
     headline: item.headline,
     reasoning: item.reasoning,
     affected_leagues_json: item.affectedLeagues,
+    metrics_json: item.metrics ?? null,
     platform: 'sleeper',
     layer: item.layer ?? 'action',
     status: 'open',
@@ -194,12 +204,26 @@ export async function detectTouchdownSwings(admin: AdminClient, deltas: ScoreDel
       const headline = `${event.team} scores — ${players} in the mix`
       const reasoning = `${event.team} just put points on the board (now ${event.newHomeScore}-${event.newAwayScore}). You roster ${players} across ${info.leagueNames.length} ${info.leagueNames.length === 1 ? 'league' : 'leagues'} — exact scoring player isn't available from the live scoreboard feed, only the team-level swing.`
 
+      let metrics: InterruptMetricRow[] | undefined
+      if (!(await isFreePlan(admin, userId))) {
+        try {
+          const { matchups } = await buildLiveRoster(admin, userId)
+          const affectedIds = new Set(info.leagues.map((l) => l.id))
+          const rows = computeLeagueWinProbs(matchups, affectedIds)
+          if (rows.length > 0) metrics = rows
+        } catch {
+          // Win-prob is a garnish on the card — a failed matchup fetch just
+          // omits the rows, never blocks the touchdown interrupt.
+        }
+      }
+
       await insertPulseItem(admin, userId, {
         type: 'touchdown_swing',
         priority: 'info',
         headline,
         reasoning,
         affectedLeagues: info.leagues.map((l) => ({ leagueId: l.id, leagueName: l.league_name, platform: 'sleeper' })),
+        metrics,
         layer: 'interrupt',
       })
       await pushToUser(admin, userId, 'Touchdown!', headline)
