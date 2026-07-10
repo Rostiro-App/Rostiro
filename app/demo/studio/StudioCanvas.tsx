@@ -18,9 +18,7 @@ export function StudioCanvas({ state = 'game_day', aspect, event, leaving, conte
   content?: unknown
 }) {
   if (state === 'live') {
-    // Studio is an authoring surface: freeze the scene on its representative "live" frame
-    // so edits in the panel are reflected immediately, instead of waiting through the arc.
-    return <LiveScene scenario={content as LiveScenario} aspect={aspect} frame={500} />
+    return <LiveScene scenario={content as LiveScenario} aspect={aspect} />
   }
 
   const pack = state !== 'game_day' ? SURFACE_PACKS[state] : undefined

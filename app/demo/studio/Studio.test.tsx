@@ -32,6 +32,6 @@ describe('Studio', () => {
   it('switching to Live plays the companion scene with the prefilled scenario', () => {
     render(<Studio />)
     fireEvent.click(screen.getByText('Live'))
-    expect(screen.getByText(/live now/i)).toBeTruthy()
+    expect(screen.getByText(/second-screen companion/i)).toBeTruthy()
   })
 })
