@@ -7,7 +7,7 @@ describe('StudioPanel', () => {
   it('filters the player search and prefills metrics on select', () => {
     let ev = defaultInterruptEvent()
     const onChange = vi.fn((e) => { ev = e })
-    render(<StudioPanel event={ev} onChange={onChange} onFire={() => {}} />)
+    render(<StudioPanel state="game_day" onState={() => {}} event={ev} onChange={onChange} onFire={() => {}} packContent={null} onPackChange={() => {}} />)
     fireEvent.change(screen.getByPlaceholderText(/search player/i), { target: { value: 'Lamar' } })
     const opt = screen.getByText(/Lamar Jackson/)
     fireEvent.click(opt)
@@ -19,7 +19,7 @@ describe('StudioPanel', () => {
   it('lets the operator rename a league and change a metric label', () => {
     const withMetric = { ...defaultInterruptEvent(), metrics: [{ leagueName: 'Sunday Money', label: 'Win Prob', value: '+22%', deltaPositive: true }] }
     const onChange = vi.fn()
-    render(<StudioPanel event={withMetric} onChange={onChange} onFire={() => {}} />)
+    render(<StudioPanel state="game_day" onState={() => {}} event={withMetric} onChange={onChange} onFire={() => {}} packContent={null} onPackChange={() => {}} />)
     fireEvent.change(screen.getByDisplayValue('Sunday Money'), { target: { value: 'Bench Regret FC' } })
     expect(onChange.mock.calls.at(-1)![0].metrics[0].leagueName).toBe('Bench Regret FC')
     fireEvent.change(screen.getByDisplayValue('Win Prob'), { target: { value: 'Pain Index' } })
