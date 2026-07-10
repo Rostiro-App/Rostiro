@@ -243,8 +243,8 @@ describe('resolveAt', () => {
   it('surfaces the alert from the most recent alert beat', () => {
     expect(resolveAt(beats, 12, 'standard').activeAlert?.id).toBe('a1')
   })
-  it('clears the alert once a later state beat has no alert', () => {
-    // no beat clears here; alert persists — documents current behavior
+  it('keeps the active alert until a later alert beat replaces it', () => {
+    // resolveAt is sticky: a state-only beat does not clear a prior alert.
     expect(resolveAt(beats, 25, 'standard').activeAlert?.id).toBe('a1')
   })
 })
