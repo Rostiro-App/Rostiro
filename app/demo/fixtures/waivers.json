@@ -1,0 +1,86 @@
+[
+  {
+    "playerId": "00-0038979",
+    "name": "Cedric Tillman",
+    "pos": "WR",
+    "addPct": 67,
+    "faabSuggestion": 33
+  },
+  {
+    "playerId": "00-0031503",
+    "name": "Jameis Winston",
+    "pos": "QB",
+    "addPct": 64,
+    "faabSuggestion": 32
+  },
+  {
+    "playerId": "00-0038129",
+    "name": "Cade Otton",
+    "pos": "TE",
+    "addPct": 55,
+    "faabSuggestion": 28
+  },
+  {
+    "playerId": "00-0026498",
+    "name": "Matthew Stafford",
+    "pos": "QB",
+    "addPct": 47,
+    "faabSuggestion": 23
+  },
+  {
+    "playerId": "00-0039384",
+    "name": "Tyrone Tracy",
+    "pos": "RB",
+    "addPct": 46,
+    "faabSuggestion": 23
+  },
+  {
+    "playerId": "00-0039363",
+    "name": "Isaac Guerendo",
+    "pos": "RB",
+    "addPct": 46,
+    "faabSuggestion": 23
+  },
+  {
+    "playerId": "00-0039732",
+    "name": "Bo Nix",
+    "pos": "QB",
+    "addPct": 45,
+    "faabSuggestion": 23
+  },
+  {
+    "playerId": "00-0029604",
+    "name": "Kirk Cousins",
+    "pos": "QB",
+    "addPct": 44,
+    "faabSuggestion": 22
+  },
+  {
+    "playerId": "00-0037837",
+    "name": "Calvin Austin",
+    "pos": "WR",
+    "addPct": 43,
+    "faabSuggestion": 22
+  },
+  {
+    "playerId": "00-0034771",
+    "name": "Mason Rudolph",
+    "pos": "QB",
+    "addPct": 39,
+    "faabSuggestion": 19
+  },
+  {
+    "playerId": "00-0036355",
+    "name": "Justin Herbert",
+    "pos": "QB",
+    "addPct": 37,
+    "faabSuggestion": 19
+  },
+  {
+    "playerId": "00-0039491",
+    "name": "Jalen Coker",
+    "pos": "WR",
+    "addPct": 36,
+    "faabSuggestion": 18
+  }
+]
