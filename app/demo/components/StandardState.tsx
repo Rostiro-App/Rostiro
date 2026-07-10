@@ -67,7 +67,7 @@ function PulseCard({ item, isFirst }: { item: DemoPulseItem; isFirst: boolean })
   )
 }
 
-export function StandardState({ items: itemsProp, leagueCount = 1 }: { items?: DemoPulseItem[]; leagueCount?: number } = {}) {
+export function StandardState({ items: itemsProp, leagueCount = 1, missionControl, sweeping }: { items?: DemoPulseItem[]; leagueCount?: number; missionControl?: boolean; sweeping?: boolean } = {}) {
   const hr = useMemo(() => demoHealth(), [])
   const items = useMemo(() => itemsProp ?? buildPulseFeed(hr), [hr, itemsProp])
   const estMinutes = items.length * 2
@@ -75,6 +75,14 @@ export function StandardState({ items: itemsProp, leagueCount = 1 }: { items?: D
   return (
     <div className="max-w-2xl mx-auto px-5 md:px-6 pt-8 pb-10">
       <div className="mb-5">
+        {missionControl && (
+          <span
+            className={`mono-data inline-block text-[9.5px] tracking-[0.16em] px-2 py-0.5 rounded-full mb-2 ${sweeping ? 'value-tick' : ''}`.trim()}
+            style={{ color: '#E24B4A', border: '1px solid #E24B4A', backgroundColor: 'color-mix(in srgb, currentColor 12%, transparent)' }}
+          >
+            MISSION CONTROL
+          </span>
+        )}
         <h1 className="text-[22px] font-semibold tracking-tight" style={{ color: 'var(--t1)' }}>
           {greeting()}, {hr.founder.handle.split(' ')[0]}.
         </h1>

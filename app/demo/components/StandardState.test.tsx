@@ -24,4 +24,12 @@ describe('StandardState (Pulse feed)', () => {
     render(<DemoStateProvider autoplay={false}><StandardState leagueCount={3} /></DemoStateProvider>)
     expect(screen.getByText((_, el) => el?.tagName === 'P' && /across 3 leagues/.test(el.textContent ?? ''))).toBeTruthy()
   })
+  it('renders the MISSION CONTROL pill when missionControl is set', () => {
+    render(<DemoStateProvider autoplay={false}><StandardState missionControl /></DemoStateProvider>)
+    expect(screen.getByText('MISSION CONTROL')).toBeTruthy()
+  })
+  it('does not render the MISSION CONTROL pill by default', () => {
+    render(<DemoStateProvider autoplay={false}><StandardState /></DemoStateProvider>)
+    expect(screen.queryByText('MISSION CONTROL')).toBeNull()
+  })
 })
