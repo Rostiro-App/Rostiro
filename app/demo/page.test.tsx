@@ -4,8 +4,11 @@ import { DemoStateProvider } from './lib/DemoStateProvider'
 import { DemoTour } from './page'
 
 describe('DemoTour', () => {
-  it('renders the Standard state surface by default', () => {
+  it('renders the OS shell with the Pulse feed by default', () => {
     render(<DemoStateProvider autoplay={false}><DemoTour consoleVisible={false} /></DemoStateProvider>)
-    expect(screen.getByText(/Standings/)).toBeTruthy()
+    // Chrome
+    expect(screen.getByText('ROSTIRO')).toBeTruthy()
+    // Standard-state surface: the greeting
+    expect(screen.getByRole('heading', { name: /Good (morning|afternoon|evening)/ })).toBeTruthy()
   })
 })

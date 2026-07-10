@@ -2,6 +2,7 @@
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useDemo } from './lib/DemoStateProvider'
+import { DemoShell } from './components/DemoShell'
 import { StandardState } from './components/StandardState'
 import { DirectorConsole } from './components/DirectorConsole'
 import { ScriptedToast } from './components/ScriptedToast'
@@ -10,11 +11,13 @@ export function DemoTour({ consoleVisible }: { consoleVisible: boolean }) {
   const { state } = useDemo()
   return (
     <>
-      {state.currentState === 'standard'
-        ? <StandardState />
-        : <div style={{ padding: 48, textAlign: 'center', opacity: 0.7 }}>
-            {state.currentState} — engine ships in a follow-on spec
-          </div>}
+      <DemoShell>
+        {state.currentState === 'standard'
+          ? <StandardState />
+          : <div className="mono-data flex items-center justify-center h-full text-center" style={{ padding: 48, color: 'var(--t3)', letterSpacing: '0.06em' }}>
+              {state.currentState.toUpperCase().replace('_', ' ')} — ENGINE SHIPS IN A FOLLOW-ON SPEC
+            </div>}
+      </DemoShell>
       <ScriptedToast />
       <DirectorConsole visible={consoleVisible} />
     </>
