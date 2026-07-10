@@ -67,20 +67,28 @@ function PulseCard({ item, isFirst }: { item: DemoPulseItem; isFirst: boolean })
   )
 }
 
-export function StandardState() {
+export function StandardState({ items: itemsProp, leagueCount = 1, missionControl, sweeping }: { items?: DemoPulseItem[]; leagueCount?: number; missionControl?: boolean; sweeping?: boolean } = {}) {
   const hr = useMemo(() => demoHealth(), [])
-  const items = useMemo(() => buildPulseFeed(hr), [hr])
+  const items = useMemo(() => itemsProp ?? buildPulseFeed(hr), [hr, itemsProp])
   const estMinutes = items.length * 2
 
   return (
     <div className="max-w-2xl mx-auto px-5 md:px-6 pt-8 pb-10">
       <div className="mb-5">
+        {missionControl && (
+          <span
+            className={`mono-data inline-block text-[9.5px] tracking-[0.16em] px-2 py-0.5 rounded-full mb-2 ${sweeping ? 'value-tick' : ''}`.trim()}
+            style={{ color: '#E24B4A', border: '1px solid #E24B4A', backgroundColor: 'color-mix(in srgb, currentColor 12%, transparent)' }}
+          >
+            MISSION CONTROL
+          </span>
+        )}
         <h1 className="text-[22px] font-semibold tracking-tight" style={{ color: 'var(--t1)' }}>
           {greeting()}, {hr.founder.handle.split(' ')[0]}.
         </h1>
         <p className="text-[13px] mt-0.5" style={{ color: 'var(--t2)' }}>
           <b style={{ color: 'var(--t1)', fontWeight: 600 }}>{items.length} {items.length === 1 ? 'decision' : 'decisions'}</b>
-          {' across 1 league'}
+          {` across ${leagueCount} ${leagueCount === 1 ? 'league' : 'leagues'}`}
           {estMinutes > 0 && <> · Est. <b style={{ color: 'var(--t1)', fontWeight: 600 }}>{estMinutes} min</b></>}
         </p>
         <div className="mono-data mt-3.5 flex items-center gap-3 text-[10px] tracking-[0.1em]" style={{ color: 'var(--t3)' }}>

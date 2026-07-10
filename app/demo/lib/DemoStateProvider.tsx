@@ -59,3 +59,10 @@ export function useDemo(): Ctx {
   if (!ctx) throw new Error('useDemo must be used within DemoStateProvider')
   return ctx
 }
+
+/** Like useDemo but returns null instead of throwing when no provider is
+ *  present — lets the shared shell render outside the /demo route (e.g. in a
+ *  frame-driven feature scene) with explicit state props instead. */
+export function useDemoOptional(): Ctx | null {
+  return useContext(DemoCtx)
+}

@@ -1,4 +1,8 @@
 # Rostiro Video Shotlist v1.0
+
+## RESOLVED 2026-07-09 — superseded by live in-page demos
+All three clips are now implemented as choreographed, self-playing **live product demos** on `/features` (see `components/marketing/scenes/` and `docs/superpowers/plans/2026-07-09-feature-demos.md`). They run the real demo-mode UI on real 2024 data, so the deferred founder shoot below is retired for these three slots. The shoot notes are kept only as historical record.
+
 ## Status: DEFERRED — requires the founder to film. Not buildable by Claude Code.
 
 > These are the three "Founder B-roll" clips referenced in `app/features/page.tsx`'s `ProductVideoDemo` call sites and in `Rostiro_Marketing_Plan_v1.md` §5. All three need real device footage of the actual product against real accounts and, for two of them, a real live NFL Sunday — none of that can be produced by an AI agent. This doc turns the one-line shot-list notes already in the code into a filmable, beat-by-beat script so shoot day has zero ambiguity. Nothing here is optional creative interpretation; shoot exactly what's below, then swap the placeholder in `ProductVideoDemo` for the real file.
