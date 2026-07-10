@@ -4,9 +4,11 @@ import { StandardState } from '@/app/demo/components/StandardState'
 import { InterruptCardView } from '@/components/interrupt/InterruptCardView'
 import type { InterruptSimEvent } from '../lib/simEvents'
 import { SURFACE_PACKS, type StudioStateKind } from '../lib/studioPacks'
+import { LiveScene } from './live/LiveScene'
+import type { LiveScenario } from '@/app/demo/lib/liveScenario'
 import type { RostiroState } from '@/types'
 
-type CanvasState = StudioStateKind | 'game_day'
+type CanvasState = StudioStateKind | 'game_day' | 'live'
 
 export function StudioCanvas({ state = 'game_day', aspect, event, leaving, content }: {
   state?: CanvasState
@@ -15,6 +17,10 @@ export function StudioCanvas({ state = 'game_day', aspect, event, leaving, conte
   leaving?: boolean
   content?: unknown
 }) {
+  if (state === 'live') {
+    return <LiveScene scenario={content as LiveScenario} aspect={aspect} />
+  }
+
   const pack = state !== 'game_day' ? SURFACE_PACKS[state] : undefined
   const stateOverride: RostiroState = state === 'game_day' ? 'game_day' : (state as RostiroState)
 

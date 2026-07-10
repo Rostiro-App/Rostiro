@@ -28,4 +28,10 @@ describe('Studio', () => {
     fireEvent.click(screen.getByText('Film Room'))
     expect(screen.getByText('FILM ROOM')).toBeTruthy()
   })
+
+  it('switching to Live plays the companion scene with the prefilled scenario', () => {
+    render(<Studio />)
+    fireEvent.click(screen.getByText('Live'))
+    expect(screen.getByText(/second-screen companion/i)).toBeTruthy()
+  })
 })

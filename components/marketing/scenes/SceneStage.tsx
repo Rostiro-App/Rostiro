@@ -9,10 +9,12 @@ interface SceneStageProps {
   frame?: number
   /** Frame held when prefers-reduced-motion is on. */
   staticFrame?: number
+  /** Aspect ratio of the scene frame. Defaults to '16:9' for backward compatibility. */
+  aspect?: '16:9' | '9:16'
   children: (frame: number) => ReactNode
 }
 
-export function SceneStage({ durationFrames, caption, fps = 30, frame, staticFrame = 0, children }: SceneStageProps) {
+export function SceneStage({ durationFrames, caption, fps = 30, frame, staticFrame = 0, aspect = '16:9', children }: SceneStageProps) {
   const [tick, setTick] = useState(0)
   const [visible, setVisible] = useState(false)
   const [reduced, setReduced] = useState(false)
@@ -55,7 +57,11 @@ export function SceneStage({ durationFrames, caption, fps = 30, frame, staticFra
       <div
         ref={rootRef}
         className="glass-heavy rounded-2xl overflow-hidden relative"
-        style={{ aspectRatio: '16 / 9', border: '1px solid var(--hairline-bright)' }}
+        style={{
+          aspectRatio: aspect === '16:9' ? '16 / 9' : '9 / 16',
+          border: '1px solid var(--hairline-bright)',
+          ...(aspect === '9:16' ? { maxWidth: 480, margin: '0 auto' } : {}),
+        }}
       >
         {children(current)}
       </div>
