@@ -1,5 +1,6 @@
 import type { FC } from 'react'
 import { StandardState } from '@/app/demo/components/StandardState'
+import { waiverPack } from '@/app/demo/studio/packs/waiver/waiverPack'
 
 export type StudioStateKind = 'standard' | 'waiver_day' | 'film_room' // 'draft' future; game_day handled specially
 
@@ -28,4 +29,5 @@ const standardPack: StatePack<null> = {
 
 export const SURFACE_PACKS: Partial<Record<StudioStateKind, StatePack<any>>> = {
   standard: standardPack,
+  waiver_day: waiverPack,
 }
