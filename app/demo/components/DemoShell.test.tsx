@@ -24,4 +24,13 @@ describe('DemoShell (Rostiro OS chrome)', () => {
     wrap()
     expect(screen.getByText('page-body')).toBeTruthy()
   })
+  it('contained variant renders without a DemoStateProvider using stateOverride', () => {
+    render(<DemoShell variant="contained" stateOverride="game_day" score={81}><div>body</div></DemoShell>)
+    expect(screen.getByText('body')).toBeTruthy()
+    expect(screen.getByTestId('health-score').textContent).toBe('81')
+  })
+  it('applies the kickoff-sweep class to the system bar when sweeping', () => {
+    const { container } = render(<DemoShell variant="contained" stateOverride="game_day" sweeping score={81}><div /></DemoShell>)
+    expect(container.querySelector('.kickoff-sweep')).toBeTruthy()
+  })
 })

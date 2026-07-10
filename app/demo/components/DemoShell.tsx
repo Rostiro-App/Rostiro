@@ -1,9 +1,10 @@
 'use client'
 import { useMemo, type ReactNode } from 'react'
 import PulseMark from '@/components/PulseMark'
-import { useDemo } from '../lib/DemoStateProvider'
+import { useDemoOptional } from '../lib/DemoStateProvider'
 import { demoHealth } from '../lib/demoHealth'
 import { loadFixtures } from '../lib/loadFixtures'
+import type { RostiroState } from '@/types'
 
 // Reproduces the real Rostiro OS chrome (SystemBar + icon dock + Bloomberg
 // ticker) using the shared globals.css design tokens — visually faithful but
@@ -72,15 +73,14 @@ function DemoSidebar() {
   )
 }
 
-function DemoSystemBar({ score }: { score: number | null }) {
-  const { state } = useDemo()
+function DemoSystemBar({ score, state, sweeping }: { score: number | null; state: RostiroState; sweeping?: boolean }) {
   return (
     <div
-      className="glass-bar mono-data flex items-center gap-3 md:gap-5 px-3 md:px-4 flex-shrink-0 relative z-20"
+      className={`glass-bar mono-data flex items-center gap-3 md:gap-5 px-3 md:px-4 flex-shrink-0 relative z-20 ${sweeping ? 'kickoff-sweep' : ''}`.trim()}
       style={{ borderBottom: '1px solid var(--hairline)', height: '42px', fontSize: '11px' }}
     >
       <span className="hidden md:flex items-center gap-2.5 flex-shrink-0">
-        <PulseMark state={state.currentState} playoffTier="none" />
+        <PulseMark state={state} playoffTier="none" />
         <span aria-hidden="true" style={{ width: 1, height: 14, backgroundColor: 'var(--hairline)' }} />
         <span className="flex items-baseline gap-1.5">
           <span className="font-bold tracking-[0.18em] text-[11.5px]" style={{ color: 'var(--t1)' }}>ROSTIRO</span>
@@ -149,12 +149,30 @@ function DemoTicker() {
   )
 }
 
-export function DemoShell({ children }: { children: ReactNode }) {
-  const { health } = useMemo(() => demoHealth(), [])
+export function DemoShell({
+  children,
+  variant = 'route',
+  stateOverride,
+  sweeping,
+  score: scoreProp,
+}: {
+  children: ReactNode
+  variant?: 'route' | 'contained'
+  stateOverride?: RostiroState
+  sweeping?: boolean
+  score?: number | null
+}) {
+  const ctx = useDemoOptional()
+  const state: RostiroState = stateOverride ?? ctx?.state.currentState ?? 'standard'
+  const computed = useMemo(() => demoHealth(), [])
+  const score = scoreProp ?? computed.health.score
+  const rootClass = variant === 'contained'
+    ? 'absolute inset-0 h-full w-full flex flex-col overflow-hidden'
+    : 'flex flex-col h-screen overflow-hidden relative'
   return (
-    <div className="flex flex-col h-screen overflow-hidden relative" style={{ backgroundColor: 'var(--void)' }}>
+    <div className={rootClass} style={{ backgroundColor: 'var(--void)' }}>
       <div className="ambient-ground" aria-hidden="true" />
-      <DemoSystemBar score={health.score} />
+      <DemoSystemBar score={score} state={state} sweeping={sweeping} />
       <div className="flex flex-1 min-h-0 relative z-10">
         <DemoSidebar />
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
