@@ -1,7 +1,7 @@
 # Cross-League Touchdown Injector (Director's Console) — Design Spec
 
 **Date:** 2026-07-10
-**Status:** Approved design → ready for implementation plan
+**Status:** SUPERSEDED by `2026-07-10-simulation-studio-foundation-design.md` — its engine (`crossLeagueImpact`), demo-league fixtures (`demoLeagues`), and card layout carry forward under the Simulation Studio. Kept as historical seed.
 **Scope:** Upgrade the `/demo` Director's Console "Inject TD" button into a live, searchable touchdown injector: type any real NFL player from `players.json`, enter custom fantasy points, and instantly fire a `CrossLeagueInterruptCard` that flashes the win-probability impact across the founder's leagues. Purpose-built as a **marketing capture tool** for high-converting social-video (TikTok/Reels/X).
 
 ## Goal
