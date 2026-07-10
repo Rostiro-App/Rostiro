@@ -5,7 +5,7 @@ function PlayerRow({ p }: { p: LivePlayerFrame }) {
   const ring = p.event ? 'var(--live)' : 'transparent'
   return (
     <div className="w-full flex items-center gap-3 px-3 py-2.5 text-left" style={{ borderTop: '1px solid var(--hairline)', backgroundColor: 'rgba(8,15,26,0.6)' }}>
-      <img src={p.headshotUrl ?? ''} alt={p.name} className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+      <img src={p.headshotUrl ?? undefined} alt={p.name} className="w-10 h-10 rounded-full object-cover flex-shrink-0"
         style={{ backgroundColor: 'var(--glass-solid)', border: `2px solid ${ring}`, transition: 'border-color 1s' }}
         onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden' }} />
       <div className="min-w-0 flex-1">
