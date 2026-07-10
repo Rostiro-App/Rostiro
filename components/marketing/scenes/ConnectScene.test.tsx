@@ -12,9 +12,9 @@ describe('ConnectScene', () => {
     expect(screen.queryByText('Connected')).toBeNull()
   })
 
-  it('shows Sleeper and Yahoo connected by frame 240 (before ESPN beat)', () => {
-    render(<ConnectScene frame={240} />)
-    expect(screen.getAllByText('Connected').length).toBeGreaterThan(0)
+  it('shows exactly two Connected pills at frame 200 (Sleeper + Yahoo, before ESPN)', () => {
+    render(<ConnectScene frame={200} />)
+    expect(screen.getAllByText('Connected')).toHaveLength(2)
   })
 
   it('shows the unified multi-league feed once the cross-fade completes (frame 370)', () => {

@@ -67,7 +67,7 @@ function PulseCard({ item, isFirst }: { item: DemoPulseItem; isFirst: boolean })
   )
 }
 
-export function StandardState({ items: itemsProp }: { items?: DemoPulseItem[] } = {}) {
+export function StandardState({ items: itemsProp, leagueCount = 1 }: { items?: DemoPulseItem[]; leagueCount?: number } = {}) {
   const hr = useMemo(() => demoHealth(), [])
   const items = useMemo(() => itemsProp ?? buildPulseFeed(hr), [hr, itemsProp])
   const estMinutes = items.length * 2
@@ -80,7 +80,7 @@ export function StandardState({ items: itemsProp }: { items?: DemoPulseItem[] } 
         </h1>
         <p className="text-[13px] mt-0.5" style={{ color: 'var(--t2)' }}>
           <b style={{ color: 'var(--t1)', fontWeight: 600 }}>{items.length} {items.length === 1 ? 'decision' : 'decisions'}</b>
-          {' across 1 league'}
+          {` across ${leagueCount} ${leagueCount === 1 ? 'league' : 'leagues'}`}
           {estMinutes > 0 && <> · Est. <b style={{ color: 'var(--t1)', fontWeight: 600 }}>{estMinutes} min</b></>}
         </p>
         <div className="mono-data mt-3.5 flex items-center gap-3 text-[10px] tracking-[0.1em]" style={{ color: 'var(--t3)' }}>

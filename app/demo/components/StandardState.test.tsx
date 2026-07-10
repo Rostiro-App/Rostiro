@@ -20,4 +20,8 @@ describe('StandardState (Pulse feed)', () => {
     // At least one card headline about an unrostered free agent (real Health signal)
     expect(screen.getByText(/unrostered/)).toBeTruthy()
   })
+  it('reflects a multi-league count in the header', () => {
+    render(<DemoStateProvider autoplay={false}><StandardState leagueCount={3} /></DemoStateProvider>)
+    expect(screen.getByText((_, el) => el?.tagName === 'P' && /across 3 leagues/.test(el.textContent ?? ''))).toBeTruthy()
+  })
 })

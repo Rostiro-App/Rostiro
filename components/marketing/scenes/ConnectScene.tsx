@@ -1,10 +1,10 @@
 'use client'
 import { SceneStage } from './SceneStage'
-import { inRange, interpolate } from './timeline'
+import { interpolate } from './timeline'
 import { ConnectPanel } from './ConnectPanel'
 import { DemoShell } from '@/app/demo/components/DemoShell'
 import { StandardState } from '@/app/demo/components/StandardState'
-import { multiLeaguePulse } from './fixtures'
+import { multiLeaguePulse, DEMO_LEAGUES } from './fixtures'
 
 const DURATION = 390 // 13s @ 30fps
 
@@ -31,12 +31,10 @@ export function ConnectScene({ frame: frameOverride }: { frame?: number } = {}) 
             {showFeed && (
               <div className="absolute inset-0" style={{ opacity: feedOpacity }}>
                 <DemoShell variant="contained" stateOverride="standard">
-                  <StandardState items={cards} />
+                  <StandardState items={cards} leagueCount={DEMO_LEAGUES.length} />
                 </DemoShell>
               </div>
             )}
-            {/* keep inRange imported/used for beat clarity in tests */}
-            <span hidden>{inRange(frame, 0, DURATION) ? '' : ''}</span>
           </>
         )
       }}
