@@ -1,0 +1,5 @@
+[
+  { "timeOffset": 0, "state": "standard", "label": "Standard — league home" },
+  { "timeOffset": 8, "state": "standard", "activeAlert": { "id": "i1", "kind": "info", "title": "Health Score updated", "body": "Lawrence's Legends: 82 — Healthy" }, "label": "Health Score" },
+  { "timeOffset": 18, "state": "standard", "label": "standings + chat" }
+]
