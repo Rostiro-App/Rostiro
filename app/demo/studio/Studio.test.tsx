@@ -16,4 +16,16 @@ describe('Studio', () => {
     // After firing, the canvas card's cross-league divider is present:
     expect(screen.getByText(/OF YOUR LEAGUE/i)).toBeTruthy()
   })
+
+  it('switching to Waiver Day shows the Mission Briefing surface with prefilled targets', () => {
+    render(<Studio />)
+    fireEvent.click(screen.getByText('Waiver Day'))
+    expect(screen.getByText('MISSION BRIEFING')).toBeTruthy()
+    expect(screen.getAllByText('WAIVER').length).toBeGreaterThan(0)
+  })
+  it('switching to Film Room shows the recap surface', () => {
+    render(<Studio />)
+    fireEvent.click(screen.getByText('Film Room'))
+    expect(screen.getByText('FILM ROOM')).toBeTruthy()
+  })
 })
