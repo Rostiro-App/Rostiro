@@ -10,8 +10,10 @@ describe('Studio', () => {
     // author: type + select, then Fire
     fireEvent.change(screen.getByPlaceholderText(/search player/i), { target: { value: 'Lamar' } })
     fireEvent.click(screen.getByText(/Lamar Jackson/))
+    // Before firing, no interrupt card is on the canvas:
+    expect(screen.queryByText(/OF YOUR LEAGUE/i)).toBeNull()
     fireEvent.click(screen.getByText(/Fire/))
-    // the fired card shows the player line on the canvas
-    expect(screen.getAllByText(/Lamar Jackson/).length).toBeGreaterThan(0)
+    // After firing, the canvas card's cross-league divider is present:
+    expect(screen.getByText(/OF YOUR LEAGUE/i)).toBeTruthy()
   })
 })

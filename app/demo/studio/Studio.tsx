@@ -1,5 +1,5 @@
 'use client'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { StudioPanel } from './StudioPanel'
 import { StudioCanvas } from './StudioCanvas'
 import { defaultInterruptEvent, type InterruptSimEvent } from '../lib/simEvents'
@@ -10,19 +10,24 @@ export function Studio() {
   const [leaving, setLeaving] = useState(false)
   const [aspect, setAspect] = useState<'16:9' | '9:16'>('16:9')
   const [showPanel, setShowPanel] = useState(true)
-  const timer = useRef<number | null>(null)
+  const timers = useRef<number[]>([])
+  function clearTimers() { timers.current.forEach((t) => window.clearTimeout(t)); timers.current = [] }
 
   function fire() {
-    if (timer.current) window.clearTimeout(timer.current)
+    clearTimers()
     setLeaving(false)
     setFired(draft)
     if (draft.autoDismissMs != null) {
-      timer.current = window.setTimeout(() => {
+      const t1 = window.setTimeout(() => {
         setLeaving(true)
-        window.setTimeout(() => setFired(null), 340)
+        const t2 = window.setTimeout(() => setFired(null), 340)
+        timers.current.push(t2)
       }, draft.autoDismissMs)
+      timers.current.push(t1)
     }
   }
+
+  useEffect(() => () => clearTimers(), [])
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--void)' }}>
