@@ -10,9 +10,13 @@ export const DEMO_LEAGUES = ["Lawrence's Legends League", 'Sunday Money', 'The B
  *  uses the real "N leagues" label form to prove genuine aggregation). */
 export function multiLeaguePulse(): DemoPulseItem[] {
   const base = buildPulseFeed(demoHealth())
-  return base.slice(0, 4).map((card, i) => ({
-    ...card,
-    id: `ml-${card.id}`,
-    leagueName: i === 3 ? '2 leagues' : DEMO_LEAGUES[i % DEMO_LEAGUES.length],
-  }))
+  return base.slice(0, 4).map((card, i) => {
+    const newLeagueName = i === 3 ? '2 leagues' : DEMO_LEAGUES[i % DEMO_LEAGUES.length]
+    return {
+      ...card,
+      id: `ml-${card.id}`,
+      leagueName: newLeagueName,
+      reasoning: card.reasoning.replaceAll("Lawrence's Legends League", newLeagueName),
+    }
+  })
 }
