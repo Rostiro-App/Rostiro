@@ -1,0 +1,2642 @@
+[
+  {
+    "id": "00-0034796",
+    "name": "Lamar Jackson",
+    "pos": "QB",
+    "nflTeam": "BAL",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/cruqs6qpbykh7a2whd7p",
+    "adp": 40.6,
+    "season": {
+      "points": 430.4,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0036442",
+    "name": "Joe Burrow",
+    "pos": "QB",
+    "nflTeam": "CIN",
+    "headshotUrl": "https://static.www.nfl.com/image/private/f_auto,q_auto/league/jzzqz5ubkilrn9dpxtlp",
+    "adp": 81,
+    "season": {
+      "points": 372.8,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0034857",
+    "name": "Josh Allen",
+    "pos": "QB",
+    "nflTeam": "BUF",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/lq4ezafbszwwt2qsvhqv",
+    "adp": 27.3,
+    "season": {
+      "points": 372.3,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0034855",
+    "name": "Baker Mayfield",
+    "pos": "QB",
+    "nflTeam": "TB",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/xrbgtbyy8a7l0ux13hjy",
+    "adp": null,
+    "season": {
+      "points": 365.8,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0039910",
+    "name": "Jayden Daniels",
+    "pos": "QB",
+    "nflTeam": "WAS",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/mh9rkwpmq1rgfarg9rpm",
+    "adp": 116.7,
+    "season": {
+      "points": 355.8,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0036900",
+    "name": "Ja'Marr Chase",
+    "pos": "WR",
+    "nflTeam": "CIN",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/qkcb3qt2fhasfgtfuprd",
+    "adp": 6.3,
+    "season": {
+      "points": 339.5,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0034844",
+    "name": "Saquon Barkley",
+    "pos": "RB",
+    "nflTeam": "PHI",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/ugiuanl8bf6uoya5mgid",
+    "adp": 9.5,
+    "season": {
+      "points": 338.8,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0039139",
+    "name": "Jahmyr Gibbs",
+    "pos": "RB",
+    "nflTeam": "DET",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/f5y3osxxtov5rgfv4ra5",
+    "adp": 8.6,
+    "season": {
+      "points": 328.9,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0032764",
+    "name": "Derrick Henry",
+    "pos": "RB",
+    "nflTeam": "BAL",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/m7bv3lv9puapabltvykk",
+    "adp": 13.1,
+    "season": {
+      "points": 326.9,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0033106",
+    "name": "Jared Goff",
+    "pos": "QB",
+    "nflTeam": "DET",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/jxyaiwwkabzmmphouxil",
+    "adp": 92.3,
+    "season": {
+      "points": 324,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0039732",
+    "name": "Bo Nix",
+    "pos": "QB",
+    "nflTeam": "DEN",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/zibtvsprpauxnytis229",
+    "adp": null,
+    "season": {
+      "points": 316.7,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0036389",
+    "name": "Jalen Hurts",
+    "pos": "QB",
+    "nflTeam": "PHI",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/k2p5yb4qmqwoo3qcapgt",
+    "adp": 33.9,
+    "season": {
+      "points": 315.1,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0038542",
+    "name": "Bijan Robinson",
+    "pos": "RB",
+    "nflTeam": "ATL",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/rydwvaod6ethdjap41l6",
+    "adp": 2,
+    "season": {
+      "points": 311.2,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0034869",
+    "name": "Sam Darnold",
+    "pos": "QB",
+    "nflTeam": "MIN",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/agjgfwk9jk9ufoac2vpd",
+    "adp": null,
+    "season": {
+      "points": 308,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0035228",
+    "name": "Kyler Murray",
+    "pos": "QB",
+    "nflTeam": "ARI",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/lsladvvsaptc29bbcah2",
+    "adp": 68.4,
+    "season": {
+      "points": 297.2,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0036355",
+    "name": "Justin Herbert",
+    "pos": "QB",
+    "nflTeam": "LAC",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/vvwim9hpgq1zs3bufmr0",
+    "adp": 103.6,
+    "season": {
+      "points": 285.4,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0033873",
+    "name": "Patrick Mahomes",
+    "pos": "QB",
+    "nflTeam": "KC",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/qrdbvu4iqy7wkqg8jq8d",
+    "adp": 36.2,
+    "season": {
+      "points": 282.5,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0035700",
+    "name": "Josh Jacobs",
+    "pos": "RB",
+    "nflTeam": "GB",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/ksdusqxnwqtnph0htcfx",
+    "adp": 19.9,
+    "season": {
+      "points": 275.1,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0037834",
+    "name": "Brock Purdy",
+    "pos": "QB",
+    "nflTeam": "SF",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/myvg8siij2bn9ecx7btm",
+    "adp": 61.7,
+    "season": {
+      "points": 266.9,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0030565",
+    "name": "Geno Smith",
+    "pos": "QB",
+    "nflTeam": "SEA",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/izkm5yyxybb5uy5dkcgf",
+    "adp": 159.4,
+    "season": {
+      "points": 266,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0036322",
+    "name": "Justin Jefferson",
+    "pos": "WR",
+    "nflTeam": "MIN",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/vrftbpzwk6qmv0zjcysg",
+    "adp": 8.3,
+    "season": {
+      "points": 266,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0039040",
+    "name": "Devon Achane",
+    "pos": "RB",
+    "nflTeam": "MIA",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/zqfkz3hbyurjcwhw7xoi",
+    "adp": 21.9,
+    "season": {
+      "points": 260.9,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0036963",
+    "name": "Amon-Ra St. Brown",
+    "pos": "WR",
+    "nflTeam": "DET",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/jmfuamqblg8jag0stpnq",
+    "adp": 6.9,
+    "season": {
+      "points": 258.7,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0023459",
+    "name": "Aaron Rodgers",
+    "pos": "QB",
+    "nflTeam": "NYJ",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/jdcb4nomlc4rd6k5l6to",
+    "adp": 116.4,
+    "season": {
+      "points": 256.6,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0037840",
+    "name": "Kyren Williams",
+    "pos": "RB",
+    "nflTeam": "LA",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/vcvstwywz6iufk7iul3x",
+    "adp": 14.8,
+    "season": {
+      "points": 255.1,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0039918",
+    "name": "Caleb Williams",
+    "pos": "QB",
+    "nflTeam": "CHI",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/idewrhb7kngpdtrvku31",
+    "adp": 112.9,
+    "season": {
+      "points": 254.5,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0037248",
+    "name": "James Cook",
+    "pos": "RB",
+    "nflTeam": "BUF",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/bzdvrarxum9zate4te4b",
+    "adp": 32,
+    "season": {
+      "points": 250.7,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0039893",
+    "name": "Brian Thomas",
+    "pos": "WR",
+    "nflTeam": "JAX",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/gsz15iz0ppibhslzzgch",
+    "adp": 142.9,
+    "season": {
+      "points": 240.5,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0036223",
+    "name": "Jonathan Taylor",
+    "pos": "RB",
+    "nflTeam": "IND",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/ye4runp84oku1vnodsa7",
+    "adp": 11.3,
+    "season": {
+      "points": 237.7,
+      "games": 14
+    }
+  },
+  {
+    "id": "00-0036264",
+    "name": "Jordan Love",
+    "pos": "QB",
+    "nflTeam": "GB",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/a8xqle2vmsnumawdhswb",
+    "adp": 78.7,
+    "season": {
+      "points": 233.9,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0033906",
+    "name": "Alvin Kamara",
+    "pos": "RB",
+    "nflTeam": "NO",
+    "headshotUrl": "https://static.www.nfl.com/image/private/f_auto,q_auto/league/tl9enad6kiwv6cukf4vt",
+    "adp": 47.4,
+    "season": {
+      "points": 231.3,
+      "games": 14
+    }
+  },
+  {
+    "id": "00-0037238",
+    "name": "Drake London",
+    "pos": "WR",
+    "nflTeam": "ATL",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/wikjazqtt3uunjufgqrf",
+    "adp": 25.1,
+    "season": {
+      "points": 230.8,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0033553",
+    "name": "James Conner",
+    "pos": "RB",
+    "nflTeam": "ARI",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/rtvys5j7sxjrlbpy5iim",
+    "adp": 45,
+    "season": {
+      "points": 230.3,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0038597",
+    "name": "Chase Brown",
+    "pos": "RB",
+    "nflTeam": "CIN",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/rxzzjpgjgjsmmkekp6zu",
+    "adp": 93.3,
+    "season": {
+      "points": 228,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0035659",
+    "name": "Terry McLaurin",
+    "pos": "WR",
+    "nflTeam": "WAS",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/wokz1etv1wj1vhbmvxgs",
+    "adp": 70.6,
+    "season": {
+      "points": 226.8,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0033897",
+    "name": "Joe Mixon",
+    "pos": "RB",
+    "nflTeam": "HOU",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/gwyhozfhjgedwdmmjjcf",
+    "adp": 28.4,
+    "season": {
+      "points": 222.5,
+      "games": 14
+    }
+  },
+  {
+    "id": "00-0039361",
+    "name": "Bucky Irving",
+    "pos": "RB",
+    "nflTeam": "TB",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/wjaqkrtdhwf16wldi83h",
+    "adp": 145.8,
+    "season": {
+      "points": 220.9,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0039163",
+    "name": "C.J. Stroud",
+    "pos": "QB",
+    "nflTeam": "HOU",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/fbk2eqpo54lawppgetjn",
+    "adp": 44.2,
+    "season": {
+      "points": 220.4,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0036555",
+    "name": "Chuba Hubbard",
+    "pos": "RB",
+    "nflTeam": "CAR",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/oyis5zooijf0xfme9csj",
+    "adp": 121.3,
+    "season": {
+      "points": 220.1,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0039337",
+    "name": "Malik Nabers",
+    "pos": "WR",
+    "nflTeam": "NYG",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/w3edoyyuomqlovvp9ixc",
+    "adp": 52.5,
+    "season": {
+      "points": 219.1,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0033293",
+    "name": "Aaron Jones",
+    "pos": "RB",
+    "nflTeam": "MIN",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/bktkfvgfwujkdbzkcfim",
+    "adp": 42.7,
+    "season": {
+      "points": 216.1,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0026498",
+    "name": "Matthew Stafford",
+    "pos": "QB",
+    "nflTeam": "LA",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/xdlnnbapdbk8trxqlasu",
+    "adp": 119.1,
+    "season": {
+      "points": 214.6,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0036358",
+    "name": "CeeDee Lamb",
+    "pos": "WR",
+    "nflTeam": "DAL",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/tfuj9njqdw2dovkwhryc",
+    "adp": 2.6,
+    "season": {
+      "points": 212.9,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0038120",
+    "name": "Breece Hall",
+    "pos": "RB",
+    "nflTeam": "NYJ",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/ekmqygsmfkwwwdmuox4r",
+    "adp": 4.4,
+    "season": {
+      "points": 212.4,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0039338",
+    "name": "Brock Bowers",
+    "pos": "TE",
+    "nflTeam": "LV",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/mjy86xh8munoiur4hejf",
+    "adp": 108.1,
+    "season": {
+      "points": 206.7,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0035685",
+    "name": "David Montgomery",
+    "pos": "RB",
+    "nflTeam": "DET",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/nwdb4paueb1x4gv7tlb9",
+    "adp": 51.1,
+    "season": {
+      "points": 203.7,
+      "games": 14
+    }
+  },
+  {
+    "id": "00-0031408",
+    "name": "Mike Evans",
+    "pos": "WR",
+    "nflTeam": "TB",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/vfsaie1uiokfczwv9p4d",
+    "adp": 29.1,
+    "season": {
+      "points": 203.4,
+      "games": 14
+    }
+  },
+  {
+    "id": "00-0038543",
+    "name": "Jaxon Smith-Njigba",
+    "pos": "WR",
+    "nflTeam": "SEA",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/lfroslgx4bo5p641flvg",
+    "adp": 94.7,
+    "season": {
+      "points": 203,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0037740",
+    "name": "Garrett Wilson",
+    "pos": "WR",
+    "nflTeam": "NYJ",
+    "headshotUrl": "https://static.www.nfl.com/image/private/f_auto,q_auto/league/llgosx4tokddwnyrgvbx",
+    "adp": 13.3,
+    "season": {
+      "points": 201.4,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0039915",
+    "name": "Ladd McConkey",
+    "pos": "WR",
+    "nflTeam": "LAC",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/wcx39ialovvxxnvs2bke",
+    "adp": 88.5,
+    "season": {
+      "points": 199.9,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0034348",
+    "name": "Courtland Sutton",
+    "pos": "WR",
+    "nflTeam": "DEN",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/qts95gbd6hv65s9eiseq",
+    "adp": 100.9,
+    "season": {
+      "points": 199.8,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0031381",
+    "name": "Davante Adams",
+    "pos": "WR",
+    "nflTeam": "NYJ",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/jweoujpjv9u2a8k7wnos",
+    "adp": 21,
+    "season": {
+      "points": 198.8,
+      "games": 14
+    }
+  },
+  {
+    "id": "00-0033288",
+    "name": "George Kittle",
+    "pos": "TE",
+    "nflTeam": "SF",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/ivkrikewqqdllzvano8h",
+    "adp": 72.4,
+    "season": {
+      "points": 197.6,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0036407",
+    "name": "Jerry Jeudy",
+    "pos": "WR",
+    "nflTeam": "CLE",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/szca1v9butuqkjs7ekpm",
+    "adp": 127.7,
+    "season": {
+      "points": 195.9,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0039150",
+    "name": "Bryce Young",
+    "pos": "QB",
+    "nflTeam": "CAR",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/gdmtmmviwadpobyjogal",
+    "adp": null,
+    "season": {
+      "points": 195,
+      "games": 14
+    }
+  },
+  {
+    "id": "00-0036275",
+    "name": "D'Andre Swift",
+    "pos": "RB",
+    "nflTeam": "CHI",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/xlqznrxbapcjhxxazkbx",
+    "adp": 57.9,
+    "season": {
+      "points": 193.5,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0034827",
+    "name": "D.J. Moore",
+    "pos": "WR",
+    "nflTeam": "CHI",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/hqb9xnzm9brx79zl6wve",
+    "adp": 37.9,
+    "season": {
+      "points": 189.1,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0037744",
+    "name": "Trey McBride",
+    "pos": "TE",
+    "nflTeam": "ARI",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/hfdgljgi9gfaskomdl1h",
+    "adp": 58.9,
+    "season": {
+      "points": 188.3,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0036893",
+    "name": "Najee Harris",
+    "pos": "RB",
+    "nflTeam": "PIT",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/pdyv1dfyb1w0tmvnkp3v",
+    "adp": 55.9,
+    "season": {
+      "points": 186.6,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0036410",
+    "name": "Tee Higgins",
+    "pos": "WR",
+    "nflTeam": "CIN",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/swqgkrdmjecz3vumrex5",
+    "adp": 48.5,
+    "season": {
+      "points": 185.6,
+      "games": 12
+    }
+  },
+  {
+    "id": "00-0035676",
+    "name": "A.J. Brown",
+    "pos": "WR",
+    "nflTeam": "PHI",
+    "headshotUrl": "https://static.www.nfl.com/image/private/f_auto,q_auto/league/a014sgzctarbvhwb35lw",
+    "adp": 11.2,
+    "season": {
+      "points": 183.4,
+      "games": 13
+    }
+  },
+  {
+    "id": "00-0037240",
+    "name": "Jameson Williams",
+    "pos": "WR",
+    "nflTeam": "DET",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/kt6xzcnjbe9affdfsayt",
+    "adp": 99.9,
+    "season": {
+      "points": 183.2,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0036212",
+    "name": "Tua Tagovailoa",
+    "pos": "QB",
+    "nflTeam": "MIA",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/xzdbwt2ezmxk3pjcsr1n",
+    "adp": 89.6,
+    "season": {
+      "points": 181.6,
+      "games": 11
+    }
+  },
+  {
+    "id": "00-0038994",
+    "name": "Jordan Addison",
+    "pos": "WR",
+    "nflTeam": "MIN",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/tmyckmignrvy8truccwm",
+    "adp": 127.3,
+    "season": {
+      "points": 181,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0035261",
+    "name": "Tony Pollard",
+    "pos": "RB",
+    "nflTeam": "TEN",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/koxn5qhfnsgvnqfqfmpp",
+    "adp": 75.9,
+    "season": {
+      "points": 180.2,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0036139",
+    "name": "Rico Dowdle",
+    "pos": "RB",
+    "nflTeam": "DAL",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/fe8ge4f6vvtyihou5czu",
+    "adp": 114,
+    "season": {
+      "points": 178.3,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0033858",
+    "name": "Jonnu Smith",
+    "pos": "TE",
+    "nflTeam": "MIA",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/p8uldtljkzb6sile3wgx",
+    "adp": null,
+    "season": {
+      "points": 178.3,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0033040",
+    "name": "Tyreek Hill",
+    "pos": "WR",
+    "nflTeam": "MIA",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/gdwjlpbkenmnsibawkht",
+    "adp": 3.9,
+    "season": {
+      "points": 177.7,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0039851",
+    "name": "Drake Maye",
+    "pos": "QB",
+    "nflTeam": "NE",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/iy96wbyjth5ehizc0xq5",
+    "adp": null,
+    "season": {
+      "points": 177.1,
+      "games": 13
+    }
+  },
+  {
+    "id": "00-0036554",
+    "name": "Nico Collins",
+    "pos": "WR",
+    "nflTeam": "HOU",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/q7c9aq8rpremfygslmya",
+    "adp": 31.3,
+    "season": {
+      "points": 176.6,
+      "games": 12
+    }
+  },
+  {
+    "id": "00-0029604",
+    "name": "Kirk Cousins",
+    "pos": "QB",
+    "nflTeam": "ATL",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/yt6n07jezvfmcsoq0j13",
+    "adp": 129.4,
+    "season": {
+      "points": 176.3,
+      "games": 14
+    }
+  },
+  {
+    "id": "00-0036158",
+    "name": "J.K. Dobbins",
+    "pos": "RB",
+    "nflTeam": "LAC",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/rbuyzj3kv10xrq1rfy2l",
+    "adp": 120.3,
+    "season": {
+      "points": 175.8,
+      "games": 13
+    }
+  },
+  {
+    "id": "00-0034960",
+    "name": "Jakobi Meyers",
+    "pos": "WR",
+    "nflTeam": "LV",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/p1abjttm5pu8gev0gwea",
+    "adp": 160.4,
+    "season": {
+      "points": 174.5,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0037256",
+    "name": "Rachaad White",
+    "pos": "RB",
+    "nflTeam": "TB",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/przphhlw0zga7b45qlyb",
+    "adp": 29.1,
+    "season": {
+      "points": 174.1,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0029263",
+    "name": "Russell Wilson",
+    "pos": "QB",
+    "nflTeam": "PIT",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/u36rhg0md8ey3b4khbre",
+    "adp": null,
+    "season": {
+      "points": 172.8,
+      "games": 11
+    }
+  },
+  {
+    "id": "00-0039064",
+    "name": "Zay Flowers",
+    "pos": "WR",
+    "nflTeam": "BAL",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/oidhqwg0fjvanyk57nc1",
+    "adp": 56.9,
+    "season": {
+      "points": 172.5,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0036259",
+    "name": "Jauan Jennings",
+    "pos": "WR",
+    "nflTeam": "SF",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/fqyzagb57zrtegmw69eb",
+    "adp": null,
+    "season": {
+      "points": 172,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0039146",
+    "name": "Jayden Reed",
+    "pos": "WR",
+    "nflTeam": "GB",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/blh2tfg9qjthqo2g6ot4",
+    "adp": 63.1,
+    "season": {
+      "points": 169.5,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0034837",
+    "name": "Calvin Ridley",
+    "pos": "WR",
+    "nflTeam": "TEN",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/tmeij0cfgylmurfybs74",
+    "adp": 74.2,
+    "season": {
+      "points": 167.2,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0039075",
+    "name": "Puka Nacua",
+    "pos": "WR",
+    "nflTeam": "LA",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/i1pmrhua5gpvwgsqphxa",
+    "adp": 14.9,
+    "season": {
+      "points": 167.1,
+      "games": 11
+    }
+  },
+  {
+    "id": "00-0039849",
+    "name": "Marvin Harrison",
+    "pos": "WR",
+    "nflTeam": "ARI",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/o6hg5zeofmxvzjjpo2sf",
+    "adp": 16.1,
+    "season": {
+      "points": 165.5,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0036912",
+    "name": "DeVonta Smith",
+    "pos": "WR",
+    "nflTeam": "PHI",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/bmdflwy52nsk7zpnfhwb",
+    "adp": 40.2,
+    "season": {
+      "points": 165.4,
+      "games": 13
+    }
+  },
+  {
+    "id": "00-0039384",
+    "name": "Tyrone Tracy",
+    "pos": "RB",
+    "nflTeam": "NYG",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/hc2uk0xrbc6qizrerwxd",
+    "adp": null,
+    "season": {
+      "points": 163.3,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0039164",
+    "name": "Anthony Richardson",
+    "pos": "QB",
+    "nflTeam": "IND",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/areyvihumylqo7y2ehk2",
+    "adp": 64.4,
+    "season": {
+      "points": 162.9,
+      "games": 11
+    }
+  },
+  {
+    "id": "00-0039165",
+    "name": "Zach Charbonnet",
+    "pos": "RB",
+    "nflTeam": "SEA",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/eaaj5vbfmk08wvwelyqt",
+    "adp": 114.6,
+    "season": {
+      "points": 162.7,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0034753",
+    "name": "Mark Andrews",
+    "pos": "TE",
+    "nflTeam": "BAL",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/y5maejm3puruskwc344y",
+    "adp": 49.7,
+    "season": {
+      "points": 161.3,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0036309",
+    "name": "Darnell Mooney",
+    "pos": "WR",
+    "nflTeam": "ATL",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/c1ixyspw0eshl3a2qrly",
+    "adp": null,
+    "season": {
+      "points": 161.2,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0036875",
+    "name": "Rhamondre Stevenson",
+    "pos": "RB",
+    "nflTeam": "NE",
+    "headshotUrl": "https://static.www.nfl.com/image/private/f_auto,q_auto/league/ro2fqabc4qndtnxykvm7",
+    "adp": 61.9,
+    "season": {
+      "points": 159.4,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0038134",
+    "name": "Kenneth Walker",
+    "pos": "RB",
+    "nflTeam": "SEA",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/ielqdthtspzi0ufvs4tw",
+    "adp": 27.1,
+    "season": {
+      "points": 158.2,
+      "games": 11
+    }
+  },
+  {
+    "id": "00-0035640",
+    "name": "DK Metcalf",
+    "pos": "WR",
+    "nflTeam": "SEA",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/ezpzdcvzlu5ga4uv6oas",
+    "adp": 35.5,
+    "season": {
+      "points": 158.2,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0039894",
+    "name": "Xavier Worthy",
+    "pos": "WR",
+    "nflTeam": "KC",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/fvzbx5gpiqkogglyoo1w",
+    "adp": 78.8,
+    "season": {
+      "points": 157.7,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0036550",
+    "name": "Rashod Bateman",
+    "pos": "WR",
+    "nflTeam": "BAL",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/jkcapzvd65fxivefjv8l",
+    "adp": null,
+    "season": {
+      "points": 152.1,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0031280",
+    "name": "Derek Carr",
+    "pos": "QB",
+    "nflTeam": "NO",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/qsz1pyrlu6bmvby6maaf",
+    "adp": null,
+    "season": {
+      "points": 150.9,
+      "games": 10
+    }
+  },
+  {
+    "id": "00-0037746",
+    "name": "Brian Robinson",
+    "pos": "RB",
+    "nflTeam": "WAS",
+    "headshotUrl": "https://static.www.nfl.com/image/private/f_auto,q_auto/league/gxcfbuvmooytbn45kvxf",
+    "adp": 90.2,
+    "season": {
+      "points": 149.8,
+      "games": 14
+    }
+  },
+  {
+    "id": "00-0030279",
+    "name": "Keenan Allen",
+    "pos": "WR",
+    "nflTeam": "CHI",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/lngo1onvkcqjnq7ozkuu",
+    "adp": 61.9,
+    "season": {
+      "points": 149.4,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0038544",
+    "name": "Quentin Johnston",
+    "pos": "WR",
+    "nflTeam": "LAC",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/jbxlvsbokf9qdqtet1qr",
+    "adp": null,
+    "season": {
+      "points": 147.2,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0030506",
+    "name": "Travis Kelce",
+    "pos": "TE",
+    "nflTeam": "KC",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/ilk4qbxxs6mt3v9zfvtg",
+    "adp": 32,
+    "season": {
+      "points": 146.9,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0038997",
+    "name": "Josh Downs",
+    "pos": "WR",
+    "nflTeam": "IND",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/zue2xxvfrignllqlhagu",
+    "adp": null,
+    "season": {
+      "points": 146.2,
+      "games": 14
+    }
+  },
+  {
+    "id": "00-0036971",
+    "name": "Trevor Lawrence",
+    "pos": "QB",
+    "nflTeam": "JAX",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/ftznnho2rk2xzrculbob",
+    "adp": 133.7,
+    "season": {
+      "points": 145.7,
+      "games": 10
+    }
+  },
+  {
+    "id": "00-0039065",
+    "name": "Sam LaPorta",
+    "pos": "TE",
+    "nflTeam": "DET",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/ucw8cfj5t5nwkx670wzu",
+    "adp": 33.4,
+    "season": {
+      "points": 144.6,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0037261",
+    "name": "Khalil Shakir",
+    "pos": "WR",
+    "nflTeam": "BUF",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/ch2yarhiobqlvr9ls2yw",
+    "adp": 104.7,
+    "season": {
+      "points": 144.5,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0030061",
+    "name": "Zach Ertz",
+    "pos": "TE",
+    "nflTeam": "WAS",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/xktmmeumuoglbuam75iz",
+    "adp": null,
+    "season": {
+      "points": 144.4,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0033923",
+    "name": "Kareem Hunt",
+    "pos": "RB",
+    "nflTeam": "KC",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/mm0t1ghvbpdhy6m5utcq",
+    "adp": null,
+    "season": {
+      "points": 143.9,
+      "games": 13
+    }
+  },
+  {
+    "id": "00-0037664",
+    "name": "Alec Pierce",
+    "pos": "WR",
+    "nflTeam": "IND",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/hvtcpccoigf9cghzkxcg",
+    "adp": null,
+    "season": {
+      "points": 142.9,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0033908",
+    "name": "Cooper Kupp",
+    "pos": "WR",
+    "nflTeam": "LA",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/sq7zwzcgrajuk0hwwph2",
+    "adp": 22.6,
+    "season": {
+      "points": 141.5,
+      "games": 12
+    }
+  },
+  {
+    "id": "00-0038996",
+    "name": "Tucker Kraft",
+    "pos": "TE",
+    "nflTeam": "GB",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/klrmgekdzx1ywjjmixp7",
+    "adp": null,
+    "season": {
+      "points": 138.3,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0038117",
+    "name": "Wan'Dale Robinson",
+    "pos": "WR",
+    "nflTeam": "NYG",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/z94hnehk9vgmvtad6sgi",
+    "adp": null,
+    "season": {
+      "points": 136.2,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0036894",
+    "name": "Pat Freiermuth",
+    "pos": "TE",
+    "nflTeam": "PIT",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/sozfjyy3bmntjv8tmqah",
+    "adp": 118.3,
+    "season": {
+      "points": 135.8,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0035710",
+    "name": "Daniel Jones",
+    "pos": "QB",
+    "nflTeam": "NYG",
+    "headshotUrl": "https://static.www.nfl.com/image/private/f_auto,q_auto/league/zrhniboizqpxtdyz6gez",
+    "adp": null,
+    "season": {
+      "points": 135.3,
+      "games": 10
+    }
+  },
+  {
+    "id": "00-0037247",
+    "name": "George Pickens",
+    "pos": "WR",
+    "nflTeam": "PIT",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/klxzcb6p7ekngcognpiy",
+    "adp": 54.7,
+    "season": {
+      "points": 134.9,
+      "games": 14
+    }
+  },
+  {
+    "id": "00-0036997",
+    "name": "Javonte Williams",
+    "pos": "RB",
+    "nflTeam": "DEN",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/dm8qipfrz2nes9kgpcyp",
+    "adp": 117.7,
+    "season": {
+      "points": 131.9,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0036252",
+    "name": "Michael Pittman",
+    "pos": "WR",
+    "nflTeam": "IND",
+    "headshotUrl": "https://static.www.nfl.com/image/private/f_auto,q_auto/league/wnymcombo2plamteihiy",
+    "adp": 46.2,
+    "season": {
+      "points": 131.3,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0031503",
+    "name": "Jameis Winston",
+    "pos": "QB",
+    "nflTeam": "CLE",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/chdeosreuupotgq0eqlm",
+    "adp": null,
+    "season": {
+      "points": 131.1,
+      "games": 11
+    }
+  },
+  {
+    "id": "00-0035719",
+    "name": "Deebo Samuel",
+    "pos": "WR",
+    "nflTeam": "SF",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/shqoqpjwwoiexzy6cmgb",
+    "adp": 18.2,
+    "season": {
+      "points": 130.1,
+      "games": 14
+    }
+  },
+  {
+    "id": "00-0037666",
+    "name": "Jalen Tolbert",
+    "pos": "WR",
+    "nflTeam": "DAL",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/cek1m1cbly5rfmmmjpcc",
+    "adp": null,
+    "season": {
+      "points": 127.5,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0038555",
+    "name": "Tank Bigsby",
+    "pos": "RB",
+    "nflTeam": "JAX",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/vwl0kijb59dp20m3hs3u",
+    "adp": null,
+    "season": {
+      "points": 125.5,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0036613",
+    "name": "Jaylen Waddle",
+    "pos": "WR",
+    "nflTeam": "MIA",
+    "headshotUrl": "https://static.www.nfl.com/image/private/f_auto,q_auto/league/qjsz2h6shbdnksctzeka",
+    "adp": 30.9,
+    "season": {
+      "points": 120.6,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0039152",
+    "name": "Will Levis",
+    "pos": "QB",
+    "nflTeam": "TEN",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/vr01ufscgtoagtuut9o4",
+    "adp": 160.8,
+    "season": {
+      "points": 119.9,
+      "games": 12
+    }
+  },
+  {
+    "id": "00-0036182",
+    "name": "Nick Westbrook-Ikhine",
+    "pos": "WR",
+    "nflTeam": "TEN",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/rt9ic9wzwl2pevlxt1nd",
+    "adp": null,
+    "season": {
+      "points": 119.7,
+      "games": 13
+    }
+  },
+  {
+    "id": "00-0034972",
+    "name": "Alexander Mattison",
+    "pos": "RB",
+    "nflTeam": "LV",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/uftc0gl0wzo5povcu6ih",
+    "adp": null,
+    "season": {
+      "points": 119.4,
+      "games": 14
+    }
+  },
+  {
+    "id": "00-0036945",
+    "name": "Justin Fields",
+    "pos": "QB",
+    "nflTeam": "PIT",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/vqcvybvs1vlqhkjvujbg",
+    "adp": null,
+    "season": {
+      "points": 119.1,
+      "games": 10
+    }
+  },
+  {
+    "id": "00-0030564",
+    "name": "DeAndre Hopkins",
+    "pos": "WR",
+    "nflTeam": "KC",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/viymeohipdn0voptrkzh",
+    "adp": 91.7,
+    "season": {
+      "points": 119,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0039919",
+    "name": "Rome Odunze",
+    "pos": "WR",
+    "nflTeam": "CHI",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/labs8tstecnehvzfmrs5",
+    "adp": 133.8,
+    "season": {
+      "points": 117.9,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0039855",
+    "name": "Jalen McMillan",
+    "pos": "WR",
+    "nflTeam": "TB",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/zdxkyl8gy4dqiq6evfzp",
+    "adp": null,
+    "season": {
+      "points": 116.9,
+      "games": 13
+    }
+  },
+  {
+    "id": "00-0033077",
+    "name": "Dak Prescott",
+    "pos": "QB",
+    "nflTeam": "DAL",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/xmtaggdnhuyl4pdwtv8j",
+    "adp": 56.7,
+    "season": {
+      "points": 116.5,
+      "games": 8
+    }
+  },
+  {
+    "id": "00-0033885",
+    "name": "David Njoku",
+    "pos": "TE",
+    "nflTeam": "CLE",
+    "headshotUrl": "https://static.www.nfl.com/image/private/f_auto,q_auto/league/ilvxwdllivrvwbuj69cm",
+    "adp": 102.9,
+    "season": {
+      "points": 116.5,
+      "games": 11
+    }
+  },
+  {
+    "id": "00-0030035",
+    "name": "Adam Thielen",
+    "pos": "WR",
+    "nflTeam": "CAR",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/pxehgo0l9xl03n7dronf",
+    "adp": 138.1,
+    "season": {
+      "points": 115.5,
+      "games": 10
+    }
+  },
+  {
+    "id": "00-0037267",
+    "name": "Jerome Ford",
+    "pos": "RB",
+    "nflTeam": "CLE",
+    "headshotUrl": "https://static.www.nfl.com/image/private/f_auto,q_auto/league/djggmwo5v8osoboiseo2",
+    "adp": 95.9,
+    "season": {
+      "points": 115.5,
+      "games": 14
+    }
+  },
+  {
+    "id": "00-0033699",
+    "name": "Austin Ekeler",
+    "pos": "RB",
+    "nflTeam": "WAS",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/sldndpn2zwt4uhkj2zks",
+    "adp": 88.7,
+    "season": {
+      "points": 114.8,
+      "games": 12
+    }
+  },
+  {
+    "id": "00-0038621",
+    "name": "Demario Douglas",
+    "pos": "WR",
+    "nflTeam": "NE",
+    "headshotUrl": "https://static.www.nfl.com/image/private/f_auto,q_auto/league/svnh61ottqtfmcqvnbj3",
+    "adp": null,
+    "season": {
+      "points": 114.7,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0038977",
+    "name": "Tank Dell",
+    "pos": "WR",
+    "nflTeam": "HOU",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/tqxgovzlhxj0jnwkcvtq",
+    "adp": 48.5,
+    "season": {
+      "points": 114.5,
+      "games": 14
+    }
+  },
+  {
+    "id": "00-0033921",
+    "name": "Chris Godwin",
+    "pos": "WR",
+    "nflTeam": "TB",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/al7b3dzqhysgve7l5lke",
+    "adp": 71.5,
+    "season": {
+      "points": 112.8,
+      "games": 7
+    }
+  },
+  {
+    "id": "00-0033090",
+    "name": "Hunter Henry",
+    "pos": "TE",
+    "nflTeam": "NE",
+    "headshotUrl": "https://static.www.nfl.com/image/private/f_auto,q_auto/league/sdjob9akppefyo7py5tj",
+    "adp": null,
+    "season": {
+      "points": 112.4,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0034407",
+    "name": "Ray-Ray McCloud",
+    "pos": "WR",
+    "nflTeam": "ATL",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/nvwn3sdihyyd2itjt7vy",
+    "adp": null,
+    "season": {
+      "points": 111.5,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0038129",
+    "name": "Cade Otton",
+    "pos": "TE",
+    "nflTeam": "TB",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/mljam77kst1wlqd5y91v",
+    "adp": null,
+    "season": {
+      "points": 111.1,
+      "games": 14
+    }
+  },
+  {
+    "id": "00-0036973",
+    "name": "Travis Etienne",
+    "pos": "RB",
+    "nflTeam": "JAX",
+    "headshotUrl": "https://static.www.nfl.com/image/private/f_auto,q_auto/league/ne5lyv8n6elqw77yrz9w",
+    "adp": 16.9,
+    "season": {
+      "points": 110.7,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0038976",
+    "name": "Marvin Mims",
+    "pos": "WR",
+    "nflTeam": "DEN",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/trvilnckw7nprw1gkghl",
+    "adp": 167.7,
+    "season": {
+      "points": 110,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0033662",
+    "name": "Cooper Rush",
+    "pos": "QB",
+    "nflTeam": "DAL",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/amuag2qiwa9veml1lhvs",
+    "adp": null,
+    "season": {
+      "points": 109.6,
+      "games": 12
+    }
+  },
+  {
+    "id": "00-0037525",
+    "name": "Jordan Mason",
+    "pos": "RB",
+    "nflTeam": "SF",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/ub1ub6sxuov1f1kux1v9",
+    "adp": null,
+    "season": {
+      "points": 109.5,
+      "games": 12
+    }
+  },
+  {
+    "id": "00-0037816",
+    "name": "Romeo Doubs",
+    "pos": "WR",
+    "nflTeam": "GB",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/dyulbddqbqshoqdxgo63",
+    "adp": 100,
+    "season": {
+      "points": 109.1,
+      "games": 13
+    }
+  },
+  {
+    "id": "00-0034829",
+    "name": "Mike Gesicki",
+    "pos": "TE",
+    "nflTeam": "CIN",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/zabpknonv9ozmkyw4qqt",
+    "adp": null,
+    "season": {
+      "points": 109,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0032775",
+    "name": "Demarcus Robinson",
+    "pos": "WR",
+    "nflTeam": "LA",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/lakf0xue1qqb7ed4p6ge",
+    "adp": null,
+    "season": {
+      "points": 108,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0036970",
+    "name": "Kyle Pitts",
+    "pos": "TE",
+    "nflTeam": "ATL",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/t8ymqyhvv8i1r80jyhy2",
+    "adp": 83.3,
+    "season": {
+      "points": 107.7,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0039875",
+    "name": "Ray Davis",
+    "pos": "RB",
+    "nflTeam": "BUF",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/xm8csnleyxsop4pldyby",
+    "adp": 162.1,
+    "season": {
+      "points": 107.6,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0034521",
+    "name": "Allen Lazard",
+    "pos": "WR",
+    "nflTeam": "NYJ",
+    "headshotUrl": "https://static.www.nfl.com/image/private/f_auto,q_auto/league/blrzk3bfnpneuyhsqiqg",
+    "adp": null,
+    "season": {
+      "points": 107.5,
+      "games": 12
+    }
+  },
+  {
+    "id": "00-0034975",
+    "name": "Justice Hill",
+    "pos": "RB",
+    "nflTeam": "BAL",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/jeeq17ah67zxc6vdamhk",
+    "adp": null,
+    "season": {
+      "points": 106.1,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0038563",
+    "name": "Tre Tucker",
+    "pos": "WR",
+    "nflTeam": "LV",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/soebzcfwhgnjffwqv1ox",
+    "adp": null,
+    "season": {
+      "points": 105.8,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0032104",
+    "name": "Ameer Abdullah",
+    "pos": "RB",
+    "nflTeam": "LV",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/atwi5p12mlgnsl4y8cgt",
+    "adp": null,
+    "season": {
+      "points": 105.2,
+      "games": 13
+    }
+  },
+  {
+    "id": "00-0037228",
+    "name": "Jaylen Warren",
+    "pos": "RB",
+    "nflTeam": "PIT",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/aaw4yacm6azisxqy273i",
+    "adp": 82.5,
+    "season": {
+      "points": 105.1,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0037837",
+    "name": "Calvin Austin",
+    "pos": "WR",
+    "nflTeam": "PIT",
+    "headshotUrl": "https://static.www.nfl.com/image/private/f_auto,q_auto/league/qlt6ztqcbu0uzad6aavt",
+    "adp": null,
+    "season": {
+      "points": 102.8,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0037838",
+    "name": "Isaiah Likely",
+    "pos": "TE",
+    "nflTeam": "BAL",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/xmikfnklnpjmzjhbjrur",
+    "adp": 166.4,
+    "season": {
+      "points": 102.7,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0038619",
+    "name": "Andrei Iosivas",
+    "pos": "WR",
+    "nflTeam": "CIN",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/pgbqgzrxmbnmpcnkhsya",
+    "adp": null,
+    "season": {
+      "points": 101.9,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0038559",
+    "name": "Michael Wilson",
+    "pos": "WR",
+    "nflTeam": "ARI",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/spsbduvpqe21tgkwhvbc",
+    "adp": 165.8,
+    "season": {
+      "points": 101,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0031544",
+    "name": "Amari Cooper",
+    "pos": "WR",
+    "nflTeam": "BUF",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/zmtzqznqui37unmo5xv9",
+    "adp": 49.5,
+    "season": {
+      "points": 100.7,
+      "games": 13
+    }
+  },
+  {
+    "id": "00-0039342",
+    "name": "Xavier Legette",
+    "pos": "WR",
+    "nflTeam": "CAR",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/a3etuvp3kqtwmtkioq8g",
+    "adp": null,
+    "season": {
+      "points": 100.6,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0038608",
+    "name": "Kayshon Boutte",
+    "pos": "WR",
+    "nflTeam": "NE",
+    "headshotUrl": "https://static.www.nfl.com/image/private/f_auto,q_auto/league/nz6t7jhx6erszovbv1bd",
+    "adp": null,
+    "season": {
+      "points": 100.4,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0037263",
+    "name": "Tyler Allgeier",
+    "pos": "RB",
+    "nflTeam": "ATL",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/yosaj2anmqoujqrgzecd",
+    "adp": 113.3,
+    "season": {
+      "points": 99.7,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0026158",
+    "name": "Joe Flacco",
+    "pos": "QB",
+    "nflTeam": "IND",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/yxvyoeojkif7tnfviamc",
+    "adp": null,
+    "season": {
+      "points": 99,
+      "games": 7
+    }
+  },
+  {
+    "id": "00-0039032",
+    "name": "Tyjae Spears",
+    "pos": "RB",
+    "nflTeam": "TEN",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/qb4us1f96uox7v3poxzj",
+    "adp": 89.9,
+    "season": {
+      "points": 98.6,
+      "games": 12
+    }
+  },
+  {
+    "id": "00-0031588",
+    "name": "Stefon Diggs",
+    "pos": "WR",
+    "nflTeam": "HOU",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/to2qwuffjnjlouctglsl",
+    "adp": 44.2,
+    "season": {
+      "points": 98.4,
+      "games": 8
+    }
+  },
+  {
+    "id": "00-0036040",
+    "name": "Juwan Johnson",
+    "pos": "TE",
+    "nflTeam": "NO",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/pdsl9w3agc9uvjqpq1jy",
+    "adp": null,
+    "season": {
+      "points": 97.8,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0039901",
+    "name": "Keon Coleman",
+    "pos": "WR",
+    "nflTeam": "BUF",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/ipwpdgb0cm3xy3d8zu1l",
+    "adp": 81.5,
+    "season": {
+      "points": 97,
+      "games": 13
+    }
+  },
+  {
+    "id": "00-0036290",
+    "name": "Cole Kmet",
+    "pos": "TE",
+    "nflTeam": "CHI",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/fdxpctcmwjupassg9g9d",
+    "adp": null,
+    "season": {
+      "points": 96.9,
+      "games": 14
+    }
+  },
+  {
+    "id": "00-0032211",
+    "name": "Tyler Lockett",
+    "pos": "WR",
+    "nflTeam": "SEA",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/yz9p4pfwr0iyakhnwj4z",
+    "adp": 111.9,
+    "season": {
+      "points": 96.5,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0034270",
+    "name": "Tyler Conklin",
+    "pos": "TE",
+    "nflTeam": "NYJ",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/chajhumpfogd8effewe6",
+    "adp": null,
+    "season": {
+      "points": 96.4,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0035289",
+    "name": "Gardner Minshew",
+    "pos": "QB",
+    "nflTeam": "LV",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/zn2kvriijuixffqfx7ob",
+    "adp": null,
+    "season": {
+      "points": 96.3,
+      "games": 10
+    }
+  },
+  {
+    "id": "00-0036972",
+    "name": "Mac Jones",
+    "pos": "QB",
+    "nflTeam": "JAX",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/pedpdxybeus7mrovsoko",
+    "adp": null,
+    "season": {
+      "points": 96.1,
+      "games": 10
+    }
+  },
+  {
+    "id": "00-0034771",
+    "name": "Mason Rudolph",
+    "pos": "QB",
+    "nflTeam": "TEN",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/pn938e0z2fobxmzfxmlh",
+    "adp": null,
+    "season": {
+      "points": 95.8,
+      "games": 8
+    }
+  },
+  {
+    "id": "00-0038579",
+    "name": "Aidan O'Connell",
+    "pos": "QB",
+    "nflTeam": "LV",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/aphs7sdbtn8v4zo9pz6w",
+    "adp": null,
+    "season": {
+      "points": 93.5,
+      "games": 9
+    }
+  },
+  {
+    "id": "00-0036637",
+    "name": "Noah Gray",
+    "pos": "TE",
+    "nflTeam": "KC",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/erihh0eiq4m76k2ejvax",
+    "adp": null,
+    "season": {
+      "points": 93.3,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0035208",
+    "name": "Olamide Zaccheaus",
+    "pos": "WR",
+    "nflTeam": "WAS",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/hcmdnfgnnvcp0qbktpxd",
+    "adp": null,
+    "season": {
+      "points": 91.9,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0036328",
+    "name": "Antonio Gibson",
+    "pos": "RB",
+    "nflTeam": "NE",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/hsjhpzgfdilf9cyrpeup",
+    "adp": 147.9,
+    "season": {
+      "points": 91.9,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0034383",
+    "name": "Dalton Schultz",
+    "pos": "TE",
+    "nflTeam": "HOU",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/ooatvpu1knzypdmjljo9",
+    "adp": 143.7,
+    "season": {
+      "points": 91.7,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0037291",
+    "name": "Jalen Nailor",
+    "pos": "WR",
+    "nflTeam": "MIN",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/fe9b3l4fz6n02gbr5zbt",
+    "adp": null,
+    "season": {
+      "points": 91,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0038393",
+    "name": "Dontayvion Wicks",
+    "pos": "WR",
+    "nflTeam": "GB",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/ghsev2bmz8kvhm8dsbey",
+    "adp": 158.9,
+    "season": {
+      "points": 91,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0033357",
+    "name": "Taysom Hill",
+    "pos": "TE",
+    "nflTeam": "NO",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/q8itjlocg5do60qat4l3",
+    "adp": 129.9,
+    "season": {
+      "points": 90.8,
+      "games": 8
+    }
+  },
+  {
+    "id": "00-0038124",
+    "name": "Christian Watson",
+    "pos": "WR",
+    "nflTeam": "GB",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/qenktpex0mep8er8dzxj",
+    "adp": 82.8,
+    "season": {
+      "points": 90.8,
+      "games": 14
+    }
+  },
+  {
+    "id": "00-0035535",
+    "name": "Darius Slayton",
+    "pos": "WR",
+    "nflTeam": "NYG",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/zhm6evj813ucss03ndlx",
+    "adp": null,
+    "season": {
+      "points": 90.5,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0038797",
+    "name": "Emanuel Wilson",
+    "pos": "RB",
+    "nflTeam": "GB",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/hpscbhsmjocm8kmwfbuc",
+    "adp": null,
+    "season": {
+      "points": 90.5,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0036980",
+    "name": "Elijah Moore",
+    "pos": "WR",
+    "nflTeam": "CLE",
+    "headshotUrl": "https://static.www.nfl.com/image/private/f_auto,q_auto/league/bhwvzckfhhcqhb7zdqyj",
+    "adp": null,
+    "season": {
+      "points": 90.4,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0037801",
+    "name": "Kavontae Turpin",
+    "pos": "WR",
+    "nflTeam": "DAL",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/lwkox2bvc6k3hqmidf4q",
+    "adp": null,
+    "season": {
+      "points": 88.7,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0039363",
+    "name": "Isaac Guerendo",
+    "pos": "RB",
+    "nflTeam": "SF",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/vi0oa4oajc6ecgzr8l08",
+    "adp": null,
+    "season": {
+      "points": 88.7,
+      "games": 13
+    }
+  },
+  {
+    "id": "00-0036988",
+    "name": "Josh Palmer",
+    "pos": "WR",
+    "nflTeam": "LAC",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/dexbsmmldvsqtr83or5l",
+    "adp": null,
+    "season": {
+      "points": 87.9,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0037809",
+    "name": "Chigoziem Okonkwo",
+    "pos": "TE",
+    "nflTeam": "TEN",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/ut2gqeq2lowknrro0wlu",
+    "adp": null,
+    "season": {
+      "points": 87.6,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0034981",
+    "name": "Foster Moreau",
+    "pos": "TE",
+    "nflTeam": "NO",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/hfcik9okcbwsbhgoaljy",
+    "adp": null,
+    "season": {
+      "points": 87.3,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0036414",
+    "name": "Cam Akers",
+    "pos": "RB",
+    "nflTeam": "MIN",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/dutj0wamu7giwghnmr4m",
+    "adp": null,
+    "season": {
+      "points": 86.2,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0032392",
+    "name": "Austin Hooper",
+    "pos": "TE",
+    "nflTeam": "NE",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/hj0ybtjspne3t1cso961",
+    "adp": null,
+    "season": {
+      "points": 86.1,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0035250",
+    "name": "Devin Singletary",
+    "pos": "RB",
+    "nflTeam": "NYG",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/wz8mp8xb5bdspcxosreh",
+    "adp": 109.7,
+    "season": {
+      "points": 86.1,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0039424",
+    "name": "Devaughn Vele",
+    "pos": "WR",
+    "nflTeam": "DEN",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/f2lz4vsh2daurrwdamzv",
+    "adp": null,
+    "season": {
+      "points": 86,
+      "games": 13
+    }
+  },
+  {
+    "id": "00-0038794",
+    "name": "Jaleel McLaughlin",
+    "pos": "RB",
+    "nflTeam": "DEN",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/ndqnhudqtipzrnzslyla",
+    "adp": 128.1,
+    "season": {
+      "points": 85.2,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0034159",
+    "name": "Will Dissly",
+    "pos": "TE",
+    "nflTeam": "LAC",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/opdpeoconvviwkufolxr",
+    "adp": null,
+    "season": {
+      "points": 85.1,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0033555",
+    "name": "Mack Hollins",
+    "pos": "WR",
+    "nflTeam": "BUF",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/xchw7quzjszgrm6psbyg",
+    "adp": null,
+    "season": {
+      "points": 83.3,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0035537",
+    "name": "Ty Johnson",
+    "pos": "RB",
+    "nflTeam": "BUF",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/zdedn4xqr2jy6mddh5pb",
+    "adp": null,
+    "season": {
+      "points": 82.7,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0034351",
+    "name": "Dallas Goedert",
+    "pos": "TE",
+    "nflTeam": "PHI",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/wfj54vhw1zxwwb3vdi61",
+    "adp": 133.8,
+    "season": {
+      "points": 82.6,
+      "games": 10
+    }
+  },
+  {
+    "id": "00-0038606",
+    "name": "Parker Washington",
+    "pos": "WR",
+    "nflTeam": "JAX",
+    "headshotUrl": "https://static.www.nfl.com/image/private/f_auto,q_auto/league/pukz1x5ysxkhvsmcttdm",
+    "adp": null,
+    "season": {
+      "points": 81,
+      "games": 13
+    }
+  },
+  {
+    "id": "00-0035704",
+    "name": "Drew Lock",
+    "pos": "QB",
+    "nflTeam": "NYG",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/tlkgzjnuugarxjeoj9vk",
+    "adp": null,
+    "season": {
+      "points": 80.1,
+      "games": 7
+    }
+  },
+  {
+    "id": "00-0035644",
+    "name": "Noah Fant",
+    "pos": "TE",
+    "nflTeam": "SEA",
+    "headshotUrl": "https://static.www.nfl.com/image/private/f_auto,q_auto/league/w1gqasldrg3jumzdqjvy",
+    "adp": null,
+    "season": {
+      "points": 80,
+      "games": 14
+    }
+  },
+  {
+    "id": "00-0038933",
+    "name": "Dalton Kincaid",
+    "pos": "TE",
+    "nflTeam": "BUF",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/rsimqxdfwlb1n9qd4w3g",
+    "adp": 67,
+    "season": {
+      "points": 78.8,
+      "games": 13
+    }
+  },
+  {
+    "id": "00-0039916",
+    "name": "Ricky Pearsall",
+    "pos": "WR",
+    "nflTeam": "SF",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/akwepvt6qxwbgankljmv",
+    "adp": null,
+    "season": {
+      "points": 78,
+      "games": 10
+    }
+  },
+  {
+    "id": "00-0036849",
+    "name": "Tutu Atwell",
+    "pos": "WR",
+    "nflTeam": "LA",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/hpvbp9pn7ifbh62nde0n",
+    "adp": null,
+    "season": {
+      "points": 77.9,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0033537",
+    "name": "Deshaun Watson",
+    "pos": "QB",
+    "nflTeam": "CLE",
+    "headshotUrl": "https://static.www.nfl.com/image/private/f_auto,q_auto/league/otfs2docj6eahaebo5xn",
+    "adp": 159,
+    "season": {
+      "points": 76.7,
+      "games": 7
+    }
+  },
+  {
+    "id": "00-0039491",
+    "name": "Jalen Coker",
+    "pos": "WR",
+    "nflTeam": "CAR",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/wk9xewrixauh09f71pqh",
+    "adp": null,
+    "season": {
+      "points": 76.6,
+      "games": 11
+    }
+  },
+  {
+    "id": "00-0033375",
+    "name": "Tim Patrick",
+    "pos": "WR",
+    "nflTeam": "DET",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/tsbe7jbwmgzby45hnb3j",
+    "adp": null,
+    "season": {
+      "points": 75.9,
+      "games": 15
+    }
+  },
+  {
+    "id": "00-0039794",
+    "name": "Braelon Allen",
+    "pos": "RB",
+    "nflTeam": "NYJ",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/p0fylkec7poarrjosefz",
+    "adp": null,
+    "season": {
+      "points": 75.7,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0034272",
+    "name": "Marquez Valdes-Scantling",
+    "pos": "WR",
+    "nflTeam": "NO",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/vn2bg6lhyl15xrymtd5g",
+    "adp": null,
+    "season": {
+      "points": 75,
+      "games": 13
+    }
+  },
+  {
+    "id": "00-0038041",
+    "name": "Jake Ferguson",
+    "pos": "TE",
+    "nflTeam": "DAL",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/lbvrn1ibwszd6tzgh6o1",
+    "adp": 94.3,
+    "season": {
+      "points": 74.9,
+      "games": 14
+    }
+  },
+  {
+    "id": "00-0035216",
+    "name": "Diontae Johnson",
+    "pos": "WR",
+    "nflTeam": "HOU",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/rjtil6ilydmwoy0btlt7",
+    "adp": 105.7,
+    "season": {
+      "points": 72.6,
+      "games": 11
+    }
+  },
+  {
+    "id": "00-0035500",
+    "name": "Greg Dortch",
+    "pos": "WR",
+    "nflTeam": "ARI",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/gkog6lrht3rnktwiberj",
+    "adp": null,
+    "season": {
+      "points": 71.8,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0037545",
+    "name": "Rashid Shaheed",
+    "pos": "WR",
+    "nflTeam": "NO",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/mnaref4vwyau8mbsp0ri",
+    "adp": 128.8,
+    "season": {
+      "points": 71.8,
+      "games": 6
+    }
+  },
+  {
+    "id": "00-0038935",
+    "name": "Brenton Strange",
+    "pos": "TE",
+    "nflTeam": "JAX",
+    "headshotUrl": "https://static.www.nfl.com/image/private/f_auto,q_auto/league/trfk78mrfsafnbatyx2x",
+    "adp": null,
+    "season": {
+      "points": 71.1,
+      "games": 14
+    }
+  },
+  {
+    "id": "00-0034364",
+    "name": "Jordan Akins",
+    "pos": "TE",
+    "nflTeam": "CLE",
+    "headshotUrl": "https://static.www.nfl.com/image/private/f_auto,q_auto/league/fgkl9zfpy2yxrkxfge84",
+    "adp": null,
+    "season": {
+      "points": 71,
+      "games": 16
+    }
+  },
+  {
+    "id": "00-0036251",
+    "name": "Zack Moss",
+    "pos": "RB",
+    "nflTeam": "CIN",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/oxrltdgoquiabhihhgnk",
+    "adp": 75.3,
+    "season": {
+      "points": 70.4,
+      "games": 8
+    }
+  },
+  {
+    "id": "00-0039021",
+    "name": "Roschon Johnson",
+    "pos": "RB",
+    "nflTeam": "CHI",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/skajjk8i3zdrvzqmucww",
+    "adp": null,
+    "season": {
+      "points": 69.4,
+      "games": 12
+    }
+  },
+  {
+    "id": "00-0033589",
+    "name": "David Moore",
+    "pos": "WR",
+    "nflTeam": "CAR",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/i2esmsczxxoq7pzvg6yf",
+    "adp": null,
+    "season": {
+      "points": 69.1,
+      "games": 14
+    }
+  },
+  {
+    "id": "00-0033591",
+    "name": "Noah Brown",
+    "pos": "WR",
+    "nflTeam": "WAS",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/nv6ix0p8965yiugsuhwh",
+    "adp": null,
+    "season": {
+      "points": 68.8,
+      "games": 11
+    }
+  },
+  {
+    "id": "00-0033526",
+    "name": "Samaje Perine",
+    "pos": "RB",
+    "nflTeam": "KC",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/liorwdmj8gelxh5u7rc4",
+    "adp": null,
+    "season": {
+      "points": 67.4,
+      "games": 17
+    }
+  },
+  {
+    "id": "00-0039376",
+    "name": "Spencer Rattler",
+    "pos": "QB",
+    "nflTeam": "NO",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/xhllpfkd4hrpbwczbca6",
+    "adp": null,
+    "season": {
+      "points": 67.3,
+      "games": 7
+    }
+  },
+  {
+    "id": "00-0033881",
+    "name": "Evan Engram",
+    "pos": "TE",
+    "nflTeam": "JAX",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/sea0atk2feif4n75dvq8",
+    "adp": 89.3,
+    "season": {
+      "points": 66,
+      "games": 9
+    }
+  },
+  {
+    "id": "00-0035229",
+    "name": "T.J. Hockenson",
+    "pos": "TE",
+    "nflTeam": "MIN",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/n9zhffstwzae8i5di6tk",
+    "adp": 108.6,
+    "season": {
+      "points": 66,
+      "games": 10
+    }
+  },
+  {
+    "id": "00-0038979",
+    "name": "Cedric Tillman",
+    "pos": "WR",
+    "nflTeam": "CLE",
+    "headshotUrl": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/fp371fgk45btt01uvucq",
+    "adp": null,
+    "season": {
+      "points": 65.9,
+      "games": 9
+    }
+  }
+]

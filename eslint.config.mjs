@@ -20,6 +20,21 @@ const eslintConfig = defineConfig([
       }],
     },
   },
+  {
+    files: ['app/demo/**/*.{ts,tsx}'],
+    ignores: ['scripts/**'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [
+          { group: [
+            '@/lib/supabase', '@/lib/supabase-browser', '@/lib/sleeper',
+            '@/lib/espn', '@/lib/espnNews', '@/lib/yahoo',
+            '@/lib/liveMatchupPoints', '@/lib/pulse',
+          ], message: 'app/demo must stay in-memory: no Supabase/live-API/DB-coupled imports.' },
+        ],
+      }],
+    },
+  },
 ]);
 
 export default eslintConfig;
