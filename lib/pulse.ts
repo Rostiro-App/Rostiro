@@ -19,7 +19,7 @@ import { generatePlayerNewsContext, generateOpportunitySurgeContext } from '@/li
 import { pushToUser } from '@/lib/engagementTriggers'
 import { isFreePlan } from '@/lib/usageLimits'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { AffectedLeague, PulseItem, PulseItemStatus, PulseItemType, PulsePriority } from '@/types'
+import type { AffectedLeague, InterruptMetricRow, PulseItem, PulseItemStatus, PulseItemType, PulsePriority } from '@/types'
 
 // Pulse generation isn't mode-scoped today (unlike Start/Sit, Draft Copilot)
 // — matches toneInstruction's own 'balanced' default rather than plumbing a
@@ -87,6 +87,7 @@ export interface PulseItemRow {
   headline: string
   reasoning: string
   affected_leagues_json: AffectedLeague[]
+  metrics_json?: InterruptMetricRow[] | null
   deadline: string | null
   action_url: string | null
   platform: 'espn' | 'yahoo' | 'sleeper' | null
@@ -702,6 +703,7 @@ export function rowToPulseItem(row: PulseItemRow): PulseItem {
     headline: row.headline,
     reasoning: row.reasoning,
     affectedLeagues: row.affected_leagues_json ?? [],
+    metrics: row.metrics_json ?? undefined,
     deadline: row.deadline,
     actionUrl: row.action_url,
     platform: row.platform,
