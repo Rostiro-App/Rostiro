@@ -11,7 +11,7 @@ const DURATION = 390 // 13s @ 30fps
 export function ConnectScene({ frame: frameOverride }: { frame?: number } = {}) {
   const cards = multiLeaguePulse()
   return (
-    <SceneStage durationFrames={DURATION} caption="One list, every league — interactive demo on real 2024 data." staticFrame={330} frame={frameOverride}>
+    <SceneStage durationFrames={DURATION} caption="One list, every league — interactive demo on real 2024 data." staticFrame={370} frame={frameOverride}>
       {(frame) => {
         const connected = {
           sleeper: frame >= 75,
