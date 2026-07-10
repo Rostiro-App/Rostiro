@@ -47,7 +47,7 @@ export function InterruptCardView({
           <div className="flex items-end gap-5">
             {metrics.map((m, i) => (
               <span key={i} className="mono-data text-[26px] font-bold leading-none" style={{ color: m.deltaPositive === false ? 'var(--crit)' : 'var(--live)' }}>
-                <span aria-hidden="true">▲ </span><span>{m.value}</span>
+                <span aria-hidden="true">{m.deltaPositive === false ? '▼' : '▲'} </span><span>{m.value}</span>
               </span>
             ))}
           </div>
