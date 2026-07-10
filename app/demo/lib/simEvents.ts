@@ -1,5 +1,5 @@
 import { computeInjectionImpact } from './crossLeagueImpact'
-import type { InterruptMetricRow } from '@/components/interrupt/InterruptCardView'
+import type { InterruptMetricRow } from '@/types'
 
 export type SimEventKind = 'interrupt'  // Phase 1. Future: 'roster_exposure', ...
 export type SimMetricRow = InterruptMetricRow

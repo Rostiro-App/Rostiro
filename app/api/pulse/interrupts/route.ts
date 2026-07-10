@@ -25,7 +25,7 @@ export async function GET() {
   // queue's own read path.
   const { data, error } = await supabase
     .from('pulse_items')
-    .select('id, user_id, type, priority, headline, reasoning, affected_leagues_json, deadline, action_url, platform, status, snoozed_until, created_at')
+    .select('id, user_id, type, priority, headline, reasoning, affected_leagues_json, metrics_json, deadline, action_url, platform, status, snoozed_until, created_at')
     .eq('user_id', user.id)
     .eq('layer', 'interrupt')
     .or(`status.eq.open,and(status.eq.snoozed,snoozed_until.lte.${nowIso})`)

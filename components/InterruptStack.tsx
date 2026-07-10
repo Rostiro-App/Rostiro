@@ -121,6 +121,7 @@ export default function InterruptStack() {
       typeLabel={typeLabel}
       headline={current.headline}
       reasoning={current.reasoning}
+      metrics={current.metrics}
       color={color}
       priority={current.priority}
       leaving={leaving}
