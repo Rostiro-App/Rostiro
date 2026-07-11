@@ -8,6 +8,8 @@
 import { createAdminClient } from '@/lib/supabase'
 import { fetchEspnNflNews } from '@/lib/espnNews'
 import { matchPlayerIds } from '@/lib/newsRelevance'
+import { classifyScratch } from '@/lib/scratchClassifier'
+import { detectStarterScratches } from '@/lib/engagementTriggers'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function GET(request: NextRequest) {
@@ -55,6 +57,31 @@ export async function GET(request: NextRequest) {
       const { error } = await admin.from('news_items').upsert(relevantRows, { onConflict: 'id' })
       if (error) throw new Error(error.message)
       synced = relevantRows.length
+    }
+
+    // T-163: derive fresh scratch signals from the same tagged headlines. One
+    // row per player (upsert). Best-effort: a failure here never breaks news.
+    try {
+      const scratchRows = relevantRows.flatMap((r) => {
+        const cls = classifyScratch(r.headline, r.summary)
+        if (!cls) return []
+        return r.player_ids.map((pid) => ({
+          player_id: pid,
+          platform: 'sleeper' as const,
+          status: cls.status,
+          confidence: cls.confidence,
+          source: 'espn_news' as const,
+          news_id: r.id,
+          headline: r.headline,
+          detected_at: new Date().toISOString(),
+        }))
+      })
+      if (scratchRows.length > 0) {
+        await admin.from('player_scratches').upsert(scratchRows, { onConflict: 'player_id,platform' })
+      }
+      await detectStarterScratches(admin)
+    } catch {
+      // scratch derivation is additive to news ingestion — never fail the cron for it
     }
 
     return NextResponse.json({ fetched: newsItems.length, synced })
