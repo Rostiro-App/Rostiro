@@ -28,6 +28,20 @@ describe('groupScratchedStartersByUser', () => {
     ]
     expect(groupScratchedStartersByUser(rosters, scratched).size).toBe(2)
   })
+  it('collects two distinct scratched starters for one user across leagues into one group', () => {
+    const twoScratched = new Map<string, ScratchedPlayer>([
+      ['p1', { playerId: 'p1', playerName: 'Josh Allen', status: 'out' }],
+      ['p2', { playerId: 'p2', playerName: 'Bijan Robinson', status: 'out' }],
+    ])
+    const rosters: UserLeagueRoster[] = [
+      { userId: 'u1', leagueId: 'L1', leagueName: 'Legends', starterIds: ['p1'] },
+      { userId: 'u1', leagueId: 'L2', leagueName: 'Money', starterIds: ['p2'] },
+    ]
+    const out = groupScratchedStartersByUser(rosters, twoScratched)
+    expect(out.size).toBe(1)
+    expect(out.get('u1')!.playerNames.sort()).toEqual(['Bijan Robinson', 'Josh Allen'])
+    expect(out.get('u1')!.leagueNames.sort()).toEqual(['Legends', 'Money'])
+  })
 })
 
 describe('scratchDedupeKey', () => {
@@ -50,6 +64,9 @@ describe('resolveEffectiveInjury', () => {
   })
   it('returns null when both clean', () => {
     expect(resolveEffectiveInjury(null, null)).toBeNull()
+  })
+  it('preserves a non-scratch (unranked) Sleeper status untouched', () => {
+    expect(resolveEffectiveInjury('IR', null)).toBe('IR')
   })
 })
 
