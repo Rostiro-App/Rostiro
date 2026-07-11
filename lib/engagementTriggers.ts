@@ -62,7 +62,7 @@ async function loadSleeperLeagues(admin: AdminClient): Promise<SleeperLeagueRow[
 async function claimTrigger(
   admin: AdminClient,
   userId: string,
-  triggerType: 'touchdown_swing' | 'lineup_lock' | 'mission_complete',
+  triggerType: 'touchdown_swing' | 'lineup_lock' | 'mission_complete' | 'starter_scratch',
   dedupeKey: string
 ): Promise<boolean> {
   const { error } = await admin

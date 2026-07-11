@@ -32,3 +32,6 @@ grant select on
   public.players_cache,
   public.player_mappings
 to anon;
+
+-- service_role: admin-written tables (cron, backend only)
+grant select, insert, update, delete on public.player_scratches to service_role;
