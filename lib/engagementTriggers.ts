@@ -91,6 +91,12 @@ export async function pushToUser(admin: AdminClient, userId: string, title: stri
   // logic applies here too, instead of a second, independent plan check.
   if (await isFreePlan(admin, userId)) return
 
+  // T-163: honor the global push toggle (users.push_enabled) — stored and
+  // shown in settings since T-71 but never actually enforced in the send
+  // path until now. Applies to every trigger, not just scratches.
+  const { data: prefRow } = await admin.from('users').select('push_enabled').eq('id', userId).maybeSingle()
+  if (prefRow && prefRow.push_enabled === false) return
+
   const { data } = await admin.from('push_subscriptions').select('onesignal_player_id').eq('user_id', userId)
   const ids = ((data ?? []) as { onesignal_player_id: string }[]).map((r) => r.onesignal_player_id)
   if (ids.length === 0) return
