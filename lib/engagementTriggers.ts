@@ -375,7 +375,7 @@ export async function detectMissionComplete(admin: AdminClient, todayEt: string)
 // one-shot dedup, Pro-gated push. Reads the fresh player_scratches signal the
 // news cron writes. HIGH-confidence only pushes; medium is card-only (built in
 // lib/pulse.ts). Sleeper-only, best-effort.
-const SCRATCH_FRESHNESS_MS = 18 * 60 * 60 * 1000 // same-game-day window; stale scratches age out
+const SCRATCH_FRESHNESS_MS = 8 * 60 * 60 * 1000 // same-game-day window; 8h aggressively ages out stale scratches (matches the card read in lib/pulse.ts)
 
 export async function detectStarterScratches(admin: AdminClient): Promise<void> {
   const sinceIso = new Date(Date.now() - SCRATCH_FRESHNESS_MS).toISOString()

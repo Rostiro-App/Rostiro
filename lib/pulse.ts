@@ -170,15 +170,17 @@ export async function buildPulseItemsForUser(
     notesByPlayerId.set(n.player_id, existing ? `${existing} ${n.body}` : n.body)
   }
 
-  // T-163: fresh news-derived scratches (< 18h) override the once-daily
+  // T-163: fresh news-derived scratches (< 8h) override the once-daily
   // injury_status cache when more severe. Best-effort; empty on missing table.
-  const scratchSinceIso = new Date(Date.now() - 18 * 60 * 60 * 1000).toISOString()
+  // The 8h age-out aggressively purges a stale morning scratch so a reversal
+  // (which writes no row) can't keep the card showing "Out" into the evening.
+  const scratchSinceIso = new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString()
   const { data: scratchData } = await supabase
     .from('player_scratches')
-    .select('player_id, status')
+    .select('player_id, status, detected_at')
     .eq('platform', 'sleeper')
     .gte('detected_at', scratchSinceIso)
-  const scratchStatusById = new Map(((scratchData ?? []) as { player_id: string; status: 'out' | 'doubtful' | 'questionable' }[]).map((r) => [r.player_id, r.status]))
+  const scratchStatusById = new Map(((scratchData ?? []) as { player_id: string; status: 'out' | 'doubtful' | 'questionable'; detected_at: string }[]).map((r) => [r.player_id, { status: r.status, detectedAt: r.detected_at }]))
 
   const results = await Promise.allSettled(
     rows.map((league) => buildLeagueItems(supabase, league, topPool, recentNews, surgeEvents, notesByPlayerId, free, scratchStatusById))
@@ -202,7 +204,7 @@ async function buildLeagueItems(
   surgeEvents: SurgeEvent[],
   notesByPlayerId: Map<string, string>,
   free: boolean,
-  scratchStatusById: Map<string, 'out' | 'doubtful' | 'questionable'>
+  scratchStatusById: Map<string, { status: 'out' | 'doubtful' | 'questionable'; detectedAt: string }>
 ): Promise<BuiltPulseItem[]> {
   const [rosters, drafts, sleeperLeague] = await Promise.all([
     getSleeperRosters(league.league_id),
@@ -313,20 +315,29 @@ async function buildLeagueItems(
 
   // ─── Injuries on my roster ───────────────────────────────────────────────
   for (const p of myPlayers) {
-    const effectiveStatus = resolveEffectiveInjury(p.injury_status, scratchStatusById.get(p.player_id) ?? null)
+    const scratchInfo = scratchStatusById.get(p.player_id)
+    const effectiveStatus = resolveEffectiveInjury(p.injury_status, scratchInfo?.status ?? null)
     if (!effectiveStatus) continue
     const isStarter = starterSet.has(p.player_id)
     const priority = injuryPriority(effectiveStatus, isStarter)
     if (!priority) continue
+
+    // T-163 freshness stamp: only when the news scratch is the source of the
+    // shown status. A subtle "· As of 11:04 AM ET" reads the card as a
+    // point-in-time signal (paired with the 8h age-out), keeping us honest
+    // that this is headline-derived, not a live feed.
+    const scratchStamp = scratchInfo && effectiveStatus.toLowerCase() === scratchInfo.status
+      ? ` · As of ${new Date(scratchInfo.detectedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' })} ET`
+      : ''
 
     items.push({
       fingerprint: `injury:${league.id}:${p.player_id}:${effectiveStatus.toLowerCase()}`,
       type: 'injury_alert',
       priority,
       headline: `${p.name} — ${formatInjuryStatus(effectiveStatus)}`,
-      reasoning: isStarter
+      reasoning: (isStarter
         ? `${p.name} is in your starting lineup and listed as ${formatInjuryStatus(effectiveStatus).toLowerCase()}. Check for a bench replacement before kickoff.`
-        : `${p.name} is on your bench and listed as ${formatInjuryStatus(effectiveStatus).toLowerCase()}.`,
+        : `${p.name} is on your bench and listed as ${formatInjuryStatus(effectiveStatus).toLowerCase()}.`) + scratchStamp,
       affectedLeagues: [affectedLeague],
       deadline: null,
       actionUrl: leagueLink,
