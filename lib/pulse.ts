@@ -18,6 +18,7 @@ import { detectOpportunitySurges, type SurgeEvent } from '@/lib/opportunitySurge
 import { generatePlayerNewsContext, generateOpportunitySurgeContext } from '@/lib/claude'
 import { pushToUser } from '@/lib/engagementTriggers'
 import { isFreePlan } from '@/lib/usageLimits'
+import { resolveEffectiveInjury } from './scratchAlerts'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AffectedLeague, InterruptMetricRow, PulseItem, PulseItemStatus, PulseItemType, PulsePriority } from '@/types'
 
@@ -169,8 +170,18 @@ export async function buildPulseItemsForUser(
     notesByPlayerId.set(n.player_id, existing ? `${existing} ${n.body}` : n.body)
   }
 
+  // T-163: fresh news-derived scratches (< 18h) override the once-daily
+  // injury_status cache when more severe. Best-effort; empty on missing table.
+  const scratchSinceIso = new Date(Date.now() - 18 * 60 * 60 * 1000).toISOString()
+  const { data: scratchData } = await supabase
+    .from('player_scratches')
+    .select('player_id, status')
+    .eq('platform', 'sleeper')
+    .gte('detected_at', scratchSinceIso)
+  const scratchStatusById = new Map(((scratchData ?? []) as { player_id: string; status: 'out' | 'doubtful' | 'questionable' }[]).map((r) => [r.player_id, r.status]))
+
   const results = await Promise.allSettled(
-    rows.map((league) => buildLeagueItems(supabase, league, topPool, recentNews, surgeEvents, notesByPlayerId, free))
+    rows.map((league) => buildLeagueItems(supabase, league, topPool, recentNews, surgeEvents, notesByPlayerId, free, scratchStatusById))
   )
 
   // One league failing (Sleeper down, league deleted) shouldn't blank the
@@ -190,7 +201,8 @@ async function buildLeagueItems(
   recentNews: NewsRow[],
   surgeEvents: SurgeEvent[],
   notesByPlayerId: Map<string, string>,
-  free: boolean
+  free: boolean,
+  scratchStatusById: Map<string, 'out' | 'doubtful' | 'questionable'>
 ): Promise<BuiltPulseItem[]> {
   const [rosters, drafts, sleeperLeague] = await Promise.all([
     getSleeperRosters(league.league_id),
@@ -301,19 +313,20 @@ async function buildLeagueItems(
 
   // ─── Injuries on my roster ───────────────────────────────────────────────
   for (const p of myPlayers) {
-    if (!p.injury_status) continue
+    const effectiveStatus = resolveEffectiveInjury(p.injury_status, scratchStatusById.get(p.player_id) ?? null)
+    if (!effectiveStatus) continue
     const isStarter = starterSet.has(p.player_id)
-    const priority = injuryPriority(p.injury_status, isStarter)
+    const priority = injuryPriority(effectiveStatus, isStarter)
     if (!priority) continue
 
     items.push({
-      fingerprint: `injury:${league.id}:${p.player_id}:${p.injury_status.toLowerCase()}`,
+      fingerprint: `injury:${league.id}:${p.player_id}:${effectiveStatus.toLowerCase()}`,
       type: 'injury_alert',
       priority,
-      headline: `${p.name} — ${formatInjuryStatus(p.injury_status)}`,
+      headline: `${p.name} — ${formatInjuryStatus(effectiveStatus)}`,
       reasoning: isStarter
-        ? `${p.name} is in your starting lineup and listed as ${formatInjuryStatus(p.injury_status).toLowerCase()}. Check for a bench replacement before kickoff.`
-        : `${p.name} is on your bench and listed as ${formatInjuryStatus(p.injury_status).toLowerCase()}.`,
+        ? `${p.name} is in your starting lineup and listed as ${formatInjuryStatus(effectiveStatus).toLowerCase()}. Check for a bench replacement before kickoff.`
+        : `${p.name} is on your bench and listed as ${formatInjuryStatus(effectiveStatus).toLowerCase()}.`,
       affectedLeagues: [affectedLeague],
       deadline: null,
       actionUrl: leagueLink,
