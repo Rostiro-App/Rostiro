@@ -43,6 +43,19 @@ export default function ModeSelection({ onContinue }: { onContinue: (mode: Mode)
   // that plumbing existed, nothing was ever collecting the name for it.
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
+  const [notifyScratches, setNotifyScratches] = useState(true)
+
+  function toggleScratches() {
+    const next = !notifyScratches
+    setNotifyScratches(next)
+    // Persist immediately; default is already true server-side, so this only
+    // needs to fire on an opt-down, but firing either way is harmless.
+    fetch('/api/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notifyScratches: next }),
+    }).catch(() => {})
+  }
 
   async function handleContinue() {
     if (typeof window !== 'undefined') {
@@ -163,6 +176,23 @@ export default function ModeSelection({ onContinue }: { onContinue: (mode: Mode)
                 </button>
               )
             })}
+          </div>
+
+          {/* Scratch-alert preference — on-by-default awareness toggle (T-163) */}
+          <div className="mb-8 flex items-center justify-between rounded-lg border p-3" style={{ borderColor: 'var(--hairline)' }}>
+            <div>
+              <p className="text-sm text-white">Get notified within minutes when a starter is ruled out</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--t3)' }}>One alert across all your leagues. You can change this later in Settings.</p>
+            </div>
+            <button
+              role="switch"
+              aria-checked={notifyScratches}
+              onClick={toggleScratches}
+              className="relative rounded-full transition-all flex-shrink-0"
+              style={{ width: 40, height: 22, backgroundColor: notifyScratches ? 'var(--signal)' : 'var(--hairline)' }}
+            >
+              <span className="absolute top-[3px] rounded-full transition-all" style={{ width: 16, height: 16, left: notifyScratches ? 21 : 3, backgroundColor: '#fff' }} />
+            </button>
           </div>
 
           {/* CTA */}
