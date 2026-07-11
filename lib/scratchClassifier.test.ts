@@ -24,6 +24,9 @@ describe('classifyScratch', () => {
     expect(classifyScratch('QB will play, upgraded to active', null)).toBeNull()
     expect(classifyScratch('WR expected to play, cleared from injury report', null)).toBeNull()
   })
+  it('returns high-confidence out when reversal language co-occurs with a ruled-out phrase', () => {
+    expect(classifyScratch('Was active in warmups but has been ruled out', null)).toEqual({ status: 'out', confidence: 'high' })
+  })
   it('returns null when no injury language', () => {
     expect(classifyScratch('Chiefs sign veteran to practice squad', null)).toBeNull()
   })
