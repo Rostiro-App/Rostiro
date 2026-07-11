@@ -26,6 +26,7 @@ import { sendPushNotification } from '@/lib/onesignal'
 import { isFreePlan } from '@/lib/usageLimits'
 import { buildLiveRoster } from '@/lib/liveRoster'
 import { computeLeagueWinProbs } from '@/lib/liveWinProb'
+import { groupScratchedStartersByUser, scratchDedupeKey, formatScratchPush, type UserLeagueRoster, type ScratchedPlayer } from './scratchAlerts'
 import type { createAdminClient } from '@/lib/supabase'
 import type { InterruptMetricRow } from '@/types'
 
@@ -366,5 +367,72 @@ export async function detectMissionComplete(admin: AdminClient, todayEt: string)
       affectedLeagues: userLeagues.map((l) => ({ leagueId: l.id, leagueName: l.league_name, platform: 'sleeper' })),
     })
     await pushToUser(admin, userId, headline, reasoning)
+  }
+}
+
+// ─── Starter scratch alerts (T-163) ─────────────────────────────────────────
+// Mirrors detectTouchdownSwings: per-user byUser grouping, engagement_log
+// one-shot dedup, Pro-gated push. Reads the fresh player_scratches signal the
+// news cron writes. HIGH-confidence only pushes; medium is card-only (built in
+// lib/pulse.ts). Sleeper-only, best-effort.
+const SCRATCH_FRESHNESS_MS = 18 * 60 * 60 * 1000 // same-game-day window; stale scratches age out
+
+export async function detectStarterScratches(admin: AdminClient): Promise<void> {
+  const sinceIso = new Date(Date.now() - SCRATCH_FRESHNESS_MS).toISOString()
+  const { data: scratchRows } = await admin
+    .from('player_scratches')
+    .select('player_id, status, confidence, headline')
+    .eq('platform', 'sleeper')
+    .eq('confidence', 'high')
+    .gte('detected_at', sinceIso)
+  if (!scratchRows || scratchRows.length === 0) return
+
+  const scratchById = new Map((scratchRows as { player_id: string; status: string; headline: string | null }[]).map((r) => [r.player_id, r]))
+
+  // Resolve player names once (for the message) from the cache.
+  const { data: nameRows } = await admin
+    .from('players_cache').select('player_id, name').eq('platform', 'sleeper').in('player_id', [...scratchById.keys()])
+  const nameById = new Map(((nameRows ?? []) as { player_id: string; name: string }[]).map((r) => [r.player_id, r.name]))
+
+  const scratched = new Map<string, ScratchedPlayer>()
+  for (const [id, row] of scratchById) {
+    scratched.set(id, { playerId: id, playerName: nameById.get(id) ?? id, status: row.status as ScratchedPlayer['status'] })
+  }
+
+  const leagues = await loadSleeperLeagues(admin)
+  if (leagues.length === 0) return
+
+  const rosterCache = new Map<string, Awaited<ReturnType<typeof getSleeperRosters>>>()
+  const rosters: UserLeagueRoster[] = []
+  for (const league of leagues) {
+    if (!rosterCache.has(league.league_id)) {
+      rosterCache.set(league.league_id, await getSleeperRosters(league.league_id).catch(() => []))
+    }
+    const myRoster = (rosterCache.get(league.league_id) ?? []).find((r) => String(r.roster_id) === league.team_id)
+    const starterIds = (myRoster?.starters ?? []).filter((id: string) => id !== '0')
+    rosters.push({ userId: league.user_id, leagueId: league.id, leagueName: league.league_name, starterIds })
+  }
+
+  const byUser = groupScratchedStartersByUser(rosters, scratched)
+
+  for (const [userId, group] of byUser) {
+    if (await isFreePlan(admin, userId)) continue // Pro-only push (card still exists)
+
+    // notify_scratches gate (default true; column may be missing pre-migration -> treat as on)
+    const { data: pref } = await admin.from('users').select('notify_scratches').eq('id', userId).maybeSingle()
+    if (pref && pref.notify_scratches === false) continue
+
+    // Claim per scratched starter+status; collect the newly-claimed ones so a
+    // re-run in a later tick doesn't re-push the same scratch.
+    const newlyClaimed: ScratchedPlayer[] = []
+    for (const s of group.scratched) {
+      if (await claimTrigger(admin, userId, 'starter_scratch', scratchDedupeKey(s.playerId, s.status))) {
+        newlyClaimed.push(s)
+      }
+    }
+    if (newlyClaimed.length === 0) continue
+
+    const { title, message } = formatScratchPush(newlyClaimed.map((s) => s.playerName), group.leagueNames)
+    await pushToUser(admin, userId, title, message, '/pulse')
   }
 }
