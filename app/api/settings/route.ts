@@ -15,13 +15,15 @@ const Body = z
     // "replay tour" resets via its own explicit payload).
     addSeenHints: z.array(z.string().max(64)).max(32).optional(),
     resetSeenHints: z.boolean().optional(),
+    notifyScratches: z.boolean().optional(),
   })
   .refine(
     (b) =>
       b.mode !== undefined ||
       b.pushEnabled !== undefined ||
       b.addSeenHints !== undefined ||
-      b.resetSeenHints !== undefined,
+      b.resetSeenHints !== undefined ||
+      b.notifyScratches !== undefined,
     { message: 'Nothing to update' }
   )
 
@@ -37,7 +39,7 @@ export async function GET() {
   const meta = (user.user_metadata ?? {}) as Record<string, unknown>
   const fullName = typeof meta.full_name === 'string' ? meta.full_name : null
 
-  const [{ data: profile, error: profileError }, { data: leagues, error: leaguesError }, { data: founderRow, error: founderError }] = await Promise.all([
+  const [{ data: profile, error: profileError }, { data: leagues, error: leaguesError }, { data: founderRow, error: founderError }, { data: scratchRow, error: scratchError }] = await Promise.all([
     supabase
       .from('users')
       .select('email, plan, push_enabled, mode, seen_hints, created_at, stripe_customer_id')
@@ -54,11 +56,19 @@ export async function GET() {
     // (migration_founder_recognition.sql), so it needs to degrade on its
     // own rather than compounding the existing mode/seen_hints fallback.
     supabase.from('users').select('founding_number').eq('id', user.id).maybeSingle(),
+    // T-163: same rationale as founding_number above — notify_scratches
+    // comes from its own independent migration (migration_scratch_alerts.sql)
+    // not yet run in dev, so it's queried separately to degrade on its own.
+    supabase.from('users').select('notify_scratches').eq('id', user.id).maybeSingle(),
   ])
 
   const foundingNumber = founderError?.code === '42703' || founderError?.code === 'PGRST204'
     ? null
     : (founderRow as { founding_number: number | null } | null)?.founding_number ?? null
+
+  const notifyScratches = scratchError?.code === '42703' || scratchError?.code === 'PGRST204'
+    ? true
+    : (scratchRow as { notify_scratches: boolean | null } | null)?.notify_scratches ?? true
 
   // T-107: migration_waiver_cutoff.sql not run yet — retry without the two
   // new columns so the rest of Settings (and league list) still works.
@@ -104,6 +114,7 @@ export async function GET() {
     hasBilling: !!row.stripe_customer_id,
     foundingNumber,
     pushEnabled: row.push_enabled,
+    notifyScratches,
     mode: modeAvailable ? row.mode : null,
     seenHints: (row as { seen_hints?: string[] }).seen_hints ?? [],
     createdAt: row.created_at,
@@ -130,6 +141,7 @@ export async function PATCH(request: Request) {
   const update: Record<string, unknown> = {}
   if (parsed.data.mode !== undefined) update.mode = parsed.data.mode
   if (parsed.data.pushEnabled !== undefined) update.push_enabled = parsed.data.pushEnabled
+  if (parsed.data.notifyScratches !== undefined) update.notify_scratches = parsed.data.notifyScratches
 
   // Never blind-overwrite seen_hints — read the current array first so a
   // dismissal from one tab doesn't race-clobber one from another, then

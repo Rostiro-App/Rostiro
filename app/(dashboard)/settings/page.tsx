@@ -15,6 +15,7 @@ interface SettingsData {
   email: string
   plan: string
   pushEnabled: boolean
+  notifyScratches: boolean
   mode: Mode | null
   createdAt: string
   leagues: Array<{
@@ -110,6 +111,17 @@ export default function SettingsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pushEnabled: next }),
     }).catch(() => setData((d) => (d ? { ...d, pushEnabled: !next } : d)))
+  }
+
+  function toggleScratches() {
+    if (!data) return
+    const next = !data.notifyScratches
+    setData({ ...data, notifyScratches: next })
+    fetch('/api/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notifyScratches: next }),
+    }).catch(() => setData((d) => (d ? { ...d, notifyScratches: !next } : d)))
   }
 
   async function disconnect(leagueId: string) {
@@ -376,6 +388,26 @@ export default function SettingsPage() {
                     left: data.pushEnabled ? 21 : 3,
                     backgroundColor: data.pushEnabled ? '#FFFFFF' : 'var(--t2)',
                   }}
+                />
+              </button>
+            </div>
+            <div className="flex items-center justify-between py-1">
+              <div>
+                <p className="text-sm text-white">Starter ruled out</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--t3)' }}>
+                  Get pinged within minutes when a starter is ruled out, one alert across all your leagues.
+                </p>
+              </div>
+              <button
+                role="switch"
+                aria-checked={data.notifyScratches}
+                onClick={toggleScratches}
+                className="relative rounded-full transition-all flex-shrink-0"
+                style={{ width: 40, height: 22, backgroundColor: data.notifyScratches ? 'var(--cta)' : 'var(--hairline)' }}
+              >
+                <span
+                  className="absolute top-[3px] rounded-full transition-all"
+                  style={{ width: 16, height: 16, left: data.notifyScratches ? 21 : 3, backgroundColor: '#fff' }}
                 />
               </button>
             </div>
