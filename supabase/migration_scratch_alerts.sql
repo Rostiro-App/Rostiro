@@ -16,9 +16,13 @@ create table if not exists public.player_scratches (
 create index if not exists player_scratches_detected_idx on public.player_scratches (detected_at);
 
 alter table public.player_scratches enable row level security;
--- Admin-written by cron; no client read path needed today. No policy = deny-all
--- to anon/authenticated, which is correct (T-154 lesson: RLS on with no policy
--- is deny-all — intended here, unlike the founder_feedback bug).
+-- Global player injury signals — no per-user data — so authenticated users get a
+-- role-level read (the Pulse card is built on-demand with the authenticated SSR
+-- client via buildPulseItemsForUser; RLS-on with no policy would deny that read and
+-- leave the in-app card silently empty). Mirrors the news_items read policy.
+drop policy if exists "Authenticated users can read player scratches" on public.player_scratches;
+create policy "Authenticated users can read player scratches" on public.player_scratches
+  for select using (auth.role() = 'authenticated');
 
 -- Per-type push preference (T-163 principle 4). Default on.
 alter table public.users add column if not exists notify_scratches boolean not null default true;

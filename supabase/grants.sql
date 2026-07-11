@@ -33,5 +33,9 @@ grant select on
   public.player_mappings
 to anon;
 
+-- authenticated read-only: global player injury signals (no per-user data),
+-- read on-demand by buildPulseItemsForUser via the authenticated SSR client
+grant select on public.player_scratches to authenticated;
+
 -- service_role: admin-written tables (cron, backend only)
 grant select, insert, update, delete on public.player_scratches to service_role;
