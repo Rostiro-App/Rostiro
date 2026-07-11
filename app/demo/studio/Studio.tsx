@@ -5,8 +5,9 @@ import { StudioCanvas } from './StudioCanvas'
 import { defaultInterruptEvent, type InterruptSimEvent } from '../lib/simEvents'
 import { SURFACE_PACKS, type StudioStateKind } from '../lib/studioPacks'
 import { prefillLiveScenario } from '../lib/liveScenario'
+import { prefillPushMoment } from '../lib/pushMoment'
 
-type PanelState = StudioStateKind | 'game_day' | 'live'
+type PanelState = StudioStateKind | 'game_day' | 'live' | 'push'
 
 export function Studio() {
   const [state, setState] = useState<PanelState>('game_day')
@@ -22,6 +23,7 @@ export function Studio() {
   function selectState(s: PanelState) {
     setState(s); setFired(null); clearTimers()
     if (s === 'live') setPackContent(prefillLiveScenario())
+    else if (s === 'push') setPackContent(prefillPushMoment())
     else if (s !== 'game_day') setPackContent(SURFACE_PACKS[s]!.prefill())
   }
   function fire() {

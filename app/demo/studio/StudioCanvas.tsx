@@ -6,9 +6,11 @@ import type { InterruptSimEvent } from '../lib/simEvents'
 import { SURFACE_PACKS, type StudioStateKind } from '../lib/studioPacks'
 import { LiveScene } from './live/LiveScene'
 import type { LiveScenario } from '@/app/demo/lib/liveScenario'
+import { PushLockScreen } from './push/PushLockScreen'
+import type { PushMoment } from '@/app/demo/lib/pushMoment'
 import type { RostiroState } from '@/types'
 
-type CanvasState = StudioStateKind | 'game_day' | 'live'
+type CanvasState = StudioStateKind | 'game_day' | 'live' | 'push'
 
 export function StudioCanvas({ state = 'game_day', aspect, event, leaving, content }: {
   state?: CanvasState
@@ -19,6 +21,10 @@ export function StudioCanvas({ state = 'game_day', aspect, event, leaving, conte
 }) {
   if (state === 'live') {
     return <LiveScene scenario={content as LiveScenario} aspect={aspect} />
+  }
+
+  if (state === 'push') {
+    return <PushLockScreen content={content as PushMoment} aspect={aspect} />
   }
 
   const pack = state !== 'game_day' ? SURFACE_PACKS[state] : undefined
