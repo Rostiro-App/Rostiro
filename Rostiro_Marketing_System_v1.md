@@ -1,3 +1,6 @@
+> ⚠️ **ARCHIVED / SUPERSEDED (July 10, 2026) by [`Rostiro_Marketing_System_v2.md`](Rostiro_Marketing_System_v2.md).**
+> v1 assumed marketing meant *filming reality* (its video shotlist was deferred because it "required the founder to film"). v2 is rebuilt around the **Simulation Studio** content engine (PRD T-157–T-161) — manufacture faithful Rostiro moments in-product, capture 16:9 + 9:16, distribute at volume. **Use v2 for strategy.** This file is retained because several tactical banks are still valid and referenced by v2: Reddit templates (§10), Discord structure (§11), Product Hunt plan (§12), newsletter (§13), launch directories (§16), and the full X/TikTok banks (§7–8, minus any pricing claims until Stripe is live).
+
 # Rostiro External Marketing System v1.0
 ### Built from `Rostiro_Marketing_Brief.md` (founder input, July 7, 2026), audited against `Rostiro_PRD_v5.md` and `rostiro-brand-kit.md`
 
