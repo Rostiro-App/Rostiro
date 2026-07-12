@@ -1,0 +1,54 @@
+{
+  "name": "Rostiro - Wins Events",
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "nodes": [
+    {
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wins-events",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": { "name": "Header Auth account" }
+      }
+    },
+    {
+      "name": "Format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [224, 0],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const b = $json.body || {};\nconst event = b.event;\nlet content;\nif (event === 'signup') {\n  content = `🎉 **New signup!** — that's **${b.total}** total.`;\n} else if (event === 'milestone') {\n  const n = Number(b.number);\n  const map = {\n    100: '💯 **100 Founders!** A hundred people have claimed a Founding 500 spot.',\n    250: '🔥 **250 Founders!** Halfway to the cap.',\n    400: '⚡ **400 Founders!** Only 100 Founding 500 spots left.',\n    500: '🏁 **FOUNDING 500 SOLD OUT** — all 500 lifetime spots are claimed. 🎉',\n  };\n  content = map[n] || `🏆 **Founding ${n}!**`;\n} else {\n  return [];\n}\nreturn [{ json: { content } }];"
+      }
+    },
+    {
+      "name": "Discord (Wins)",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [448, 0],
+      "parameters": {
+        "authentication": "webhook",
+        "content": "={{ $json.content }}",
+        "options": {}
+      },
+      "credentials": {
+        "discordWebhookApi": { "name": "Discord Wins Webhook" }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Format", "type": "main", "index": 0 }]] },
+    "Format": { "main": [[{ "node": "Discord (Wins)", "type": "main", "index": 0 }]] }
+  }
+}
