@@ -1,0 +1,59 @@
+{
+  "name": "Rostiro - Circuit Breaker Alert",
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "nodes": [
+    {
+      "id": "bb734e5a-a330-4ada-bfb3-44420622c41d",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "webhookId": "2e1da6b0-6076-40a6-a351-76105c55430b",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "circuit-breaker-alert",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": { "name": "Header Auth account" }
+      }
+    },
+    {
+      "id": "b06f1cbc-e520-415e-a148-a92a0a8e5672",
+      "name": "Gate + Format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [224, 0],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const body = $json.body || {};\nconst rec = body.record || {};\nconst old = body.old_record || {};\nconst now = Date.now();\n\n// A breaker is \"open\" when opened_until is in the future.\nconst isOpenNow = rec.opened_until && new Date(rec.opened_until).getTime() > now;\nconst wasClosed = !old.opened_until || new Date(old.opened_until).getTime() <= now;\n\n// Only fire on the transition closed -> open. Any other write returns 0 items\n// so the Discord node is skipped for that execution.\nif (!(isOpenNow && wasClosed)) {\n  return [];\n}\n\nconst platform = rec.platform || 'unknown';\nconst fails = (rec.consecutive_failures ?? '?').toString();\nconst until = rec.opened_until;\nconst content = `🚨 **Circuit breaker OPEN** · \\`${platform}\\`\\nTripped after ${fails} consecutive failures. Calls to ${platform} are paused until _${until}_.\\nCheck the source before the next slate.`;\nreturn [{ json: { content } }];"
+      }
+    },
+    {
+      "id": "c61756bf-ff02-474f-9b28-05b197d274d6",
+      "name": "Discord",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [448, 0],
+      "webhookId": "de3f06e2-e14b-4e53-89cc-fc5d1c257a75",
+      "parameters": {
+        "authentication": "webhook",
+        "content": "={{ $json.content }}",
+        "options": {}
+      },
+      "credentials": {
+        "discordWebhookApi": { "name": "Discord Webhook account" }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Gate + Format", "type": "main", "index": 0 }]] },
+    "Gate + Format": { "main": [[{ "node": "Discord", "type": "main", "index": 0 }]] }
+  }
+}
