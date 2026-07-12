@@ -1,0 +1,54 @@
+{
+  "name": "Rostiro - Sale Ping",
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "nodes": [
+    {
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sale-ping",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": { "name": "Header Auth account" }
+      }
+    },
+    {
+      "name": "Format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [224, 0],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const b = $json.body || {};\nconst rec = b.record || {};\nconst plan = rec.plan || 'unknown';\nconst fnum = rec.founding_number;\nconst labels = {\n  pro: '💰 **New sale** · Rostiro Pro — $9.99/mo',\n  starter: '🎟️ **New sale** · Founder Season Pass — $59 one-time',\n  commissioner: '🏆 **New sale** · Founding 500 — $149 lifetime',\n};\nlet content = labels[plan] || `💰 **New sale** · ${plan}`;\nif (fnum !== null && fnum !== undefined) content += ` · #${fnum}`;\nreturn [{ json: { content } }];"
+      }
+    },
+    {
+      "name": "Discord (Wins)",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [448, 0],
+      "parameters": {
+        "authentication": "webhook",
+        "content": "={{ $json.content }}",
+        "options": {}
+      },
+      "credentials": {
+        "discordWebhookApi": { "name": "Discord Wins Webhook" }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Format", "type": "main", "index": 0 }]] },
+    "Format": { "main": [[{ "node": "Discord (Wins)", "type": "main", "index": 0 }]] }
+  }
+}

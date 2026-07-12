@@ -12,6 +12,8 @@ Push, not polling: event-driven, near-instant, and it keeps the database connect
 
 **Secrets never live in this repo.** Workflow JSON references credentials by name; real values (Twilio token, Discord webhook URL, the Supabase→n8n shared secret) live only in n8n Cloud credentials and the Supabase webhook config. Keep a copy in a password manager.
 
+**Two notification channels — positive vs negative.** Money/good-news events post to **`#wins`** (credential `Discord Wins Webhook`); errors/monitoring/bad-news post to **`#alerts`** (credential `Discord Webhook account`). A 💰 should never look like a 🔴. Current split: `#alerts` = error pager, circuit-breaker, cron heartbeat · `#wins` = sale ping (and, later, Founding-500 milestones + new-signup pings).
+
 ---
 
 ## Shared secret (once, for all workflows)
@@ -147,6 +149,21 @@ select cron.schedule('cron-heartbeat-check', '*/2 * * * *',
 
 ### Test (no app or deploy needed)
 Fully exercised via a throwaway row: make it stale → `select check_cron_heartbeats()` → Discord `STALLED`; run again → silent (dedup); set `last_run_at = now()` → `recovered`; delete the row. Verify via n8n Executions + `net._http_response` (200).
+
+---
+
+## Workflow 4 — Sale Ping  💰 revenue  ✅ built & verified
+
+Posts to **`#wins`** (not `#alerts`) when a user upgrades into or between paid plans, or is assigned a Founding 500 number. First **positive** notification — separate channel + credential from the error alerts.
+
+**Nodes:** Webhook → Code (`Format`) → Discord (`Discord Wins Webhook`). Export: `sale-ping.json`. Path `/webhook/sale-ping`.
+
+**Sale = an upward move** (gated in the trigger via `plan_rank`, so the season-pass-expiry downgrade never pings). Plan map (from `lib/stripe.ts`): `pro` = Rostiro Pro $9.99/mo · `starter` = Founder Season Pass $59 · `commissioner` = Founding 500 $149 lifetime (+ `founding_number`).
+
+**Migration:** `supabase/migration_sale_ping.sql` (applied as `add_sale_ping_webhook`) — adds `plan_rank(text)` + the `sale_ping` trigger on `public.users`.
+
+### Test (no real charge, no user-row change)
+Verified by POSTing a simulated `users` update straight to the webhook (`record.plan='commissioner'`, `founding_number=127`) → `#wins` got `🏆 New sale · Founding 500 — $149 lifetime · #127`. The trigger→n8n path is identical to Workflow 2 (already proven end-to-end), and `plan_rank` was checked directly; real paying rows were never mutated.
 
 ---
 
