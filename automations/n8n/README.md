@@ -167,6 +167,23 @@ Verified by POSTing a simulated `users` update straight to the webhook (`record.
 
 ---
 
+## Workflow 5 — Wins Events (signups + Founding-500 milestones)  💰 growth  ✅ built & verified
+
+Two more **`#wins`** pings in one workflow, branched by `event`:
+- **New signup** — `handle_new_user()` creates a `public.users` row on auth signup, so an insert = a real signup. Ping: `🎉 New signup! — that's N total.`
+- **Founding-500 milestones** — at `founding_number` 100 / 250 / 400 / 500. Ping: `💯 100 Founders!` … `🏁 FOUNDING 500 SOLD OUT`.
+
+**Nodes:** Webhook (`/webhook/wins-events`) → Code (`Format`, branches on `event`) → Discord (`Discord Wins Webhook`). Export: `wins-events.json`.
+
+**PII-safe by design:** unlike the generic Supabase webhook (which ships the whole row, incl. email), these use **custom trigger functions** (`notify_new_signup`, `notify_founding_milestone`) that `net.http_post` **only** `event` + `total`/`number`. No email or stripe id ever leaves the DB. Milestone trigger is transition-gated (`old.founding_number is distinct from new`), so it fires once per threshold.
+
+**Migration:** `supabase/migration_wins_events.sql` (applied as `add_wins_events_triggers`).
+
+### Test (no user-row change)
+Both events POSTed straight to the webhook → `#wins` showed `💯 100 Founders!…` and `🎉 New signup! — that's 142 total.` Triggers confirmed installed on `public.users`.
+
+---
+
 ## Verified export
 
 Once a workflow works, export it from n8n (⋯ → Download) and commit the JSON here (`error-log-pager.json`, `circuit-breaker-alert.json`). The working workflow is the source of truth for the JSON — not a hand-written guess.
