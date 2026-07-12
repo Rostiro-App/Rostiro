@@ -7,12 +7,15 @@ import { createAdminClient } from '@/lib/supabase'
 import { ingestSeasonPoints } from '@/lib/seasonPoints'
 import { SEASON } from '@/lib/sleeper'
 import { NextResponse, type NextRequest } from 'next/server'
+import { recordCronRun } from '@/lib/cronHeartbeat'
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  await recordCronRun('season-points')
 
   try {
     const admin = createAdminClient()

@@ -124,6 +124,32 @@ Expect one Discord `#alerts` message within ~1–2s. Verify via n8n Executions +
 
 ---
 
+## Workflow 3 — Cron Heartbeat  🔴 monitoring  ✅ built (Discord; SMS pending Twilio)
+
+Catches the failure the error pager can't: a Vercel cron that **stops running entirely**, so there's no `app_error_log` row to page on. (Error pager = "a cron ran but errored"; heartbeat = "a cron stopped running".)
+
+**How it works (push, like the others — no DB creds in n8n):**
+1. Each cron route calls `recordCronRun('<name>')` right after its auth guard (`lib/cronHeartbeat.ts`), stamping `public.cron_heartbeat.last_run_at`. Best-effort, never throws — a heartbeat write can't break a Sunday score sync.
+2. A Supabase **pg_cron** job runs `check_cron_heartbeats()` every 2 min. It compares each row's `last_run_at` against its `stale_after` and `net.http_post`s to the n8n webhook **only on a state change**: stale (once) and recovered (once). Re-alert suppression via `alerted_at`.
+3. n8n: Webhook → Code (`Format`, branches on `event`) → Discord. Export: `cron-heartbeat.json`. Path `/webhook/cron-heartbeat`.
+
+**Thresholds** (`stale_after`, seeded per cron — easily tuned in the table): live-scores **5 min**, news **20 min**, the five daily crons **26 h**. The stamp is placed *after auth but before any work*, so it means "the handler was invoked" — live-scores stamps every minute even off-season when it no-ops.
+
+**Migration:** `supabase/migration_cron_heartbeat.sql` (applied as `add_cron_heartbeat_table` + `add_cron_heartbeat_checker`).
+
+### ⚠️ Arm it AFTER the app deploy
+The pg_cron schedule is intentionally **not** created until the deploy shipping `recordCronRun()` is live and `last_run_at` values are advancing — otherwise the seeded rows age out and false-alarm. Once deployed and verified:
+```sql
+create extension if not exists pg_cron;
+select cron.schedule('cron-heartbeat-check', '*/2 * * * *',
+                     $$select public.check_cron_heartbeats()$$);
+```
+
+### Test (no app or deploy needed)
+Fully exercised via a throwaway row: make it stale → `select check_cron_heartbeats()` → Discord `STALLED`; run again → silent (dedup); set `last_run_at = now()` → `recovered`; delete the row. Verify via n8n Executions + `net._http_response` (200).
+
+---
+
 ## Verified export
 
 Once a workflow works, export it from n8n (⋯ → Download) and commit the JSON here (`error-log-pager.json`, `circuit-breaker-alert.json`). The working workflow is the source of truth for the JSON — not a hand-written guess.

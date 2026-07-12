@@ -12,6 +12,7 @@
 import { createAdminClient } from '@/lib/supabase'
 import { sendSeasonPassExpiringEmail, sendSeasonPassExpiredEmail } from '@/lib/resend'
 import { NextResponse, type NextRequest } from 'next/server'
+import { recordCronRun } from '@/lib/cronHeartbeat'
 
 const WARNING_WINDOW_MIN_DAYS = 6
 const WARNING_WINDOW_MAX_DAYS = 8
@@ -21,6 +22,8 @@ export async function GET(request: NextRequest) {
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  await recordCronRun('season-pass-expiry')
 
   try {
     const admin = createAdminClient()

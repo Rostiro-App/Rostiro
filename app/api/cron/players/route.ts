@@ -7,12 +7,15 @@ import { createAdminClient } from '@/lib/supabase'
 import { getSleeperPlayers, SEASON } from '@/lib/sleeper'
 import { fetchPlayerUsageSnapshots } from '@/lib/nflverseUsage'
 import { NextResponse, type NextRequest } from 'next/server'
+import { recordCronRun } from '@/lib/cronHeartbeat'
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  await recordCronRun('players')
 
   try {
     const players = await getSleeperPlayers()

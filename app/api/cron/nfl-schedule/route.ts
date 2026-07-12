@@ -7,6 +7,7 @@
 import { createAdminClient } from '@/lib/supabase'
 import { fetchNflSchedule } from '@/lib/nflSchedule'
 import { NextResponse, type NextRequest } from 'next/server'
+import { recordCronRun } from '@/lib/cronHeartbeat'
 
 const CURRENT_SEASON = 2026
 
@@ -15,6 +16,8 @@ export async function GET(request: NextRequest) {
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  await recordCronRun('nfl-schedule')
 
   try {
     const games = await fetchNflSchedule(CURRENT_SEASON)

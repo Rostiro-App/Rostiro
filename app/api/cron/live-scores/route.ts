@@ -13,6 +13,7 @@ import { pollAllLiveMatchupPoints } from '@/lib/liveMatchupPoints'
 import { classifyDeltas } from '@/lib/liveEvents'
 import { detectAndSendWindowRecaps, detectAndSendLiveUnlockPush } from '@/lib/windowRecap'
 import { NextResponse, type NextRequest } from 'next/server'
+import { recordCronRun } from '@/lib/cronHeartbeat'
 
 const GAME_DURATION_HOURS = 4 // matches lib/rostiroState.ts's window
 
@@ -21,6 +22,8 @@ export async function GET(request: NextRequest) {
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  await recordCronRun('live-scores')
 
   if (!(await isFeatureEnabled('live_scores'))) {
     return NextResponse.json({ skipped: 'live_scores flag disabled' })

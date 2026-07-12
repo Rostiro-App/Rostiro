@@ -11,12 +11,15 @@ import { matchPlayerIds } from '@/lib/newsRelevance'
 import { classifyScratch } from '@/lib/scratchClassifier'
 import { detectStarterScratches } from '@/lib/engagementTriggers'
 import { NextResponse, type NextRequest } from 'next/server'
+import { recordCronRun } from '@/lib/cronHeartbeat'
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  await recordCronRun('news')
 
   try {
     const admin = createAdminClient()
