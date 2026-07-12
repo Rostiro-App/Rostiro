@@ -19,6 +19,23 @@ returns int language sql immutable as $$
   end
 $$;
 
+-- PII-safe (migration sale_ping_pii_safe): custom function sends only
+-- event/plan/founding_number, so email/stripe ids never reach n8n Cloud —
+-- unlike the generic supabase_functions.http_request, which ships the whole row.
+create or replace function public.notify_sale()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  perform net.http_post(
+    url := 'https://rostiro.app.n8n.cloud/webhook/sale-ping',
+    body := jsonb_build_object('event','sale','plan',new.plan,'founding_number',new.founding_number),
+    headers := jsonb_build_object(
+      'Content-Type','application/json',
+      'Authorization','Bearer <SUPABASE_N8N_WEBHOOK_SECRET>'
+    )
+  );
+  return new;
+end $$;
+
 -- Fire only on an UPWARD move (a real sale/upgrade) or a newly assigned Founding
 -- 500 number. The season-pass-expiry cron's downgrade (starter -> free) is a
 -- lower rank, so it never pings as a sale.
@@ -29,10 +46,4 @@ when (
   public.plan_rank(new.plan) > public.plan_rank(old.plan)
   or (new.founding_number is not null and old.founding_number is null)
 )
-execute function supabase_functions.http_request(
-  'https://rostiro.app.n8n.cloud/webhook/sale-ping',
-  'POST',
-  '{"Content-Type":"application/json","Authorization":"Bearer <SUPABASE_N8N_WEBHOOK_SECRET>"}',
-  '{}',
-  '5000'
-);
+execute function public.notify_sale();
