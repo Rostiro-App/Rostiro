@@ -1,0 +1,54 @@
+{
+  "name": "Rostiro - Cron Heartbeat",
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "nodes": [
+    {
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cron-heartbeat",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": { "name": "Header Auth account" }
+      }
+    },
+    {
+      "name": "Format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [224, 0],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const b = $json.body || {};\nconst name = b.cron_name || 'unknown';\nconst last = b.last_run_at || '?';\nlet content;\nif (b.event === 'recovered') {\n  content = `✅ **Cron recovered** · \\`${name}\\`\\nRunning again — last run _${last}_.`;\n} else {\n  content = `⚠️ **Cron STALLED** · \\`${name}\\`\\nNo authorized run in over ${b.stale_after || '?'}. Last seen _${last}_.\\nCheck Vercel → Crons and the route logs.`;\n}\nreturn [{ json: { content } }];"
+      }
+    },
+    {
+      "name": "Discord",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [448, 0],
+      "parameters": {
+        "authentication": "webhook",
+        "content": "={{ $json.content }}",
+        "options": {}
+      },
+      "credentials": {
+        "discordWebhookApi": { "name": "Discord Webhook account" }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Format", "type": "main", "index": 0 }]] },
+    "Format": { "main": [[{ "node": "Discord", "type": "main", "index": 0 }]] }
+  }
+}
