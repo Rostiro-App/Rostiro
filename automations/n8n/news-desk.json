@@ -1,0 +1,77 @@
+{
+  "name": "Rostiro - News Desk Auto-Inbox",
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "nodes": [
+    {
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "news-desk",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": { "name": "Header Auth account" }
+      }
+    },
+    {
+      "name": "Draft Angle",
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [224, 0],
+      "parameters": {
+        "resource": "text",
+        "operation": "message",
+        "modelId": { "__rl": true, "mode": "list", "value": "claude-haiku-4-5-20251001", "cachedResultName": "claude-haiku-4-5-20251001" },
+        "messages": { "values": [ { "role": "user", "content": "=Headline: {{ $json.body.record.headline }}\nSummary: {{ $json.body.record.summary }}" } ] },
+        "simplify": true,
+        "options": {
+          "system": "You are a fantasy-football social copywriter for Rostiro, an app to run every fantasy league (Sleeper, Yahoo, ESPN) from one place. Given an NFL news item, write ONE short product-anchored angle (1-2 sentences, under 240 characters) a solo founder could post. Rules: anchor it through Rostiro (here's how this hits your leagues); never promise a feature; never make a bold player prediction; calm, helpful, fantasy-native tone; no hype; no em dashes. Output only the angle text.",
+          "maxTokens": 220,
+          "temperature": 0.7,
+          "includeMergedResponse": true
+        }
+      },
+      "credentials": {
+        "anthropicApi": { "name": "Anthropic account" }
+      }
+    },
+    {
+      "name": "Format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [448, 0],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const a = $json;\nlet angle = '';\nif (typeof a.merged_response === 'string') angle = a.merged_response;\nelse if (typeof a.text === 'string') angle = a.text;\nelse if (Array.isArray(a.content)) angle = a.content.map(c => (c && c.text) ? c.text : '').join(' ').trim();\nelse if (typeof a.content === 'string') angle = a.content;\nangle = (angle || '').trim();\nconst wh = ($('Webhook').item.json.body || {}).record || {};\nconst headline = wh.headline || '(headline)';\nconst link = wh.link || '';\nconst content = `📰 **${headline}**${link ? '\\n' + link : ''}${angle ? '\\n\\n💡 ' + angle : '\\n\\n💡 (no angle generated)'}`;\nreturn [{ json: { content } }];"
+      }
+    },
+    {
+      "name": "Discord (Inbox)",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [672, 0],
+      "parameters": {
+        "authentication": "webhook",
+        "content": "={{ $json.content }}",
+        "options": {}
+      },
+      "credentials": {
+        "discordWebhookApi": { "name": "Discord Headline Inbox" }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Draft Angle", "type": "main", "index": 0 }]] },
+    "Draft Angle": { "main": [[{ "node": "Format", "type": "main", "index": 0 }]] },
+    "Format": { "main": [[{ "node": "Discord (Inbox)", "type": "main", "index": 0 }]] }
+  }
+}

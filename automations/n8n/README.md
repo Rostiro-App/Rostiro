@@ -184,6 +184,31 @@ Both events POSTed straight to the webhook → `#wins` showed `💯 100 Founders
 
 ---
 
+## Workflow 6 — News Desk Auto-Inbox  📰 growth  ✅ built & verified (dormant until in-season news)
+
+The flagship distribution automation: turns your app's news feed into a queue of drafted, postable angles so you never start from a blank page (`Marketing_System_v2.md` §5, `System_Map` §3.C).
+
+```
+cron/news writes a news_item (headline, summary, player_ids, link)
+   ↓  Supabase trigger — only when player_ids is non-empty (mentions a real player)
+n8n:  Anthropic (Claude Haiku) drafts ONE product-anchored angle
+   ↓
+Discord #headline-inbox  →  📰 headline + link + 💡 angle  →  you tweak & post
+```
+
+**Nodes:** Webhook (`/webhook/news-desk`) → Anthropic (`Draft Angle`) → Code (`Format`) → Discord (`Discord Headline Inbox`). Export: `news-desk.json`. Migration: `supabase/migration_news_desk.sql` (`add_news_desk_inbox_trigger`).
+
+- **Draft-only + honesty by prompt:** anchored through Rostiro, never promises a feature, never a bold player prediction, calm tone, no em dashes. You always edit before posting — respects the §2 honesty contract by construction.
+- **Model:** Claude Haiku (`claude-haiku-4-5`), ~170 in / ~35 out tokens per headline = fractions of a cent. Credential `Anthropic account` in n8n.
+- **Not Metricool-dependent.** The flow ends at `#headline-inbox`; whatever you post *with* (Metricool, Buffer, native) is downstream and irrelevant here.
+- **Dormant off-season:** `news_items` is empty in July; this goes live on its own when preseason news flows (~August). Verified now via seeded + real insert/delete tests.
+
+**Credential note:** the headline-inbox webhook is currently the n8n credential `Discord Webhook account 2` — rename it to **`Discord Headline Inbox`** to match this export.
+
+**Tuning options (if it gets noisy in-season):** raise the relevance bar (e.g. only injury/trade keywords), dedupe near-identical headlines, or switch from per-item to a batched morning digest (a pg_cron that collects the last N hours and pushes one batch).
+
+---
+
 ## Verified export
 
 Once a workflow works, export it from n8n (⋯ → Download) and commit the JSON here (`error-log-pager.json`, `circuit-breaker-alert.json`). The working workflow is the source of truth for the JSON — not a hand-written guess.
