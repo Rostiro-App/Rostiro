@@ -29,7 +29,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const b = $json.body || {};\nconst rec = b.record || {};\nconst plan = rec.plan || 'unknown';\nconst fnum = rec.founding_number;\nconst labels = {\n  pro: '💰 **New sale** · Rostiro Pro — $9.99/mo',\n  starter: '🎟️ **New sale** · Founder Season Pass — $59 one-time',\n  commissioner: '🏆 **New sale** · Founding 500 — $149 lifetime',\n};\nlet content = labels[plan] || `💰 **New sale** · ${plan}`;\nif (fnum !== null && fnum !== undefined) content += ` · #${fnum}`;\nreturn [{ json: { content } }];"
+        "jsCode": "const b = $json.body || {};\nconst plan = b.plan || 'unknown';\nconst fnum = b.founding_number;\nconst labels = {\n  pro: '💰 **New sale** · Rostiro Pro — $9.99/mo',\n  starter: '🎟️ **New sale** · Founder Season Pass — $59 one-time',\n  commissioner: '🏆 **New sale** · Founding 500 — $149 lifetime',\n};\nlet content = labels[plan] || `💰 **New sale** · ${plan}`;\nif (fnum !== null && fnum !== undefined) content += ` · #${fnum}`;\nreturn [{ json: { content } }];"
       }
     },
     {

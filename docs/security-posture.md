@@ -32,7 +32,7 @@ All alert webhooks authenticate with `Authorization: Bearer <SUPABASE_N8N_WEBHOO
 
 - **Canonical copy:** password manager only. Never in the repo (workflow JSON and these SQL files use the `<SUPABASE_N8N_WEBHOOK_SECRET>` placeholder).
 - **Rotation:** update the n8n Header Auth credential and every DB trigger/function that embeds it, together. Rotate if it's ever exposed.
-- **⚠️ Known exposure:** the current value was pasted into a Claude chat and appears in `net._http_response` logs. **Rotate it.** (Tracked in §7.)
+- **Known exposure (low risk):** the current value was pasted into a Claude chat and appears in `net._http_response` logs. It is **low-privilege** — it only authorizes posting alert payloads to Discord; it grants no DB / money / data access — and it is **not public** (never in the repo/GitHub). So rotation here is convenience-priority, not urgent. Rotate on schedule for high-value keys (DB, Stripe), not this one. (Tracked in §7.)
 
 ## 4. Per-service posture
 
@@ -46,7 +46,7 @@ All alert webhooks authenticate with `Authorization: Bearer <SUPABASE_N8N_WEBHOO
 The generic `supabase_functions.http_request` trigger helper ships the **entire row** (incl. `email`, stripe ids) to n8n Cloud, where it lands in execution logs. For `users`-table events, prefer **custom trigger functions** (`net.http_post`) that send only what the message needs.
 
 - ✅ `notify_new_signup`, `notify_founding_milestone` — PII-safe (send `event` + `total`/`number` only).
-- ⚠️ `sale_ping` — still uses the generic helper (email reaches n8n logs though not Discord). **Tighten to a custom function.** (Tracked in §7.)
+- ✅ `sale_ping` — now PII-safe too (custom `notify_sale`, sends only `plan`/`founding_number`; migration `sale_ping_pii_safe`).
 
 ## 6. The future cockpit (Subsystem B)
 
@@ -54,7 +54,7 @@ Standing AI access to prod is real there, so its design bakes in: single Discord
 
 ## 7. Open hardening items
 
-- [ ] **Rotate `SUPABASE_N8N_WEBHOOK_SECRET`** (exposed in chat/logs) — new value in n8n cred + all DB triggers/functions, together.
-- [ ] **Read-only Supabase key** for routine agent work; switch the MCP to it.
-- [ ] **Tighten `sale_ping`** to a custom PII-safe trigger function (drop email from the n8n payload).
+- [ ] **Read-only Supabase key** for routine agent work; switch the MCP to it. *(highest-value item)*
 - [ ] Confirm the GitHub token scope is limited to this repo.
+- [x] **Tighten `sale_ping`** to a custom PII-safe trigger function — done (migration `sale_ping_pii_safe`).
+- [ ] *(low priority)* **Rotate `SUPABASE_N8N_WEBHOOK_SECRET`** — exposed in chat/logs but low-privilege (Discord-post only) and not public; rotate on convenience, not urgency.
