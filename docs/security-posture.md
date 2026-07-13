@@ -54,7 +54,7 @@ Standing AI access to prod is real there, so its design bakes in: single Discord
 
 ## 7. Open hardening items
 
-- [ ] **Read-only Supabase key** for routine agent work; switch the MCP to it. *(highest-value item)*
-- [ ] Confirm the GitHub token scope is limited to this repo.
+- [~] **Read-only Supabase key for the agent — not achievable via the current MCP wiring.** Checked 2026-07-13: the Supabase MCP tool authenticates through the management API with full project access; it isn't a swappable connection string with a selectable Postgres role, so there's no in-session way to downgrade it to read-only. Actually enforcing this would mean reconfiguring the MCP plugin's own credentials at the host/environment level — outside a chat session. **Until that's changed, the real mitigation is discipline, not a technical guardrail:** every write in this project has been small, deliberate, and reversible (atomic trip-and-reset tests, throwaway rows, no bulk edits), with a full audit trail (git, n8n executions, migrations). Keep applying that standard; don't treat this as solved.
+- [ ] GitHub token is account-wide (`repo` scope covers every repo the account can access), not limited to Rostiro. Tighten with a fine-grained PAT scoped to this repo only when convenient — no incident has occurred, this is precautionary.
 - [x] **Tighten `sale_ping`** to a custom PII-safe trigger function — done (migration `sale_ping_pii_safe`).
 - [ ] *(low priority)* **Rotate `SUPABASE_N8N_WEBHOOK_SECRET`** — exposed in chat/logs but low-privilege (Discord-post only) and not public; rotate on convenience, not urgency.
