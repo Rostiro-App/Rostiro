@@ -209,6 +209,35 @@ Discord #headline-inbox  →  📰 headline + link + 💡 angle  →  you tweak 
 
 ---
 
+## Workflow 7 — Mention Radar (Reddit)  📌 growth  ✅ built & verified
+
+Surfaces brand + pain-phrase mentions on Reddit so you never miss a chance to help in-thread. **Never auto-posts** — every hit is a ping + a rewrite-it-yourself draft nudge, exactly like the News Desk auto-inbox (`Marketing_System_v2.md` §2 honesty contract, `Toolstack_v1.md` §4 "F5Bot" role — this replaces F5Bot with a zero-setup Reddit-native RSS poll).
+
+```
+Schedule (every 30 min)
+  → Reddit search RSS (rostiro OR pain-phrases, scoped to r/fantasyfootball +
+    DynastyFF + FFCommish + SleeperApp)
+  → Dedupe (cross-run, by link — never re-surface the same post)
+  → Claude Haiku: ENGAGE or SKIP + a short nudge if ENGAGE
+  → Format (keeps ENGAGE only, silently drops SKIP — no noise)
+  → Discord #mentions
+```
+
+**Nodes:** Schedule Trigger → RSS Read → Remove Duplicates (`removeItemsSeenInPreviousExecutions`, scope `node`) → Anthropic (`Draft Nudge`) → Code (`Format`) → Discord (`Discord Mentions`). Export: `mention-radar.json`.
+
+**Why Reddit RSS, not F5Bot:** `reddit.com/search.rss` is native, free, and needs no account/email inbox — n8n polls it directly. F5Bot's edge is comment-level mentions; RSS search is strongest on posts, which for a cold start are the higher-value target (pain-phrase posts like "how do you manage multiple leagues" are exactly what §16 of the marketing plan targets). X is deferred — no free search/RSS anymore.
+
+**Strict SKIP/ENGAGE parsing (not regex over prose):** the prompt forces Claude's answer onto a fixed line-1 verdict (`SKIP` or `ENGAGE`) rather than free text. *Lesson from testing:* an earlier version tried to regex-detect "not a good fit" phrasing in free-form prose — Claude phrased a skip as "not a great fit... let this one pass," which the regex missed, and a low-value post nearly got posted. A parseable protocol is more reliable than pattern-matching natural language.
+
+**Suppression is correct behavior, not a bug to route around:** most candidates SKIP (competing product launches, pure news, unrelated banter) — the Format code drops those silently rather than posting a "not worth it" message, same alert-fatigue reasoning as `#alerts`/`#wins`.
+
+**Query scope (tune here if it drifts):** brand name `rostiro` (unrestricted) OR pain-phrases restricted to `r/fantasyfootball`, `r/DynastyFF`, `r/FFCommish`, `r/SleeperApp` (an earlier unrestricted version false-matched fantasy *baseball* and unrelated soccer/jersey threads).
+
+### Test (no posting, no real engagement)
+Verified live against real Reddit results: of 10 real candidate posts, Claude correctly judged 9 `SKIP` and 1 `ENGAGE` ("Multi-League Management | Ways to Organize" — exactly the target pain point), and only the ENGAGE post + its nudge reached `#mentions`. Cross-run dedup confirmed via the node's own `clearDeduplicationHistory` operation (temporarily flip `Dedupe`'s `operation` param, run once, flip back — the store is keyed per-node).
+
+---
+
 ## Verified export
 
 Once a workflow works, export it from n8n (⋯ → Download) and commit the JSON here (`error-log-pager.json`, `circuit-breaker-alert.json`). The working workflow is the source of truth for the JSON — not a hand-written guess.

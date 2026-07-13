@@ -1,0 +1,94 @@
+{
+  "name": "Rostiro - Mention Radar",
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "nodes": [
+    {
+      "name": "Every 30 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [0, 0],
+      "parameters": {
+        "rule": { "interval": [ { "field": "minutes", "minutesInterval": 30 } ] }
+      }
+    },
+    {
+      "name": "Reddit Search RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [224, 0],
+      "parameters": {
+        "url": "=https://www.reddit.com/search.rss?q=rostiro+OR+(subreddit%3Afantasyfootball+OR+subreddit%3ADynastyFF+OR+subreddit%3AFFCommish+OR+subreddit%3ASleeperApp)+AND+(%22multiple+leagues%22+OR+%22manage+all+my%22+OR+%22run+every+league%22+OR+%22ten+tabs%22)&sort=new"
+      }
+    },
+    {
+      "name": "Dedupe (seen before?)",
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [448, 0],
+      "parameters": {
+        "operation": "removeItemsSeenInPreviousExecutions",
+        "logic": "removeItemsWithAlreadySeenKeyValues",
+        "dedupeValue": "={{ $json.link }}",
+        "options": { "scope": "node", "historySize": 2000 }
+      }
+    },
+    {
+      "name": "Draft Nudge",
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [672, 0],
+      "parameters": {
+        "resource": "text",
+        "operation": "message",
+        "modelId": { "__rl": true, "mode": "list", "value": "claude-haiku-4-5-20251001", "cachedResultName": "claude-haiku-4-5-20251001" },
+        "messages": { "values": [ { "role": "user", "content": "=Post title: {{ $json.title }}\nSnippet: {{ ($json.contentSnippet || $json.content || '').slice(0, 600) }}" } ] },
+        "simplify": true,
+        "options": {
+          "system": "You are helping a solo founder (Rostiro, an app that runs every fantasy football league from one place) respond authentically to a Reddit post that may be relevant. Given the post title and snippet, decide if this is worth the founder engaging with AS A HELPFUL FANTASY PLAYER FIRST (not a marketer). Respond in EXACTLY this format, nothing else:\nLine 1: either the single word SKIP or the single word ENGAGE\nLine 2 (only if ENGAGE): a SHORT (1-2 sentence, under 200 characters) starting-point nudge for how the founder might reply in their own words -- never a ready-to-post reply.\nSKIP if: it's a competing product's own launch/feedback post, pure NFL news/analyst content, unrelated banter, or anything where jumping in reads as self-interested. ENGAGE only for genuine multi-league-management pain or a direct, specific question the founder can add real value to. Do not mention Rostiro unless the post is genuinely about managing multiple leagues. No hype, no em dashes.",
+          "maxTokens": 180,
+          "temperature": 0.7,
+          "includeMergedResponse": true
+        }
+      },
+      "credentials": {
+        "anthropicApi": { "name": "Anthropic account" }
+      }
+    },
+    {
+      "name": "Format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [896, 0],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const dedupeItems = $('Dedupe (seen before?)').all();\nconst results = [];\nfor (const item of $input.all()) {\n  const a = item.json;\n  let raw = '';\n  if (typeof a.merged_response === 'string') raw = a.merged_response;\n  else if (typeof a.text === 'string') raw = a.text;\n  else if (Array.isArray(a.content)) raw = a.content.map(c => (c && c.text) ? c.text : '').join(' ').trim();\n  raw = (raw || '').trim();\n\n  // Strict parse: line 1 is SKIP or ENGAGE, line 2 is the nudge. No regex\n  // guessing over free-form prose -- that's what let a soft-worded skip\n  // ('not a great fit... let this one pass') slip through earlier.\n  const lines = raw.split('\\n').map((l) => l.trim()).filter(Boolean);\n  const verdict = (lines[0] || '').toUpperCase();\n  if (!verdict.startsWith('ENGAGE')) {\n    continue;\n  }\n  const nudge = lines.slice(1).join(' ').trim();\n\n  const srcIndex = item.pairedItem ? (Array.isArray(item.pairedItem) ? item.pairedItem[0].item : item.pairedItem.item) : results.length;\n  const src = (dedupeItems[srcIndex] || dedupeItems[0]).json;\n  const title = src.title || '(untitled post)';\n  const link = src.link || '';\n  const content = `📌 **${title}**${link ? '\\n' + link : ''}${nudge ? '\\n\\n💡 ' + nudge : ''}`;\n  results.push({ json: { content } });\n}\nreturn results;"
+      }
+    },
+    {
+      "name": "Discord (Mentions)",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [1120, 0],
+      "parameters": {
+        "authentication": "webhook",
+        "content": "={{ $json.content }}",
+        "options": {}
+      },
+      "credentials": {
+        "discordWebhookApi": { "name": "Discord Mentions" }
+      }
+    }
+  ],
+  "connections": {
+    "Every 30 min": { "main": [[{ "node": "Reddit Search RSS", "type": "main", "index": 0 }]] },
+    "Reddit Search RSS": { "main": [[{ "node": "Dedupe (seen before?)", "type": "main", "index": 0 }]] },
+    "Dedupe (seen before?)": { "main": [[{ "node": "Draft Nudge", "type": "main", "index": 0 }]] },
+    "Draft Nudge": { "main": [[{ "node": "Format", "type": "main", "index": 0 }]] },
+    "Format": { "main": [[{ "node": "Discord (Mentions)", "type": "main", "index": 0 }]] }
+  }
+}
