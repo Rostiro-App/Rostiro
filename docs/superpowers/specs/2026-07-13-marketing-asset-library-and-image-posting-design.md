@@ -30,12 +30,18 @@ The cockpit's Marketing agent (`src/agents/marketing.ts` in `rostiro-cockpit`) c
 
 ### New Marketing-agent tools (added in `rostiro-cockpit`, alongside the existing Postiz tools)
 - **`asset_search(query)`** — queries `marketing_assets` by pillar/player/topic keyword, returns candidates with signed Supabase Storage URLs.
-- **`generate_stat_card(data, template)`** — renders a small branded HTML/CSS template (Rostiro's existing brand tokens/logo, `lib/brandTokens.ts` as the source of truth for colors) filled with the given real data into a PNG (exact rendering library — e.g. `satori`+`resvg-js` vs. headless Chromium — is an implementation-plan decision, not fixed here), uploads it to `generated/`, and inserts a `marketing_assets` row tagged `kind=generated_card`.
+- **`generate_stat_card(data, templateId)`** — renders one of **several branded HTML/CSS templates** (Rostiro's existing brand tokens/logo, `lib/brandTokens.ts` as the source of truth for colors) filled with the given real data into a PNG, uploads it to `generated/`, and inserts a `marketing_assets` row tagged `kind=generated_card` (and the `templateId` used). Exact rendering library — e.g. `satori`+`resvg-js` vs. headless Chromium — is an implementation-plan decision, not fixed here.
+
+  **Template set for this phase** (matches the pillars already defined in `Rostiro_Marketing_System_v2.md §4`):
+  - `breaking-news` — bold headline treatment for a fast News Desk take (injury/trade/depth-chart moment): large headline text, source line, minimal chrome, built for speed of read.
+  - `stat-highlight` — a single hero number/stat (e.g. a cross-league exposure count, a win-prob swing) in large type with supporting context line.
+  - `quote-card` — a founder or build-in-public quote/take, text-forward, no stat.
+  Each template is its own HTML/CSS file with its own real-data schema (a breaking-news template needs `headline`/`source`/`timestamp`; a stat-highlight needs `statValue`/`statLabel`/`context`) — `generate_stat_card` validates the given `data` against the chosen template's schema before rendering, rather than accepting a loose free-form shape. More templates (e.g. a "founder story" or "Sunday chaos" treatment) can be added later as new template files without touching the tool's interface.
 
 ### Extensions to existing code
 - **`postizTool.ts`'s `postiz_create_post`** gains a media parameter: given a `marketing_assets` row (or its storage URL), upload it to Postiz's own media endpoint, then reference it in the post body. This is the same "verify against Postiz's real API once live" caveat already flagged for this file — the exact upload endpoint/shape must be confirmed once Postiz is actually running, not guessed.
 - **`permissionGate.ts`'s Discord approval flow** (`askForApproval`) attaches the actual image file to the Discord message, alongside the caption text, target platform(s)/integration IDs, and schedule time — replacing today's JSON-only preview for this action. The `go <id>` / `cancel <id>` mechanism is unchanged.
-- **`marketing.ts`'s system prompt** gets an added instruction: prefer a real, relevant existing screenshot when one exists; otherwise generate a stat card from real data already available (Rostiro's own `pulse_items`/`news_items` via the existing read-only connection, or data the operator supplies directly in chat); never fabricate a stat, event, or player depiction that isn't real.
+- **`marketing.ts`'s system prompt** gets an added instruction: prefer a real, relevant existing screenshot when one exists; otherwise pick the template that matches the moment (breaking news → `breaking-news`, a number-led moment → `stat-highlight`, a founder/community take → `quote-card`) and generate a card from real data already available (Rostiro's own `pulse_items`/`news_items` via the existing read-only connection, or data the operator supplies directly in chat); never fabricate a stat, event, or player depiction that isn't real.
 
 ## Data flow — worked example
 
@@ -60,7 +66,7 @@ The cockpit's Marketing agent (`src/agents/marketing.ts` in `rostiro-cockpit`) c
 ## Testing plan
 
 1. Upload one sample real screenshot to `marketing-assets/screenshots/`, tag it in `marketing_assets`, confirm `asset_search` retrieves it for a matching query.
-2. Generate one stat card from known dummy (clearly-labeled-as-test) data; visually confirm the template renders on-brand.
+2. Generate one card from each template (`breaking-news`, `stat-highlight`, `quote-card`) using known dummy (clearly-labeled-as-test) data; visually confirm each renders on-brand and rejects data that doesn't match its schema.
 3. Full dry run in `!mode propose`: drive the whole pipeline through to the Discord approval message (image attached, caption, platforms, schedule) and reply `cancel` — proving the pipeline works without ever publishing.
 4. Only once Postiz's real media-upload endpoint is confirmed against its live docs (a pre-existing, still-open caveat from the original Postiz integration) does a real throwaway post go to a low-stakes/test account.
 
