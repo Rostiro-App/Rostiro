@@ -26,6 +26,7 @@ Just type in `#cockpit`. Plain English. Examples:
 - `how did the intro tweet do`
 - `generate a stat card for the Founding 500 pricing and post it to X`
 - `check if the Vercel deploy from this morning is healthy`
+- `what are our costs this week` — real Claude API spend + Postiz's flat fee, day/week/month. Requires `ANTHROPIC_ADMIN_KEY` to be set (a separate credential from the inference key — see README) or the bot will say the tool isn't configured. Fly/Supabase/Vercel/n8n aren't included — those still need a manual dashboard check.
 
 You don't need to say "delegate to marketing" — the cockpit figures out when a request is a marketing question and routes it there itself.
 
