@@ -53,6 +53,7 @@ Click a button below, or reply "go a1b2c3" / "cancel a1b2c3".
 - Read the exact final text — this is what actually gets published, not a paraphrase.
 - If there's supposed to be an image, check it's actually attached and looks right.
 - Check the target platform(s) match what you asked for.
+- **For a carousel post (multiple images, one IG post):** all slides render as separate images in the same approval message, and one Approve/Reject covers the entire carousel — there's no per-slide confirmation. Check every slide before approving, not just the first.
 
 **To respond:** click the button (added 2026-07-14 — no more copy/pasting an id). Typing `go <id>` / `cancel <id>` still works too, kept as a fallback. Either way, the message updates in place to show ✅/❌ and the buttons disappear. An unanswered approval just sits there, waiting — it never times out and silently proceeds, and it never silently vanishes either.
 
