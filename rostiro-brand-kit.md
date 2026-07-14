@@ -65,12 +65,14 @@ The pulse mark is an SVG polyline rendered to the left of the wordmark, separate
 
 The active state is computed by `lib/rostiroState.ts`. The `PulseMark` component reads `currentState` and maps it to these values.
 
+**Corrected 2026-07-14:** `draft` was reconciled to green back on 2026-07-06 (T-104, founder-confirmed) to match `waiver_day` -- both acquisition moments read as the same "opportunity" emotion, per this section's own original spec. This doc still said amber until now; `lib/brandTokens.ts` is the real source of truth going forward, this file should match it, not drift from it.
+
 ### State configs
 
 ```typescript
 const STATE_CONFIG = {
   draft: {
-    color: '#EF9F27',      // amber
+    color: '#1D9E75',      // green -- shared with waiver_day (T-104, 2026-07-06)
     amplitude: 11,          // px deviation from center baseline
     cycleSec: 1.8,
     strokeWidth: 2.0,
@@ -231,7 +233,7 @@ On screens under 768px, the full wordmark is hidden and replaced with:
   --r-off-white:    #F5F4F0;  /* light surface, daylight mode bg */
 
   /* OS State pulse colors */
-  --r-draft:        #EF9F27;  /* amber */
+  --r-draft:        #1D9E75;  /* green — shared with waiver, T-104 (2026-07-06) */
   --r-standard:     #378ADD;  /* blue — also primary UI accent */
   --r-waiver:       #1D9E75;  /* green */
   --r-gameday:      #E24B4A;  /* red — also critical alert color */
