@@ -45,15 +45,16 @@ When it needs your OK, you'll see something like:
   "socialPost": [...]
 }
 [if there's an image, it shows inline in the Discord message]
-Reply "go a1b2c3" to approve, or "cancel a1b2c3" to reject.
+Click a button below, or reply "go a1b2c3" / "cancel a1b2c3".
+[✅ Approve]  [❌ Reject]
 ```
 
-**Before you reply `go`:**
+**Before you click Approve:**
 - Read the exact final text — this is what actually gets published, not a paraphrase.
 - If there's supposed to be an image, check it's actually attached and looks right.
 - Check the target platform(s) match what you asked for.
 
-**To respond:** type `go <the-id-shown>` or `cancel <the-id-shown>` — copy the id exactly as shown, it's how the bot knows which pending request you're answering. An unanswered approval just sits there, waiting — it never times out and silently proceeds, and it never silently vanishes either.
+**To respond:** click the button (added 2026-07-14 — no more copy/pasting an id). Typing `go <id>` / `cancel <id>` still works too, kept as a fallback. Either way, the message updates in place to show ✅/❌ and the buttons disappear. An unanswered approval just sits there, waiting — it never times out and silently proceeds, and it never silently vanishes either.
 
 **The one thing that ALWAYS gates, no matter what mode you're in:** actually publishing a social post (`integrationSchedulePostTool`). Even if you've turned auto mode on, that one step always stops and asks. Drafting, checking analytics, generating an image — those can be sped up; the actual "this is now public" moment never is.
 
@@ -149,8 +150,8 @@ Once clips exist, hand them to the cockpit (upload to the asset library, or give
 !mode auto          -- low-stakes stuff skips the prompt; publishing still always gates
 !mode readonly      -- nothing mutates, even if you say go
 !new                -- fresh conversation, drops resumed context
-go <id>              -- approve a pending action
-cancel <id>          -- reject a pending action
+[✅ Approve] / [❌ Reject] -- click the buttons on an approval message
+go <id> / cancel <id> -- text fallback, same effect as the buttons
 ```
 
 Just talk normally otherwise — the routing to the right specialist (Marketing, or the main session) happens automatically based on what you ask.
