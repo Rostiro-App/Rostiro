@@ -21,6 +21,13 @@ create table if not exists public.marketing_assets (
   created_at timestamptz not null default now()
 );
 
+-- Defense-in-depth: no policy is defined (service_role bypasses RLS
+-- entirely regardless), but enabling RLS means that if a blanket
+-- anon/authenticated grant is ever accidentally reintroduced later (the
+-- exact cron_heartbeat gotcha referenced above), the table fails closed
+-- instead of silently becoming accessible.
+alter table public.marketing_assets enable row level security;
+
 create index if not exists marketing_assets_pillar_idx on public.marketing_assets (pillar);
 create index if not exists marketing_assets_player_tags_idx on public.marketing_assets using gin (player_tags);
 
