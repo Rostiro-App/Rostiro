@@ -12,7 +12,7 @@
 
 These are the only claims in this plan written as if already true. Hold the dependent content until each is real, so this stays an honest plan.
 
-1. **Stripe/billing must be live before any pricing, Founding 500, or "capped at 500" scarcity content posts.** Until then, reframe those beats as "join the waitlist / want early access" instead of a live-purchase claim. (PRD T-85 — verified in test mode; go-live checklist at `docs/T85_STRIPE_GO_LIVE.md`.)
+1. ~~**Stripe/billing must be live before any pricing, Founding 500, or "capped at 500" scarcity content posts.**~~ ✅ **CLEARED (July 12, 2026) — Stripe is fully live.** All four tiers (Free / Rostiro Pro $9.99/mo / Founder Season Pass $59 / Founding 500 $149 lifetime, capped at 500) process real payments end-to-end. Pricing, Founding 500, and "capped at 500" scarcity content are all cleared to post with real-purchase CTAs. (PRD T-85 — done.)
 2. **Live cross-league win-probability (T-162) is real in code but its migration isn't applied and it hasn't been verified against a live game.** The **Simulation Studio** may depict it freely — that's what the Studio is for, and its dramatized "+X%" framing is a labeled editorial choice. But do **not** post "this is live in your app right now" until `migration_interrupt_metrics.sql` is applied and it's confirmed firing on a real Sunday.
 3. **Championship / playoff-bracket content holds** until it's fired against a real playoff week (carried from v1 — no league has reached a real bracket yet).
 4. **Demo fixtures are currently real 2024 data** (anchor week 8), pending a 2025 swap. Every number in a Studio clip is a real NFL number — say "real NFL data," never imply it's this-second-live unless it is.
@@ -93,25 +93,30 @@ The fantasy space is full of hype accounts. Our edge is calm competence. Three r
 
 ## 3. Channel model & roles
 
-The structural decision that shapes everything: **the same vertical video ships to IG + TikTok + YT Shorts; X is the text desk.**
+**Updated 2026-07-14 to match the real, live setup — 7 channels, split by automation, not by platform type.** The cockpit (a 24/7 Claude Agent SDK session, wired to Postiz) drafts and — for 5 of the 7 — actually schedules. The other 2 are permanent founder decisions to keep human-posted, not a technical limitation.
 
-| Channel | Role | Format | Cadence (sustainable ceiling) |
-|---|---|---|---|
-| **Instagram (LEAD)** | Primary video growth engine — best algo for a zero-audience cold start | 9:16 Reels (Studio clips, reaction memes, news), Stories on Sundays, occasional carousel | 1 Reel/day target, 4–6/week floor |
-| **TikTok** | Same videos as IG, parallel reach | Identical 9:16 clips | Same clips, same days |
-| **YouTube Shorts** | Same videos again, search longevity | Identical 9:16 clips | Same clips, batched upload |
-| **X / Twitter (TEXT DESK)** | News, takes, build-in-public, threads, founder voice. Home of the "News Desk." Clips/GIFs only when they add to a take | Text-first; 16:9 GIF optional | 1–3 posts/day |
-| **Threads** | Mirror of X text | Cross-post | Mirror |
-| **Bluesky** | Mirror of X text | Cross-post | Mirror |
-| **LinkedIn** | Founder story, credibility, hiring/investor signal | Founder posts + occasional clip | 2/week |
-| **Reddit** | Value-first presence in FF communities. No subreddit, no spam | Helpful comments/posts, Rostiro only when genuinely relevant | Ongoing, organic |
-| **Discord** | Community home: bugs, requests, beta, announcements | Server | Standing |
-| **Product Hunt + directories** | Launch credibility | One-time launch push | Timed to launch |
-| **Newsletter (Beehiiv)** | Later; weekly FF value + product | Email | Start ~Aug |
+**The setup is complete; the bar stays quality, not raw output.** Automation removes scheduling friction, not the judgment call on whether a post earns attention. We're building from zero followers with roughly two months of preseason runway (§0's "First posting day" date) — every post is a first impression for someone, and a mediocre post at high frequency does more damage (looks like a bot, trains people to scroll past) than a smaller number of posts that are actually worth stopping for. Cadence below is a **sustainable ceiling you can reach now that scheduling is automated, not a quota to hit regardless of quality.** If there's nothing real/sharp to post on a given day, skip it — §2's honesty contract already says this, it just matters more now that posting is fast enough to be tempted to skip the judgment step too.
 
-**Same-clip-everywhere** (IG/TT/Shorts) and **same-text-everywhere** (X/Threads/Bluesky) is the whole efficiency play. Never hand-craft per platform except the caption tweak and the vertical-vs-landscape cut.
+| Channel | Role | Posting | Format | Cadence (sustainable ceiling) |
+|---|---|---|---|---|
+| **X (TEXT DESK)** | News, takes, build-in-public, founder voice. Home of the "News Desk." | 🤖 **Auto** — cockpit schedules via Postiz | Text-first; 16:9 GIF optional | 2–4 posts/day |
+| **Threads (TEXT DESK)** | Mirror of X text, second text-desk leg | 🤖 **Auto** — mirrors every X text post | Cross-post | Mirror every X post |
+| **Instagram (VIDEO LEAD)** | Primary video growth engine — best algo for a zero-audience cold start | 🤖 **Auto** — cockpit schedules via Postiz | 9:16 Reels (Studio clips, reaction memes, news), Stories on Sundays | 1 Reel/day target, 4–6/week floor |
+| **TikTok (VIDEO)** | Same videos as IG, parallel reach | 🤖 **Auto** — cockpit schedules via Postiz | Identical 9:16 clips | Same clips, same days as IG |
+| **YouTube Shorts (VIDEO)** | Same videos again, search longevity | 🤖 **Auto** — cockpit schedules via Postiz | Identical 9:16 clips | Same clips, batched upload |
+| **LinkedIn** | Founder story, credibility, hiring/investor signal | ✍️ **Manual, permanently** — cockpit drafts, founder copy/pastes and posts by hand | Founder posts + occasional clip | 2/week — deliberately NOT volume-pushed; this is a credibility channel, not a reach one |
+| **Reddit** | Value-first presence in FF communities. No subreddit, no spam | ✍️ **Manual, permanently** — cockpit drafts, founder posts real comments in real threads | Helpful comments/posts, Rostiro only when genuinely relevant | Ongoing, organic — never broadcast, volume here would be counterproductive |
+| **Discord** | Community home: bugs, requests, beta, announcements | — | Server | Standing |
+| **Product Hunt + directories** | Launch credibility | — | One-time launch push | Timed to launch |
+| **Newsletter (Beehiiv)** | Later; weekly FF value + product | — | Email | Start ~Aug |
 
-**Why IG leads:** stated by the founder — with no existing audience, IG's current discovery (Reels) is the strongest cold-start surface. We optimize the clip for IG first (hook in 1.5s, on-screen text legible at a glance, trending-adjacent sound), then it works as-is on TT and Shorts.
+**Why LinkedIn and Reddit stay manual on purpose:** both are trust/credibility channels where a real human doing the posting IS the point — a founder's personal LinkedIn reads as automated the moment it isn't, and Reddit's culture actively punishes broadcast/bot behavior. The other 5 are pure reach/awareness plays where automation is a pure efficiency win with no credibility cost. This split is enforced in code, not just policy — the cockpit's Marketing agent is instructed to never call its publish tool for these two, no matter how confident the draft is.
+
+**Same-clip-everywhere** (IG/TikTok/YT Shorts) and **same-text-everywhere** (X/Threads) is the whole efficiency play across the 5 automated channels. Never hand-craft per platform except the caption tweak and the vertical-vs-landscape cut.
+
+**Why IG leads the video trio:** stated by the founder — with no existing audience, IG's current discovery (Reels) is the strongest cold-start surface. We optimize the clip for IG first (hook in 1.5s, on-screen text legible at a glance, trending-adjacent sound), then it works as-is on TikTok and Shorts.
+
+**Bluesky: deferred, not in the active 7.** TikTok's reach potential for a cold-start audience is far higher; Bluesky may get picked up later as a free X-text mirror once the core 7 are running smoothly, but it's not worth splitting attention toward right now.
 
 ---
 
@@ -214,7 +219,7 @@ Why it works: it's true, it's specific, it's a little funny, it's not a SaaS ori
 5. Add hook text + caption + CTA (template in §17). Legible-at-a-glance on-screen text; hook in first 1.5s.
 6. Schedule: IG/TT/Shorts via a scheduler; X takes queued separately.
 
-**Tooling to set up once:** a screen recorder with clean 9:16/16:9 framing (the Studio's aspect toggle does the framing; you just record the canvas), a scheduler (Buffer/Later/Metricool — pick one), and a shared clip library folder (dated).
+**Tooling to set up once:** a screen recorder with clean 9:16/16:9 framing (the Studio's aspect toggle does the framing; you just record the canvas), a scheduler (**Postiz Cloud**, live and publishable via the AI cockpit's Marketing agent — see `Rostiro_Marketing_Toolstack_v1.md §3`), and a shared clip library folder (dated).
 
 **Rhythm:** 2 Studio sessions/week (e.g. Mon + Thu) = full IG/TT/Shorts coverage with a buffer. X runs daily off the News Desk + build-in-public, no session required.
 
@@ -239,9 +244,12 @@ Rule: no asset gets made for one channel. Every capture has at least a vertical 
 
 Claim/confirm **@rostiro** everywhere; fallbacks if taken: `@rostiroapp`, `@getrostiro`, `@rostiro_app` (keep it consistent across platforms once chosen).
 
-**Claim today (hardest to recover if squatted):** TikTok, Instagram, X, YouTube, Discord.
-**This week:** Threads, Bluesky, LinkedIn company page, Reddit account (personal, founder), Product Hunt (maker), Beehiiv.
-**Later:** Facebook Page/Group (hold until Discord proves the model), GitHub org.
+**Status as of 2026-07-14:**
+- **Connected + auto-posting via Postiz:** X (`@RostiroOS`), Instagram (`@rostrioapp`), YouTube (`@rostirosports`).
+- **Connected via Postiz, manual-post only (permanent policy):** LinkedIn (Lawrence's personal account), Reddit (`RostrioSports`).
+- **Mid-connection:** TikTok, Threads — both hit a Postiz OAuth anti-bot flag on first attempt (Threads suspended by Meta; not a Rostiro-side problem). Expected live within hours of this note; once connected, both join the auto-posting 5 above per the channel model in §3. **Tip for TikTok specifically:** post once or twice manually first to build a few days of normal activity before authorizing Postiz, so the OAuth attempt doesn't read as bot signup the way Threads' did.
+- **Deferred:** Bluesky (see §3) — pick up later, not urgent.
+- **Later:** LinkedIn company page (once there's a reason to split from the founder's personal account), Facebook Page/Group (hold until Discord proves the model), GitHub org, Product Hunt (maker), Beehiiv.
 
 *(Tactical per-platform setup steps carry over unchanged from `Marketing_System_v1.md §2` — still valid.)*
 
@@ -275,7 +283,7 @@ Short, product-specific, no hype. "Run Every League." as the through-line.
 
 ## 12. The phased launch calendar
 
-Three phases. Treat daily cadences as a **ceiling, pulled from as a menu** — a quieter honest rhythm beats posting before something's real.
+Three phases. **Updated 2026-07-14:** with 5 of 7 channels now auto-scheduled through the cockpit, hitting these cadences is logistically easy. That's not the same as a mandate to hit them every day. Treat daily cadences as a **ceiling, pulled from as a menu, gated by quality** — a quieter honest rhythm beats posting before something's real, and it beats posting something mediocre just because the slot is open. Zero followers and roughly two months of runway means every post is doing first-impression work; a skipped day costs nothing, a weak post costs trust.
 
 ### Phase 1 — Cold start & origin (Jul 13 → Jul 26, day-by-day)
 

@@ -200,7 +200,7 @@ Discord #headline-inbox  →  📰 headline + link + 💡 angle  →  you tweak 
 
 - **Draft-only + honesty by prompt:** anchored through Rostiro, never promises a feature, never a bold player prediction, calm tone, no em dashes. You always edit before posting — respects the §2 honesty contract by construction.
 - **Model:** Claude Haiku (`claude-haiku-4-5`), ~170 in / ~35 out tokens per headline = fractions of a cent. Credential `Anthropic account` in n8n.
-- **Not Metricool-dependent.** The flow ends at `#headline-inbox`; whatever you post *with* (Metricool, Buffer, native) is downstream and irrelevant here.
+- **Not Postiz-dependent.** The flow ends at `#headline-inbox`; whatever you post *with* (Postiz, native) is downstream and irrelevant here.
 - **Dormant off-season:** `news_items` is empty in July; this goes live on its own when preseason news flows (~August). Verified now via seeded + real insert/delete tests.
 
 **Credential note:** the headline-inbox webhook is currently the n8n credential `Discord Webhook account 2` — rename it to **`Discord Headline Inbox`** to match this export.
