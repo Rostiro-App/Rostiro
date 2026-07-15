@@ -1,6 +1,7 @@
 // T-112: rebuilt on the real Rostiro OS tokens, matching PublicHeader.
 
 import Link from 'next/link'
+import SocialLinks from './SocialLinks'
 
 export default function PublicFooter() {
   return (
@@ -18,12 +19,14 @@ export default function PublicFooter() {
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm" style={{ color: 'var(--t2)' }}>
           <Link href="/features" className="transition-colors hover:opacity-80">Features</Link>
           <Link href="/draft" className="transition-colors hover:opacity-80">Draft Kit</Link>
+          <Link href="/about" className="transition-colors hover:opacity-80">About</Link>
           <Link href="/faq" className="transition-colors hover:opacity-80">FAQ</Link>
           <Link href="/login" className="transition-colors hover:opacity-80">Sign in</Link>
           <Link href="/signup" className="transition-colors hover:opacity-80">Get started</Link>
           <Link href="/privacy" className="transition-colors hover:opacity-80">Privacy</Link>
           <Link href="/terms" className="transition-colors hover:opacity-80">Terms</Link>
         </div>
+        <SocialLinks />
       </div>
       <p className="max-w-5xl mx-auto mt-8 text-xs" style={{ color: 'var(--t4)' }}>
         &copy; {new Date().getFullYear()} Rostiro. Not affiliated with ESPN, Yahoo, or Sleeper.

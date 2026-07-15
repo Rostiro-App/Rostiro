@@ -30,6 +30,13 @@ export default function PublicHeader() {
           Draft Kit
         </Link>
         <Link
+          href="/about"
+          className="hidden md:block text-sm font-medium px-3 py-1.5 rounded-lg transition-colors hover:opacity-80"
+          style={{ color: 'var(--t2)' }}
+        >
+          About
+        </Link>
+        <Link
           href="/faq"
           className="hidden md:block text-sm font-medium px-3 py-1.5 rounded-lg transition-colors hover:opacity-80"
           style={{ color: 'var(--t2)' }}
