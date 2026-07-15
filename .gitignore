@@ -42,3 +42,10 @@ next-env.d.ts
 
 # git worktrees used for isolated feature work
 /.worktrees/
+
+# local video drop folder -- raw Simulation Studio captures, staged here
+# for Claude Code to upload to Supabase Storage, never committed (large
+# binaries, and the real copy belongs in the marketing-assets bucket).
+# The README explaining how to use it is deliberately still tracked.
+/video-drops/*
+!/video-drops/README.md
