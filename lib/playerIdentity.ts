@@ -13,11 +13,18 @@
 import type { Platform } from '@/types'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+// Packet 03: named and exported (was an inline literal union) so
+// lib/platforms/types.ts's NormalizedRosterPlayer/NormalizedAvailablePlayer
+// can reuse the exact same confidence vocabulary this resolver produces,
+// rather than redefining an equivalent-but-separate union that could
+// silently drift out of sync.
+export type PlayerIdentityConfidence = 'exact' | 'verified_alias' | 'name_team' | 'unresolved'
+
 export interface PlayerIdentityResolution {
   canonicalPlayerId: string | null
   sourcePlatform: Platform
   sourcePlayerId: string
-  confidence: 'exact' | 'verified_alias' | 'name_team' | 'unresolved'
+  confidence: PlayerIdentityConfidence
   reason: string
 }
 

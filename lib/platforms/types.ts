@@ -7,7 +7,8 @@
 // carry yet: capability flags, draft/waiver metadata, league status, and
 // data-quality warnings.
 
-import type { League } from '@/types'
+import type { League, Platform } from '@/types'
+import type { PlayerIdentityConfidence } from '@/lib/playerIdentity'
 
 export interface PlatformCapabilities {
   leagueRead: boolean
@@ -57,4 +58,141 @@ export type NormalizedLeague = League & {
   waiver: NormalizedWaiverSettings
   capabilities: PlatformCapabilities
   warnings: DataQualityWarning[]
+}
+
+// ─── Packet 03: roster/matchup/availability contract ────────────────────────
+// Every shared intelligence consumer (Pulse, portfolio exposure, League
+// Health, Player Intelligence) should read these shapes, never a raw
+// per-platform response. identityConfidence/identityReason reuse
+// lib/playerIdentity.ts's PlayerIdentityResolution vocabulary verbatim —
+// this is NOT a parallel identity system, it's the same resolver's output
+// carried through into the roster contract.
+
+export const ROSTER_SNAPSHOT_SCHEMA_VERSION = 1 as const
+
+export type LineupStatus = 'starting' | 'bench' | 'ir' | 'taxi' | 'unknown'
+
+export interface NormalizedRosterPlayer {
+  canonicalPlayerId: string | null
+  sourcePlatform: Platform
+  sourcePlayerId: string
+  displayName: string
+  nflTeam: string | null
+  position: string | null
+  lineupStatus: LineupStatus
+  slot: string | null
+  identityConfidence: PlayerIdentityConfidence
+  identityReason: string
+}
+
+export interface NormalizedRosterSnapshot {
+  schemaVersion: typeof ROSTER_SNAPSHOT_SCHEMA_VERSION
+  connectedLeagueId: string
+  platform: Platform
+  externalLeagueId: string
+  externalTeamId: string
+  capturedAt: string
+  providerUpdatedAt: string | null
+  players: NormalizedRosterPlayer[]
+  warnings: DataQualityWarning[]
+}
+
+export type MatchupStatus = 'pregame' | 'live' | 'final' | 'unknown'
+
+export interface NormalizedMatchup {
+  connectedLeagueId: string
+  platform: Platform
+  week: number
+  myTeamId: string
+  opponentTeamId: string | null
+  myScore: number | null
+  opponentScore: number | null
+  myProjectedScore: number | null
+  opponentProjectedScore: number | null
+  status: MatchupStatus
+  capturedAt: string
+  warnings: DataQualityWarning[]
+}
+
+// A player NOT on the caller's own roster — the free-agent/waiver pool for
+// a league. Never inferred from "absent from my roster"; only ever
+// produced by a real provider read of the league's actual pool (or
+// reported 'unconfirmed' when the provider can't supply one).
+export type AvailabilityState = 'free_agent' | 'waivers' | 'unconfirmed'
+
+export interface NormalizedAvailablePlayer {
+  canonicalPlayerId: string | null
+  sourcePlatform: Platform
+  sourcePlayerId: string
+  displayName: string
+  nflTeam: string | null
+  position: string | null
+  availability: AvailabilityState
+  identityConfidence: PlayerIdentityConfidence
+}
+
+// ─── Packet 03: read-result envelope ─────────────────────────────────────────
+// Distinguishes "supported and returned," "supported but temporarily
+// failed," "unsupported by this provider/integration," "blocked pending
+// external approval" (Yahoo today), and "unverified — no real fixture
+// exists yet to trust this parser." A capability flag alone can't carry
+// this — capabilities are static per-platform declarations, this is the
+// per-call outcome.
+export type IntelligenceReadStatus = 'ok' | 'failed' | 'unsupported' | 'approval_pending' | 'unverified'
+
+export interface IntelligenceReadResult<T> {
+  status: IntelligenceReadStatus
+  data: T | null
+  warnings: DataQualityWarning[]
+  // Safe, non-credential, non-raw-response message — set only when
+  // status is 'failed'. Never include tokens, cookies, or provider
+  // response bodies here (see lib/yahoo.ts's YahooAPIError precedent).
+  errorReason?: string
+}
+
+// ─── Packet 03: named freshness states (Section 7) ───────────────────────────
+// 'fresh' / 'stale' distinguish successful-but-aging data from a genuine
+// failure; 'unavailable' means no successful snapshot has ever been
+// captured; 'unsupported'/'approval_pending' mirror IntelligenceReadStatus
+// for the same reasons a live read might not be possible.
+export type SnapshotFreshness = 'fresh' | 'stale' | 'unavailable' | 'unsupported' | 'approval_pending'
+
+// ─── Packet 03: narrow provider read adapter (Workstream B) ─────────────────
+// Server-only when a real implementation requires credentials (ESPN
+// cookies, Yahoo OAuth tokens) — this interface itself is just types, safe
+// to import anywhere; concrete adapters (lib/platforms/sleeper.ts et al.)
+// are the server-only boundary, same as lib/yahoo.ts/lib/espn.ts today.
+export interface ConnectedLeagueContext {
+  connectedLeagueId: string
+  userId: string
+  platform: Platform
+  externalLeagueId: string
+  externalTeamId: string
+}
+
+export interface PlatformIntelligenceAdapter {
+  platform: Platform
+  capabilities: PlatformCapabilities
+  readOwnedRoster(context: ConnectedLeagueContext): Promise<IntelligenceReadResult<NormalizedRosterSnapshot>>
+  readMatchup?(context: ConnectedLeagueContext, week: number): Promise<IntelligenceReadResult<NormalizedMatchup>>
+  readAvailablePlayers?(context: ConnectedLeagueContext): Promise<IntelligenceReadResult<NormalizedAvailablePlayer[]>>
+  readDraftMetadata?(context: ConnectedLeagueContext): Promise<IntelligenceReadResult<NormalizedDraftInfo>>
+}
+
+// ─── Packet 03: coverage summary (Section 13) ────────────────────────────────
+// So a consumer (and the UI, eventually Packet 04) can tell "nothing needs
+// attention" apart from "Rostiro could not inspect two of your leagues."
+export interface IntelligenceCoverage {
+  totalConnectedLeagues: number
+  freshLeagues: number
+  staleLeagues: number
+  unavailableLeagues: number
+  unresolvedPlayerCount: number
+  byPlatform: Record<Platform, {
+    connected: number
+    included: number
+    stale: number
+    failed: number
+    unsupported: number
+  }>
 }
