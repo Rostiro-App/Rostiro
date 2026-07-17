@@ -79,6 +79,13 @@ export async function POST(request: Request) {
 
   const burst = await checkRateLimit(admin, `ask_copilot:${user.id}`, 1, BURST_LIMIT_SECONDS)
   if (!burst.allowed) {
+    // service_unavailable = the rate-limit check itself failed (fail
+    // closed, this route calls a paid Claude API) — distinct from a
+    // genuine rate_limited, so a transient DB hiccup is reported honestly
+    // rather than implied to be the user asking too often.
+    if (burst.reason === 'service_unavailable') {
+      return NextResponse.json({ error: 'Temporarily unavailable — try again shortly.' }, { status: 503 })
+    }
     return NextResponse.json({ error: 'Ask Copilot too often — wait a moment and try again.' }, { status: 429 })
   }
 

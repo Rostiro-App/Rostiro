@@ -38,6 +38,21 @@ describe('POST /api/system/log-error', () => {
     expect(logAppError).not.toHaveBeenCalled()
   })
 
+  it('rejects a body that is under MAX_BODY_BYTES by .length but over it in real UTF-8 bytes (regression: multibyte undercounting)', async () => {
+    // Each '中' is 1 UTF-16 code unit (counted by .length) but 3 UTF-8
+    // bytes. message (2000 chars, zod max) + stack (5000 chars, zod max)
+    // individually satisfy every per-field cap, and no content-length
+    // header is sent, but their combined UTF-8 byte size (~21KB) exceeds
+    // MAX_BODY_BYTES (16KB) while the raw JSON string's .length (~7KB)
+    // does not — a body that would have silently sailed through and hit
+    // logAppError under the old `raw.length` check.
+    const message = '中'.repeat(2000)
+    const stack = '中'.repeat(5000)
+    const res = await POST(postReq({ source: 'client', message, stack }))
+    expect(res.status).toBe(413)
+    expect(logAppError).not.toHaveBeenCalled()
+  })
+
   it('rejects an oversized request via Content-Length before parsing', async () => {
     const res = await POST(postReq({ source: 'client', message: 'ok' }, { 'content-length': String(20 * 1024) }))
     expect(res.status).toBe(413)
@@ -64,6 +79,13 @@ describe('POST /api/system/log-error', () => {
     vi.mocked(checkRateLimit).mockResolvedValue({ allowed: false, remaining: 0, reason: 'rate_limited' })
     const res = await POST(postReq({ source: 'client', message: 'ok' }))
     expect(res.status).toBe(429)
+    expect(logAppError).not.toHaveBeenCalled()
+  })
+
+  it('returns 503, not 429, when the limiter itself is unavailable (fail-closed, not "you did something wrong")', async () => {
+    vi.mocked(checkRateLimit).mockResolvedValue({ allowed: false, remaining: 0, reason: 'service_unavailable' })
+    const res = await POST(postReq({ source: 'client', message: 'ok' }))
+    expect(res.status).toBe(503)
     expect(logAppError).not.toHaveBeenCalled()
   })
 

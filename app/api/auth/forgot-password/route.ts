@@ -27,6 +27,12 @@ export async function POST(request: NextRequest) {
   const ip = getClientIp(request)
   const ipCheck = await checkRateLimit(admin, `forgot-password:ip:${ip}`, RATE_LIMIT, RATE_WINDOW_SECONDS)
   if (!ipCheck.allowed) {
+    // service_unavailable = the rate-limit check itself failed (fail
+    // closed) — distinct from a genuine rate_limited, so a transient DB
+    // hiccup is reported honestly rather than implied to be abuse.
+    if (ipCheck.reason === 'service_unavailable') {
+      return NextResponse.json({ error: 'Temporarily unavailable — try again shortly.' }, { status: 503 })
+    }
     return NextResponse.json({ error: 'Too many requests — try again later.' }, { status: 429 })
   }
 
@@ -40,7 +46,11 @@ export async function POST(request: NextRequest) {
   if (!emailCheck.allowed) {
     // Same generic response as "account doesn't exist" below — a distinct
     // message here would leak that this address is being rate-limited,
-    // which is itself a signal an attacker could use.
+    // which is itself a signal an attacker could use. Deliberately not
+    // distinguishing service_unavailable here either (unlike the IP check
+    // above): this key is per-email, not per-caller, so surfacing a 503
+    // would itself leak "this email is being tracked" the same way a 429
+    // would — anti-enumeration wins over accurate status here.
     return NextResponse.json({
       ok: true,
       message: "If an account exists for that email, we've sent a link to reset your password.",

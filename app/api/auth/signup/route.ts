@@ -39,8 +39,14 @@ const RATE_WINDOW_SECONDS = 60 * 60
 export async function POST(request: NextRequest) {
   const admin = createAdminClient()
   const ip = getClientIp(request)
-  const { allowed } = await checkRateLimit(admin, `signup:${ip}`, RATE_LIMIT, RATE_WINDOW_SECONDS)
+  const { allowed, reason } = await checkRateLimit(admin, `signup:${ip}`, RATE_LIMIT, RATE_WINDOW_SECONDS)
   if (!allowed) {
+    // service_unavailable = the rate-limit check itself failed (fail
+    // closed) — distinct from a genuine rate_limited, so a transient DB
+    // hiccup is reported honestly rather than implied to be abuse.
+    if (reason === 'service_unavailable') {
+      return NextResponse.json({ error: 'Temporarily unavailable — try again shortly.' }, { status: 503 })
+    }
     return NextResponse.json({ error: 'Too many signup attempts — try again later.' }, { status: 429 })
   }
 

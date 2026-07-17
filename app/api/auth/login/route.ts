@@ -24,6 +24,12 @@ export async function POST(request: NextRequest) {
   const ip = getClientIp(request)
   const ipCheck = await checkRateLimit(admin, `login:ip:${ip}`, RATE_LIMIT, RATE_WINDOW_SECONDS)
   if (!ipCheck.allowed) {
+    // service_unavailable = the rate-limit check itself failed (fail
+    // closed) — distinct from a genuine rate_limited, so a transient DB
+    // hiccup is reported honestly rather than implied to be abuse.
+    if (ipCheck.reason === 'service_unavailable') {
+      return NextResponse.json({ error: 'Temporarily unavailable — try again shortly.' }, { status: 503 })
+    }
     return NextResponse.json({ error: 'Too many login attempts — try again later.' }, { status: 429 })
   }
 
@@ -35,6 +41,9 @@ export async function POST(request: NextRequest) {
 
   const emailCheck = await checkRateLimit(admin, `login:email:${email.toLowerCase()}`, RATE_LIMIT, RATE_WINDOW_SECONDS)
   if (!emailCheck.allowed) {
+    if (emailCheck.reason === 'service_unavailable') {
+      return NextResponse.json({ error: 'Temporarily unavailable — try again shortly.' }, { status: 503 })
+    }
     return NextResponse.json({ error: 'Too many login attempts for this account — try again later.' }, { status: 429 })
   }
 
