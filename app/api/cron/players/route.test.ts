@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
+import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/supabase', () => ({ createAdminClient: vi.fn(() => { throw new Error('should never be reached when auth fails') }) }))
 vi.mock('@/lib/sleeper', () => ({ getSleeperPlayers: vi.fn(() => { throw new Error('should never be reached when auth fails') }), SEASON: 2026 }))
@@ -8,10 +9,10 @@ vi.mock('@/lib/cronHeartbeat', () => ({ recordCronRun: vi.fn() }))
 import { GET } from './route'
 import { recordCronRun } from '@/lib/cronHeartbeat'
 
-function req(authHeader?: string): Request {
+function req(authHeader?: string): NextRequest {
   const headers = new Headers()
   if (authHeader !== undefined) headers.set('authorization', authHeader)
-  return new Request('http://localhost/api/cron/players', { headers }) as never
+  return new NextRequest('http://localhost/api/cron/players', { headers })
 }
 
 describe('GET /api/cron/players — auth boundary (representative cron route)', () => {

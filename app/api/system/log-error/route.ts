@@ -46,17 +46,23 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
   const ip = getClientIp(request)
-  const { allowed } = await checkRateLimit(admin, `log-error:${ip}`, RATE_LIMIT, RATE_WINDOW_SECONDS)
+  const { allowed, reason } = await checkRateLimit(admin, `log-error:${ip}`, RATE_LIMIT, RATE_WINDOW_SECONDS)
   if (!allowed) {
-    // Rate-limited or the limiter itself failed closed — either way, this
-    // is a best-effort diagnostic surface, not a route anything depends on
-    // succeeding, so a flat rejection (no reason distinction, no detail)
-    // is the right level of information to give an unauthenticated caller.
-    return NextResponse.json({ ok: false }, { status: 429 })
+    // This is a best-effort diagnostic surface, not a route anything
+    // depends on succeeding, so the body stays flat ({ ok: false }, no
+    // detail) either way — but the status code still distinguishes a real
+    // rate limit (429) from the limiter itself being unavailable (503),
+    // since that's meaningful to anything monitoring this endpoint even if
+    // it's meaningless to the crashing client that triggered the call.
+    return NextResponse.json({ ok: false }, { status: reason === 'service_unavailable' ? 503 : 429 })
   }
 
   const raw = await request.text().catch(() => null)
-  if (raw === null || raw.length > MAX_BODY_BYTES) {
+  // `.length` counts UTF-16 code units, not bytes — a body full of
+  // multibyte characters (emoji, non-Latin scripts) can be well under
+  // MAX_BODY_BYTES by .length while its actual UTF-8 encoding, and thus
+  // Supabase storage cost, exceeds it. Measure real bytes instead.
+  if (raw === null || new TextEncoder().encode(raw).length > MAX_BODY_BYTES) {
     return NextResponse.json({ ok: false }, { status: raw === null ? 400 : 413 })
   }
 
