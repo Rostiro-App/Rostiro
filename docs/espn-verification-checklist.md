@@ -25,15 +25,17 @@
 
 ## 3. DEF / D-ST resolution
 
-- [ ] Confirm `resolvePlayerIdentityPure`'s DEF branch (`lib/playerIdentity.ts`) correctly resolves a real ESPN team defense entry — no DEF/D-ST player was present in any real capture this session (`kona_player_info`'s captured sample was 3 offensive skill players; the constructed roster fixture has none either).
-- [ ] Confirm `ESPN_POSITION_MAP[16] === 'DEF'` and the specific `proTeamId` for that defense's team resolve correctly — this is the single highest-risk entry in `ESPN_POSITION_MAP`/`ESPN_PRO_TEAM_MAP`, per `lib/platforms/espn.ts`'s own comment, since a wrong proTeamId here would misresolve identity entirely rather than just degrade a display field.
+- [x] `ESPN_POSITION_MAP[16] === 'DEF'` — confirmed live 2026-07-17 (P3-4B) via a real, high-ownership Texans D/ST entry.
+- [x] Every `proTeamId` for a team defense resolves correctly — confirmed live 2026-07-17 (P3-4B) via a complete capture of all 32 real team-defense entries' unambiguous display names (e.g. "Chiefs D/ST" → 12, "Jaguars D/ST" → 30). This capture caught and fixed two real bugs in the P3-3 `ESPN_PRO_TEAM_MAP` (12/34 both mapped to HOU; 13/30 both mapped to LV) via `lib/playerMappingSeed.ts`'s collision report during a real P3-4B dry run — see `lib/platforms/espnMaps.ts`'s header comment.
+- [ ] `resolvePlayerIdentityPure`'s DEF branch (`lib/playerIdentity.ts`) has not yet been exercised against a real ESPN DEF row through the full adapter path (`espnReadOwnedRoster`/`espnReadAvailablePlayers`) — the team-ID capture above proved the *map*, not the end-to-end resolver call. Confirm once a real connected league has a DEF on a roster or in its free-agent pool.
 
 ## 4. Uncommon position/team enum values
 
-- [ ] `ESPN_POSITION_MAP` only directly spot-checked `2` (RB) and `3` (WR) against real players this session. Confirm `1` (QB), `4` (TE), `5` (K), and `16` (DEF) against real captured players before trusting them in production.
-- [ ] `ESPN_PRO_TEAM_MAP` only directly spot-checked `6` (NYJ), `11` (IND), `14` (LAR), `15` (MIA), `30` (LV) this session. Confirm the remaining ~27 team IDs against real players, particularly any team whose abbreviation differs from what's commonly documented (e.g. Washington/`WSH` naming has changed across ESPN API versions historically).
-- [ ] Note: a wrong entry in either map degrades a player's *displayed* position/team, it does not by itself break identity resolution for non-DEF players — `resolvePlayerIdentityPure` falls back to name-only matching when position/team don't line up. Confirm this fallback actually fires correctly for a real mismapped case before assuming it's a low-severity gap in practice.
+- [x] `ESPN_POSITION_MAP` — fully confirmed live 2026-07-17 (P3-4B): all six entries (QB/1, RB/2, WR/3, TE/4, K/5, DEF/16) verified against real, >50%-owned players (Josh Allen, Jahmyr Gibbs, Puka Nacua, Brock Bowers, Brandon Aubrey, Texans D/ST).
+- [x] `ESPN_PRO_TEAM_MAP` — fully confirmed live 2026-07-17 (P3-4B): all 32 mapped team IDs verified via real team-defense display names (see section 3). `proTeamId: 0` ("no team"/free agent) is still an inference, not directly observed — no real player in any fetch this session had `proTeamId 0`.
+- [ ] Confirm `proTeamId: 0` really does mean "no current NFL team" against a real unsigned player once one is observed (e.g. an unsigned rookie or a player between signings) — `espnProTeamAbbrev` currently treats it as `null`, matching the "never a placeholder" rule, but the specific value `0` itself is unverified.
+- [ ] `lib/platforms/espn.ts`'s `espnReadOwnedRoster`/`espnReadAvailablePlayers` pass `nflTeam ?? ''` into `resolvePlayerIdentityPure` (a temporary quirk — `PlayerIdentityInput.nflTeam` is still non-nullable) while the OUTPUT and `player_mappings` both correctly use `null` for a real free agent. Confirm this doesn't cause a real free-agent ESPN player to fail matching against a `player_mappings` row that correctly stores `nfl_team: null` — worth widening `PlayerIdentityInput.nflTeam` to `string | null` once this is hit with real data, rather than leaving the empty-string coercion in place indefinitely.
 
 ---
 
-**When all four sections pass:** update this file's Status line to reflect what's verified, and note any parser fixes made along the way in the relevant commit — don't silently correct `lib/platforms/espn.ts` without a record of what real data revealed.
+**When all sections pass:** update this file's Status line to reflect what's verified, and note any parser fixes made along the way in the relevant commit — don't silently correct `lib/platforms/espn.ts` without a record of what real data revealed.

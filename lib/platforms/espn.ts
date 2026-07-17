@@ -11,6 +11,7 @@ import { decrypt } from '@/lib/encrypt'
 import { EspnAPIError } from '@/types'
 import type { NFLPosition } from '@/types'
 import { fetchActivePlayerMappings, resolvePlayerIdentityPure } from '@/lib/playerIdentity'
+import { espnProTeamAbbrev, espnPosition } from './espnMaps'
 import {
   getEspnRosters,
   getEspnMatchup,
@@ -48,36 +49,10 @@ export const ESPN_CAPABILITIES: PlatformCapabilities = {
   tradeWrite: false,
 }
 
-// ESPN's defaultPositionId/proTeamId numeric enum is unofficial — ESPN
-// publishes no schema for it — but it's been stable across every public
-// ESPN fantasy API integration for years. Directly confirmed LIVE this
-// session against real players: defaultPositionId 2 (Israel Abanikanda,
-// Ameer Abdullah, Jonathan Taylor — all real RBs) and 3 (Puka Nacua, a
-// real WR); proTeamId 6 (NYJ/Abanikanda), 30 (LV/Abdullah), 15
-// (MIA/Achane), 14 (LAR/Nacua), 11 (IND/Taylor). The rest of this table
-// follows the same widely-used community enum but was NOT independently
-// re-verified live — a wrong entry here degrades a player's displayed
-// position/team, it does not break identity resolution (which falls back
-// to name-only matching when position/team don't line up — see
-// lib/playerIdentity.ts), except for DEF/D-ST players, where a wrong
-// proTeamId would misresolve entirely. Treat any DEF resolution from this
-// adapter as lower-confidence until independently verified.
-const ESPN_POSITION_MAP: Record<number, NFLPosition> = {
-  1: 'QB',
-  2: 'RB',
-  3: 'WR',
-  4: 'TE',
-  5: 'K',
-  16: 'DEF',
-}
-
-const ESPN_PRO_TEAM_MAP: Record<number, string> = {
-  1: 'ATL', 2: 'BUF', 3: 'CHI', 4: 'CIN', 5: 'CLE', 6: 'NYJ', 7: 'DEN', 8: 'DAL',
-  9: 'DET', 10: 'GB', 11: 'IND', 12: 'HOU', 13: 'LV', 14: 'LAR', 15: 'MIA',
-  16: 'MIN', 17: 'NE', 18: 'NO', 19: 'NYG', 20: 'PHI', 21: 'ARI', 22: 'PIT',
-  23: 'LAC', 24: 'SF', 25: 'SEA', 26: 'TB', 27: 'WSH', 28: 'CAR', 29: 'JAX',
-  30: 'LV', 33: 'BAL', 34: 'HOU',
-}
+// ESPN_POSITION_MAP / ESPN_PRO_TEAM_MAP moved to ./espnMaps.ts (P3-4B) so
+// lib/espnPlayerIngest.ts's players_cache seeding reads the exact same
+// table this adapter does — see that file for the verification-confidence
+// notes previously kept here.
 
 // Same convention lib/normalize.ts's normalizeEspnRoster already documents:
 // ESPN slot IDs 0=QB,2=RB,4=WR,6=TE,16=K,17=D/ST,20=BN,21=IR,23=FLEX.
@@ -104,11 +79,15 @@ interface EspnRawPlayer {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function espnPlayerFields(player: any): { name: string; nflTeam: string; position: NFLPosition | null } {
+function espnPlayerFields(player: any): { name: string; nflTeam: string | null; position: NFLPosition | null } {
   return {
     name: player?.fullName ?? '',
-    nflTeam: ESPN_PRO_TEAM_MAP[player?.proTeamId] ?? '',
-    position: ESPN_POSITION_MAP[player?.defaultPositionId] ?? null,
+    // P3-4B: genuinely null (never '') for an unmapped/free-agent
+    // proTeamId — matches lib/playerMappingSeed.ts's "never a placeholder
+    // team value" rule, so this adapter's resolvePlayerIdentityPure calls
+    // compare against the same null a real free-agent mapping row stores.
+    nflTeam: espnProTeamAbbrev(player?.proTeamId),
+    position: espnPosition(player?.defaultPositionId),
   }
 }
 
@@ -151,7 +130,12 @@ export async function espnReadOwnedRoster(
         platform: 'espn',
         sourcePlayerId,
         name,
-        nflTeam,
+        // lib/playerIdentity.ts's PlayerIdentityInput.nflTeam is still
+        // non-nullable (out of scope to widen today — see
+        // docs/espn-verification-checklist.md) — '' here is a resolver
+        // INPUT quirk only, never written to output/storage, where a
+        // real free agent is always nflTeam: null.
+        nflTeam: nflTeam ?? '',
         position,
       })
       if (resolution.confidence === 'unresolved') {
@@ -298,7 +282,12 @@ export async function espnReadAvailablePlayers(
         platform: 'espn',
         sourcePlayerId,
         name,
-        nflTeam,
+        // lib/playerIdentity.ts's PlayerIdentityInput.nflTeam is still
+        // non-nullable (out of scope to widen today — see
+        // docs/espn-verification-checklist.md) — '' here is a resolver
+        // INPUT quirk only, never written to output/storage, where a
+        // real free agent is always nflTeam: null.
+        nflTeam: nflTeam ?? '',
         position,
       })
 

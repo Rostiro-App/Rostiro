@@ -1,5 +1,5 @@
 /**
- * Packet 03, P3-4: player_mappings seed runner.
+ * Packet 03, P3-4 + P3-4B: player_mappings seed runner.
  *
  * Dry-run by default — reads real players_cache + player_mappings from
  * Supabase, builds a plan via lib/playerMappingSeed.ts's pure
@@ -9,6 +9,14 @@
  * that specific run — this file does not enforce that itself (it can't
  * know who's running it), the approval step is procedural.
  *
+ * P3-4B: if players_cache has zero ESPN rows (the real state as of
+ * 2026-07-17 — no ESPN ingestion has ever run), this script falls back to
+ * a LIVE, read-only ESPN fetch (via scripts/ingestEspnPlayers.mts's dry-run
+ * path) so the report genuinely reflects real Sleeper+ESPN candidates
+ * rather than silently staying Sleeper-only. That live fetch never writes
+ * to players_cache itself — only scripts/ingestEspnPlayers.mts --write
+ * does that, as its own separate, explicitly-approved step.
+ *
  * Usage:
  *   npx tsx scripts/seedPlayerMappings.mts             # dry run, report only
  *   npx tsx scripts/seedPlayerMappings.mts --write      # apply the plan
@@ -16,6 +24,7 @@
  */
 import { createAdminClient } from '../lib/supabase'
 import { buildPlayerMappingSeedPlan, type ExistingMapping, type PlayerCacheRow, type SeedAction } from '../lib/playerMappingSeed'
+import { fetchLiveEspnCandidates } from '../lib/espnIngestRunner'
 
 const args = process.argv.slice(2)
 const WRITE = args.includes('--write')
@@ -25,20 +34,32 @@ const SEASON = seasonArgIdx >= 0 ? Number(args[seasonArgIdx + 1]) : 2026
 const PAGE_SIZE = 1000
 
 // PostgREST caps a single response at 1000 rows by default — players_cache
-// has 1887+ real rows, so a single unpaginated select silently truncates
-// the seed's input. Page through explicitly rather than trust a default.
+// has 1887+ real Sleeper rows, so a single unpaginated select silently
+// truncates the seed's input (found and fixed during the first real P3-4
+// dry run). Page through explicitly rather than trust a default.
 async function loadCacheRows(admin: ReturnType<typeof createAdminClient>, platform: 'sleeper' | 'espn'): Promise<PlayerCacheRow[]> {
+  const adpColumn = platform === 'sleeper' ? 'adp_sleeper' : 'adp_espn'
   const rows: PlayerCacheRow[] = []
   let from = 0
   for (;;) {
     const { data, error } = await admin
       .from('players_cache')
-      .select('player_id, platform, name, position, nfl_team')
+      .select(`player_id, platform, name, position, nfl_team, ownership_pct, ${adpColumn}`)
       .eq('platform', platform)
       .range(from, from + PAGE_SIZE - 1)
     if (error) throw new Error(`Failed to load ${platform} players_cache: ${error.message}`)
     if (!data || data.length === 0) break
-    rows.push(...data.map((r) => ({ playerId: r.player_id, platform, name: r.name, position: r.position, nflTeam: r.nfl_team })))
+    rows.push(
+      ...data.map((r) => ({
+        playerId: r.player_id,
+        platform,
+        name: r.name,
+        position: r.position,
+        nflTeam: r.nfl_team,
+        ownershipPct: r.ownership_pct,
+        adp: (r as Record<string, number | null>)[adpColumn],
+      }))
+    )
     if (data.length < PAGE_SIZE) break
     from += PAGE_SIZE
   }
@@ -80,7 +101,7 @@ async function applyActions(admin: ReturnType<typeof createAdminClient>, actions
     if (action.type === 'insert') {
       const { error } = await admin.from('player_mappings').insert({
         name: action.name,
-        nfl_team: action.nflTeam,
+        nfl_team: action.nflTeam, // may be null for a real, fantasy-relevant free agent — never a placeholder
         position: action.position,
         espn_id: action.espnId,
         sleeper_id: action.sleeperId,
@@ -88,7 +109,7 @@ async function applyActions(admin: ReturnType<typeof createAdminClient>, actions
         season: action.season,
       })
       if (error) {
-        console.error(`  INSERT FAILED for ${action.name} (${action.nflTeam}): ${error.message}`)
+        console.error(`  INSERT FAILED for ${action.name} (${action.nflTeam ?? 'free agent'}): ${error.message}`)
         continue
       }
       inserted++
@@ -115,21 +136,46 @@ async function applyActions(admin: ReturnType<typeof createAdminClient>, actions
 async function main() {
   const admin = createAdminClient()
 
-  const [sleeperRows, espnRows, existingMappings] = await Promise.all([
+  const [sleeperRows, espnCacheRows, existingMappings] = await Promise.all([
     loadCacheRows(admin, 'sleeper'),
     loadCacheRows(admin, 'espn'),
     loadExistingMappings(admin, SEASON),
   ])
+
+  let espnRows = espnCacheRows
+  let espnSource: 'players_cache' | 'live_fetch' | 'none' = espnCacheRows.length > 0 ? 'players_cache' : 'none'
+
+  if (espnCacheRows.length === 0) {
+    console.log('players_cache has 0 ESPN rows — attempting a LIVE, read-only ESPN fetch so this report reflects real Sleeper+ESPN candidates (nothing will be written to players_cache from this path).')
+    try {
+      const candidates = await fetchLiveEspnCandidates(admin)
+      if (candidates.length > 0) {
+        espnRows = candidates.map((c) => ({
+          playerId: c.playerId,
+          platform: 'espn' as const,
+          name: c.name,
+          position: c.position,
+          nflTeam: c.nflTeam,
+          ownershipPct: c.ownershipPct,
+          adp: c.adpEspn,
+        }))
+        espnSource = 'live_fetch'
+      }
+    } catch (err) {
+      console.log(`Live ESPN fetch failed (${err instanceof Error ? err.message : String(err)}) — continuing with Sleeper-only candidates.`)
+    }
+  }
 
   const { actions, report } = buildPlayerMappingSeedPlan(existingMappings, sleeperRows, espnRows, SEASON)
 
   // Report contains only public NFL player names/teams (players_cache has
   // no user PII) and internal mapping row IDs — safe to print/log.
   console.log(JSON.stringify(report, null, 2))
-  console.log(`\n${actions.length} action(s) proposed. Mode: ${WRITE ? 'WRITE' : 'DRY RUN (no changes made)'}`)
+  console.log(`\nESPN candidate source: ${espnSource}`)
+  console.log(`${actions.length} action(s) proposed. Mode: ${WRITE ? 'WRITE' : 'DRY RUN (no changes made)'}`)
 
-  if (report.totals.espnCacheRows === 0) {
-    console.log('\nNOTE: 0 ESPN players_cache rows found — no ESPN player-cache sync route exists in this codebase yet (app/api/cron/players/route.ts only syncs Sleeper). This run will only ever produce single-platform Sleeper mappings until that gap is closed.')
+  if (espnSource === 'none') {
+    console.log('\nNOTE: no ESPN candidates available (no players_cache rows and no connected ESPN league with stored credentials was found for a live fetch). This run only produced single-platform Sleeper mappings.')
   }
 
   if (!WRITE) {

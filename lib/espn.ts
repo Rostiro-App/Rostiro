@@ -22,10 +22,22 @@ interface EspnCredentials {
 // tripping the breaker over a single user's expired cookies would wrongly
 // block every other ESPN user's real, healthy calls. Only a network
 // error, a 429, or an unexpected server error signals an actual outage.
+// P3-4B fix: `filterHeader` is a genuine bug fix, not new behavior — every
+// existing caller that thought it was sending 'X-Fantasy-Filter' via
+// `params` (getEspnWaivers) was actually only appending it as a harmless,
+// ignored `?X-Fantasy-Filter=...` query string parameter, because this
+// function unconditionally sent an EMPTY `{}` filter as the real HTTP
+// header regardless of what `params` contained. ESPN's kona_player_info
+// endpoint reads the filter from the header, not the query string, so
+// getEspnWaivers's intended FREEAGENT/WAIVERS/limit-50/sortPercOwned
+// filter was never actually applied — confirmed by re-reading this
+// function's own fetch() call, not assumed. Fixed by threading the real
+// filter through as its own parameter instead of via `params`.
 async function espnFetch<T>(
   path: string,
   credentials: EspnCredentials,
-  params?: Record<string, string>
+  params?: Record<string, string>,
+  filterHeader?: string
 ): Promise<T> {
   await checkCircuitBreaker('espn')
   const start = Date.now()
@@ -39,7 +51,7 @@ async function espnFetch<T>(
     res = await fetch(url.toString(), {
       headers: {
         Cookie: `espn_s2=${credentials.espnS2}; SWID=${credentials.swid}`,
-        'X-Fantasy-Filter': JSON.stringify({}),
+        'X-Fantasy-Filter': filterHeader ?? JSON.stringify({}),
       },
       next: { revalidate: 0 },
     })
@@ -206,10 +218,52 @@ export async function getEspnWaivers(
       sortPercOwned: { sortAsc: false, sortPriority: 1 },
     },
   }
-  return espnFetch(leagueUrl(leagueId), credentials, {
-    view: 'kona_player_info',
-    'X-Fantasy-Filter': JSON.stringify(filter),
-  })
+  // P3-4B: filter now sent as the real header (see espnFetch's
+  // filterHeader param) — previously this was silently dropped as a dead
+  // query-string parameter and every call returned ESPN's unfiltered
+  // default instead of the intended FREEAGENT/WAIVERS/top-50 set.
+  return espnFetch(leagueUrl(leagueId), credentials, { view: 'kona_player_info' }, JSON.stringify(filter))
+}
+
+// P3-4B: paginated full player-pool fetch (no status filter — every
+// player ESPN tracks, not just free agents/waivers) for
+// lib/espnPlayerIngest.ts's players_cache seeding. Offset/limit + a
+// safety page cap; stops as soon as a page returns fewer than pageSize
+// results, same "don't over-fetch past what's really there" discipline as
+// lib/platforms/sleeper.ts's FREE_AGENT_POOL_SIZE over-fetch comment.
+export async function getEspnAllPlayers(
+  leagueId: string,
+  credentials: EspnCredentials,
+  opts?: { pageSize?: number; maxPages?: number }
+): Promise<{ players: unknown[]; pagesFetched: number; hitMaxPages: boolean }> {
+  const pageSize = opts?.pageSize ?? 500
+  const maxPages = opts?.maxPages ?? 20
+  const all: unknown[] = []
+  let pagesFetched = 0
+  let hitMaxPages = false
+
+  for (let page = 0; page < maxPages; page++) {
+    const filter = {
+      players: {
+        limit: pageSize,
+        offset: page * pageSize,
+        sortPercOwned: { sortAsc: false, sortPriority: 1 },
+      },
+    }
+    const data = await espnFetch<{ players?: unknown[] }>(
+      leagueUrl(leagueId),
+      credentials,
+      { view: 'kona_player_info' },
+      JSON.stringify(filter)
+    )
+    const batch = data.players ?? []
+    all.push(...batch)
+    pagesFetched++
+    if (batch.length < pageSize) break
+    if (page === maxPages - 1) hitMaxPages = true
+  }
+
+  return { players: all, pagesFetched, hitMaxPages }
 }
 
 // ─── Draft sync (mDraftDetail) ─────────────────────────────────────────────────

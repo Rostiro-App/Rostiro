@@ -215,7 +215,10 @@ describe('espnReadAvailablePlayers', () => {
     expect(result.data).toHaveLength(3)
     const abdullah = result.data?.find((p) => p.sourcePlayerId === '2576336')
     expect(abdullah?.availability).toBe('waivers')
-    expect(abdullah?.nflTeam).toBe('LV')
+    // P3-4B: ESPN_PRO_TEAM_MAP was corrected using a real, complete capture
+    // of all 32 team defenses' unambiguous names — proTeamId 30 is JAX,
+    // not LV (the earlier P3-3 map had this wrong).
+    expect(abdullah?.nflTeam).toBe('JAX')
     const achane = result.data?.find((p) => p.sourcePlayerId === '4429160')
     expect(achane?.availability).toBe('free_agent')
     expect(achane?.position).toBe('RB')
