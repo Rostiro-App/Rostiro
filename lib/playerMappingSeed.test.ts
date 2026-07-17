@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildPlayerMappingSeedPlan, isFantasyRelevantFreeAgent, type ExistingMapping, type PlayerCacheRow } from './playerMappingSeed'
+import { buildPlayerMappingSeedPlan, hasTeamlessActivitySignal, type ExistingMapping, type PlayerCacheRow } from './playerMappingSeed'
 
 const SEASON = 2026
 
@@ -64,7 +64,7 @@ describe('buildPlayerMappingSeedPlan — collisions never persisted', () => {
     expect(plan.report.collisions[0].reason).toMatch(/cannot resolve unambiguously/)
   })
 
-  it('never merges two same-platform free agents sharing a name — reports a collision, never guesses which is which', () => {
+  it('never merges two same-platform teamless candidates sharing a name — reports a collision, never guesses which is which', () => {
     // P3-4B: "duplicate names with null teams" regression.
     const plan = buildPlayerMappingSeedPlan(
       [],
@@ -81,52 +81,73 @@ describe('buildPlayerMappingSeedPlan — collisions never persisted', () => {
   })
 })
 
-describe('buildPlayerMappingSeedPlan — active free agents preserved (P3-4B)', () => {
-  it('isFantasyRelevantFreeAgent is true when ownership % is above zero', () => {
-    expect(isFantasyRelevantFreeAgent({ ownershipPct: 2.5, adp: null })).toBe(true)
+describe('buildPlayerMappingSeedPlan — teamless-with-activity-signal preserved, never labeled "free agent" (P3-4B correction)', () => {
+  it('hasTeamlessActivitySignal is true when ownership % is above zero', () => {
+    expect(hasTeamlessActivitySignal({ ownershipPct: 2.5, adp: null })).toBe(true)
   })
-  it('isFantasyRelevantFreeAgent is true when an ADP exists, even a very late one', () => {
-    expect(isFantasyRelevantFreeAgent({ ownershipPct: null, adp: 480 })).toBe(true)
+  it('hasTeamlessActivitySignal is true when an ADP exists, even a very late one', () => {
+    expect(hasTeamlessActivitySignal({ ownershipPct: null, adp: 480 })).toBe(true)
   })
-  it('isFantasyRelevantFreeAgent is false with no signal at all', () => {
-    expect(isFantasyRelevantFreeAgent({ ownershipPct: null, adp: null })).toBe(false)
+  it('hasTeamlessActivitySignal is false with no signal at all', () => {
+    expect(hasTeamlessActivitySignal({ ownershipPct: null, adp: null })).toBe(false)
   })
-  it('isFantasyRelevantFreeAgent is false when ownership is exactly zero and no ADP', () => {
-    expect(isFantasyRelevantFreeAgent({ ownershipPct: 0, adp: null })).toBe(false)
+  it('hasTeamlessActivitySignal is false when ownership is exactly zero and no ADP', () => {
+    expect(hasTeamlessActivitySignal({ ownershipPct: 0, adp: null })).toBe(false)
   })
 
-  it('writes a real, currently-relevant unsigned free agent with nflTeam: null — never a placeholder team string', () => {
+  it('writes a real, currently-tracked teamless player with nflTeam: null — never a placeholder team string, and never labeled as confirmed free agency', () => {
     const plan = buildPlayerMappingSeedPlan(
       [],
-      [sleeperRow({ playerId: 's1', name: 'Free Agent Guy', nflTeam: null, ownershipPct: 12.4 })],
+      [sleeperRow({ playerId: 's1', name: 'Teamless Guy', nflTeam: null, ownershipPct: 12.4 })],
       [],
       SEASON
     )
     expect(plan.actions).toHaveLength(1)
-    expect(plan.actions[0]).toMatchObject({ type: 'insert', nflTeam: null, isFreeAgent: true })
-    expect(plan.report.proposed.freeAgentsWritten).toBe(1)
+    expect(plan.actions[0]).toMatchObject({ type: 'insert', nflTeam: null, isTeamlessActivityUnverified: true })
+    expect(plan.report.proposed.teamlessActivityUnverifiedWritten).toBe(1)
   })
 
-  it('cross-links a free agent across platforms by name alone when both are genuinely unsigned', () => {
+  it('cross-links two teamless candidates across platforms by name alone when both share an activity signal', () => {
     const plan = buildPlayerMappingSeedPlan(
       [],
-      [sleeperRow({ playerId: 's1', name: 'Free Agent Guy', nflTeam: null, adp: 300 })],
-      [espnRow({ playerId: 'e1', name: 'Free Agent Guy', nflTeam: null, ownershipPct: 0.5 })],
+      [sleeperRow({ playerId: 's1', name: 'Teamless Guy', nflTeam: null, adp: 300 })],
+      [espnRow({ playerId: 'e1', name: 'Teamless Guy', nflTeam: null, ownershipPct: 0.5 })],
       SEASON
     )
     expect(plan.actions).toHaveLength(1)
-    expect(plan.actions[0]).toMatchObject({ type: 'insert', nflTeam: null, sleeperId: 's1', espnId: 'e1', matchBasis: 'name_team_unambiguous', isFreeAgent: true })
+    expect(plan.actions[0]).toMatchObject({ type: 'insert', nflTeam: null, sleeperId: 's1', espnId: 'e1', matchBasis: 'name_team_unambiguous', isTeamlessActivityUnverified: true })
   })
 
-  it('a free-agent link stays name_team_unambiguous confidence, never promoted to exact', () => {
+  it('a teamless cross-platform link stays name_team_unambiguous confidence, never promoted to exact or verified_alias', () => {
     const plan = buildPlayerMappingSeedPlan(
       [],
-      [sleeperRow({ playerId: 's1', name: 'Free Agent Guy', nflTeam: null, adp: 300 })],
-      [espnRow({ playerId: 'e1', name: 'Free Agent Guy', nflTeam: null, ownershipPct: 0.5 })],
+      [sleeperRow({ playerId: 's1', name: 'Teamless Guy', nflTeam: null, adp: 300 })],
+      [espnRow({ playerId: 'e1', name: 'Teamless Guy', nflTeam: null, ownershipPct: 0.5 })],
       SEASON
     )
     expect(plan.actions[0]).toMatchObject({ matchBasis: 'name_team_unambiguous' })
     expect(plan.actions.some((a) => (a as { matchBasis?: string }).matchBasis === 'provider_id_reuse')).toBe(false)
+  })
+
+  it('the isTeamlessActivityUnverified flag never appears on an ordinary rostered player — only on the genuinely teamless case', () => {
+    const plan = buildPlayerMappingSeedPlan([], [sleeperRow()], [espnRow()], SEASON)
+    const insertAction = plan.actions[0]
+    expect(insertAction).toMatchObject({ type: 'insert' })
+    if (insertAction.type === 'insert') expect(insertAction.isTeamlessActivityUnverified).toBe(false)
+  })
+})
+
+describe('buildPlayerMappingSeedPlan — cross-platform links retain honest confidence (Codex correction confirmation)', () => {
+  it('a normal, rostered cross-platform match is name_team_unambiguous, never exact or verified_alias', () => {
+    const plan = buildPlayerMappingSeedPlan([], [sleeperRow()], [espnRow()], SEASON)
+    expect(plan.actions[0]).toMatchObject({ matchBasis: 'name_team_unambiguous' })
+    // No action type in this file's vocabulary is ever 'exact' or
+    // 'verified_alias' — those are lib/playerIdentity.ts's confidence
+    // labels for a STORED mapping being reused, never something this
+    // seed itself assigns based on a name+team match alone.
+    const allMatchBases = plan.actions.map((a) => a.matchBasis)
+    expect(allMatchBases).not.toContain('exact')
+    expect(allMatchBases).not.toContain('verified_alias')
   })
 })
 
@@ -140,7 +161,7 @@ describe('buildPlayerMappingSeedPlan — retired/irrelevant players separated (P
     expect(plan.report.byPlatform.sleeper.retiredOrIrrelevant).toBe(1)
   })
 
-  it('a DEF row with no team is unresolved (data-quality gap), never treated as a free agent', () => {
+  it('a DEF row with no team is unresolved (data-quality gap), never treated as teamless-with-activity-signal', () => {
     const plan = buildPlayerMappingSeedPlan([], [sleeperRow({ name: 'Some Defense', position: 'DEF', nflTeam: null })], [], SEASON)
     expect(plan.actions).toHaveLength(0)
     expect(plan.report.retiredOrIrrelevant).toHaveLength(0)
@@ -258,7 +279,7 @@ describe('buildPlayerMappingSeedPlan — idempotent rerun', () => {
     expect(second.report.byPlatform.espn.matched).toBe(1)
   })
 
-  it('is idempotent for a written free agent too — rerun produces zero actions', () => {
+  it('is idempotent for a written teamless-activity-signal row too — rerun produces zero actions', () => {
     const first = buildPlayerMappingSeedPlan([], [sleeperRow({ nflTeam: null, ownershipPct: 8 })], [], SEASON)
     const insertedAction = first.actions[0]
     if (insertedAction.type !== 'insert') throw new Error('expected insert')

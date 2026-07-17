@@ -2,9 +2,9 @@
 -- Proposed forward migration — NOT applied to production.
 
 -- ─── 1. nfl_team becomes nullable (P3-4B) ──────────────────────────────────
--- A genuinely unsigned but fantasy-relevant free agent (real ownership %
--- or ADP signal, no current NFL team) is a legitimate, exact-identity
--- mapping — lib/playerMappingSeed.ts's buildPlayerMappingSeedPlan never
+-- A player with no current NFL team on record but a real activity signal
+-- (ownership % or ADP) is a legitimate mapping with a genuinely preserved
+-- provider identity — lib/playerMappingSeed.ts's buildPlayerMappingSeedPlan never
 -- represents that with a placeholder team string ('', 'FA', etc.), only
 -- with a real null. The original schema's `nfl_team text not null`
 -- constraint would reject that honest representation outright, forcing a
@@ -13,7 +13,7 @@
 --
 -- unique(name, nfl_team, season) is untouched and still works correctly
 -- with nulls: Postgres treats NULL <> NULL in a unique constraint, so
--- multiple free agents sharing a name can coexist with nfl_team = null
+-- multiple teamless players sharing a name can coexist with nfl_team = null
 -- without violating uniqueness — collision prevention for that case is
 -- handled in memory by buildPlayerMappingSeedPlan before any write
 -- happens, not by this constraint.

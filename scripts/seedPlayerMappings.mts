@@ -21,6 +21,15 @@
  *   npx tsx scripts/seedPlayerMappings.mts             # dry run, report only
  *   npx tsx scripts/seedPlayerMappings.mts --write      # apply the plan
  *   npx tsx scripts/seedPlayerMappings.mts --season 2027
+ *
+ * IMPORTANT for any future consumer of the player_mappings rows this
+ * writes: `nfl_team: null` does NOT prove active free-agent status — see
+ * lib/playerMappingSeed.ts's `isTeamlessActivityUnverified` flag and its
+ * header comment. A row with that flag set must never be surfaced in an
+ * active waiver pool, a recommendation, or player search SOLELY because
+ * its team is null — that requires a real provider-confirmed signal (e.g.
+ * lib/platforms/*.ts's readAvailablePlayers, which asks the provider
+ * directly), not an inference from a missing team field here.
  */
 import { createAdminClient } from '../lib/supabase'
 import { buildPlayerMappingSeedPlan, type ExistingMapping, type PlayerCacheRow, type SeedAction } from '../lib/playerMappingSeed'
@@ -101,7 +110,7 @@ async function applyActions(admin: ReturnType<typeof createAdminClient>, actions
     if (action.type === 'insert') {
       const { error } = await admin.from('player_mappings').insert({
         name: action.name,
-        nfl_team: action.nflTeam, // may be null for a real, fantasy-relevant free agent — never a placeholder
+        nfl_team: action.nflTeam, // may be null when no team is on record — never a placeholder string
         position: action.position,
         espn_id: action.espnId,
         sleeper_id: action.sleeperId,
@@ -109,7 +118,7 @@ async function applyActions(admin: ReturnType<typeof createAdminClient>, actions
         season: action.season,
       })
       if (error) {
-        console.error(`  INSERT FAILED for ${action.name} (${action.nflTeam ?? 'free agent'}): ${error.message}`)
+        console.error(`  INSERT FAILED for ${action.name} (${action.nflTeam ?? 'no team on record'}): ${error.message}`)
         continue
       }
       inserted++

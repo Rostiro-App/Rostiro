@@ -16,13 +16,18 @@
 // — so 'name_team_unambiguous' is honestly reported as its own tier,
 // never mislabeled as a verified/exact match in this file's output.
 //
-// P3-4B: nflTeam is `string | null` throughout — a genuinely unsigned but
-// fantasy-relevant free agent is a real, legitimate mapping (identity is
-// still exact/unambiguous even with no team), and it is NEVER represented
-// by a placeholder team string (`''`, `'FA'`, etc.) in the data that gets
-// written. A null team is only ever bucketed as a free agent when a real
-// relevance signal (ownership % or ADP) says this is a currently-tracked
-// player, not a retired/out-of-league one — see isFantasyRelevantFreeAgent.
+// P3-4B correction: nflTeam is `string | null` throughout, and it is NEVER
+// represented by a placeholder team string (`''`, `'FA'`, etc.) — a real
+// null when there's no team on record. But nflTeam === null does NOT by
+// itself prove active free-agent status — a missing team is also
+// consistent with a stale/incomplete provider sync, so this file never
+// claims "free agent." A row with no team AND some real activity signal
+// (ownership % or ADP) is labeled `isTeamlessActivityUnverified: true` —
+// its exact provider identity is still preserved and still eligible for
+// an unambiguous cross-platform link, but downstream consumers (waiver
+// pools, recommendations, player search) must NOT treat this flag as
+// confirmation of active free agency and must not surface these rows
+// solely because nfl_team is null. See hasTeamlessActivitySignal.
 
 import { normalizePlayerName } from '@/lib/playerIdentity'
 
@@ -62,7 +67,7 @@ export type SeedAction =
       yahooId: null
       season: number
       matchBasis: MatchBasis
-      isFreeAgent: boolean
+      isTeamlessActivityUnverified: boolean
     }
   | {
       type: 'update_team'
@@ -105,7 +110,7 @@ export interface PlayerMappingSeedReport {
     insertNewSinglePlatform: number
     linkExistingRow: number
     updateTeamChange: number
-    freeAgentsWritten: number
+    teamlessActivityUnverifiedWritten: number
   }
   unresolved: UnresolvedEntry[]
   collisions: CollisionEntry[]
@@ -131,25 +136,28 @@ function isDefense(position: string | null): boolean {
   return position === 'DEF'
 }
 
-// A free agent is worth mapping only if some real signal says they're
-// still followed by fantasy platforms today — ownership % above zero, or
-// any ADP at all (even a very late one). Both fields come straight from
+// A teamless player is worth mapping only if some real signal says
+// they're still followed by fantasy platforms today — ownership % above
+// zero, or any ADP at all (even a very late one). This proves current
+// tracking/relevance, NOT active free-agent status — the player could be
+// injured-reserve-adjacent, between a cut and a re-signing that hasn't
+// synced yet, or something else entirely. Both fields come straight from
 // players_cache's real synced columns; nothing here is guessed.
-export function isFantasyRelevantFreeAgent(row: Pick<PlayerCacheRow, 'ownershipPct' | 'adp'>): boolean {
+export function hasTeamlessActivitySignal(row: Pick<PlayerCacheRow, 'ownershipPct' | 'adp'>): boolean {
   if (row.ownershipPct !== null && row.ownershipPct > 0) return true
   if (row.adp !== null) return true
   return false
 }
 
-const FREE_AGENT_SENTINEL = 'FA'
+const TEAMLESS_SENTINEL = 'FA'
 
 // DEF/D-ST is matched by normalized NFL team identity alone (display names
 // vary wildly across platforms: "Buffalo Bills" vs "BUF" vs "Bills
 // D/ST") — same discipline as resolvePlayerIdentityPure's isDefense
 // branch. Regular players are matched by normalized name + team, or
-// normalized name + the free-agent sentinel when genuinely unsigned.
+// normalized name + the teamless sentinel when no team is on record.
 function teamKeyPart(nflTeam: string | null): string {
-  return nflTeam ? nflTeam.toUpperCase() : FREE_AGENT_SENTINEL
+  return nflTeam ? nflTeam.toUpperCase() : TEAMLESS_SENTINEL
 }
 
 function identityKey(row: PlayerCacheRow): string {
@@ -173,17 +181,18 @@ function rowIdentity(row: PlayerCacheRow): string {
  * apply the returned actions.
  *
  * Matching order per cache row:
- *  0. No NFL team on record: if a real fantasy-relevance signal exists
- *     (ownership % or ADP), this is a genuine unsigned free agent —
- *     proceeds through the normal matching pipeline below keyed on
- *     name+FREE_AGENT_SENTINEL (DEF rows with no team are never treated
- *     as free agents — a defense is inherently team-bound, so this is
+ *  0. No NFL team on record: if a real activity signal exists (ownership %
+ *     or ADP), this proves current tracking/relevance — NOT confirmed
+ *     free-agent status — and proceeds through the normal matching
+ *     pipeline below keyed on name+TEAMLESS_SENTINEL, flagged
+ *     `isTeamlessActivityUnverified` (DEF rows with no team are never
+ *     treated this way — a defense is inherently team-bound, so this is
  *     reported unresolved instead). Otherwise it's reported in
  *     `retiredOrIrrelevant` and never touched again.
  *  1. Provider-ID reuse — if an existing mapping already stores this
  *     platform's ID, that row IS the canonical match regardless of a
- *     since-changed name/team (a real trade, or a release to free
- *     agency). If nflTeam differs from what's stored (including becoming
+ *     since-changed name/team (a real trade, or a team field going null).
+ *     If nflTeam differs from what's stored (including becoming
  *     null, or a null becoming a real team), propose an `update_team`
  *     action on the SAME row (preserving its id) so a team change never
  *     creates a second canonical person — unless the new identity would
@@ -217,7 +226,7 @@ export function buildPlayerMappingSeedPlan(
   let insertNewSinglePlatform = 0
   let linkExistingRow = 0
   let updateTeamChange = 0
-  let freeAgentsWritten = 0
+  let teamlessActivityUnverifiedWritten = 0
 
   const allCacheRows = [...sleeperCacheRows, ...espnCacheRows]
   const matchedRowIds = new Set<string>()
@@ -237,9 +246,9 @@ export function buildPlayerMappingSeedPlan(
 
   for (const row of allCacheRows) {
     const noTeam = !row.nflTeam
-    const isFreeAgentCandidate = noTeam && !isDefense(row.position) && isFantasyRelevantFreeAgent(row)
+    const hasActivitySignalCandidate = noTeam && !isDefense(row.position) && hasTeamlessActivitySignal(row)
 
-    if (noTeam && !isFreeAgentCandidate) {
+    if (noTeam && !hasActivitySignalCandidate) {
       // Either a DEF with no team (data-quality gap, genuinely unresolved)
       // or a player with no relevance signal — retired/out-of-league.
       if (isDefense(row.position)) {
@@ -262,7 +271,7 @@ export function buildPlayerMappingSeedPlan(
         if (collidesWithOtherRow || claimedNewKeys.has(targetKey)) {
           collisions.push({
             key: targetKey,
-            reason: `Provider ID ${row.platform}:${row.playerId} implies a team change to ${freshTeam ?? 'free agent'}, but another existing mapping already occupies that identity — needs manual review, not auto-merged`,
+            reason: `Provider ID ${row.platform}:${row.playerId} implies a team change to ${freshTeam ?? 'no team on record'}, but another existing mapping already occupies that identity — needs manual review, not auto-merged`,
             rows: [{ platform: row.platform, sourcePlayerId: row.playerId, name: row.name, nflTeam: row.nflTeam }],
           })
         } else {
@@ -301,7 +310,7 @@ export function buildPlayerMappingSeedPlan(
     const sleeperRow = byPlat.sleeper[0]
     const espnRow = byPlat.espn[0]
     const existing = existingByKey.get(key)
-    const isFreeAgentBucket = key.endsWith(`|${FREE_AGENT_SENTINEL}`)
+    const isTeamlessActivityUnverifiedBucket = key.endsWith(`|${TEAMLESS_SENTINEL}`)
 
     if (existing) {
       // Existing row at this exact key is missing exactly one platform's
@@ -326,7 +335,7 @@ export function buildPlayerMappingSeedPlan(
     actions.push({
       type: 'insert',
       name: anyRow.name,
-      // Never a placeholder team string — genuinely null for a real free agent.
+      // Never a placeholder team string — genuinely null when unknown/unset.
       nflTeam: anyRow.nflTeam ? anyRow.nflTeam.toUpperCase() : null,
       position: anyRow.position,
       espnId: espnRow?.playerId ?? null,
@@ -334,13 +343,13 @@ export function buildPlayerMappingSeedPlan(
       yahooId: null,
       season,
       matchBasis,
-      isFreeAgent: isFreeAgentBucket,
+      isTeamlessActivityUnverified: isTeamlessActivityUnverifiedBucket,
     })
     if (sleeperRow) matchedRowIds.add(rowIdentity(sleeperRow))
     if (espnRow) matchedRowIds.add(rowIdentity(espnRow))
     if (sleeperRow && espnRow) insertNewCrossPlatform++
     else insertNewSinglePlatform++
-    if (isFreeAgentBucket) freeAgentsWritten++
+    if (isTeamlessActivityUnverifiedBucket) teamlessActivityUnverifiedWritten++
   }
 
   const byPlatform: Record<SeedPlatform, { total: number; matched: number; unresolved: number; retiredOrIrrelevant: number }> = {
@@ -369,7 +378,7 @@ export function buildPlayerMappingSeedPlan(
       espnCacheRows: espnCacheRows.length,
       existingMappings: existingMappings.length,
     },
-    proposed: { insertNewCrossPlatform, insertNewSinglePlatform, linkExistingRow, updateTeamChange, freeAgentsWritten },
+    proposed: { insertNewCrossPlatform, insertNewSinglePlatform, linkExistingRow, updateTeamChange, teamlessActivityUnverifiedWritten },
     unresolved,
     collisions,
     retiredOrIrrelevant,
