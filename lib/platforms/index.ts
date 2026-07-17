@@ -24,4 +24,12 @@ export type {
 export { ROSTER_SNAPSHOT_SCHEMA_VERSION } from './types'
 
 export { YAHOO_CAPABILITIES } from './yahoo'
-export { SLEEPER_CAPABILITIES, toNormalizedSleeperLeague } from './sleeper'
+export {
+  SLEEPER_CAPABILITIES,
+  toNormalizedSleeperLeague,
+  sleeperIntelligenceAdapter,
+  sleeperReadOwnedRoster,
+  sleeperReadMatchup,
+  sleeperReadAvailablePlayers,
+  sleeperReadDraftMetadata,
+} from './sleeper'

@@ -184,22 +184,21 @@ export function resolvePlayerIdentityPure(
   }
 }
 
-// DB-backed entry point — fetches the active player_mappings universe
-// once and delegates to the pure resolver above. Callers resolving many
-// players at once (Packet 03's Pulse/exposure consumers) should fetch
-// candidates once themselves and call resolvePlayerIdentityPure directly
-// per player, rather than calling this in a loop and re-fetching every time.
-export async function resolvePlayerIdentity(
+// Fetches the active player_mappings universe once. Packet 03 adapters
+// resolving a whole roster (15-20+ players) at once should call this ONCE
+// and reuse the result across every resolvePlayerIdentityPure call, rather
+// than letting resolvePlayerIdentity below refetch the entire table per
+// player — a full-roster sync doing that is 15-20 redundant table scans.
+export async function fetchActivePlayerMappings(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  admin: SupabaseClient<any, any, any>,
-  input: PlayerIdentityInput
-): Promise<PlayerIdentityResolution> {
+  admin: SupabaseClient<any, any, any>
+): Promise<PlayerMappingRow[]> {
   const { data } = await admin
     .from('player_mappings')
     .select('id, name, nfl_team, position, espn_id, yahoo_id, sleeper_id')
     .eq('is_active', true)
 
-  const candidates: PlayerMappingRow[] = (data ?? []).map((row) => ({
+  return (data ?? []).map((row) => ({
     id: row.id,
     name: row.name,
     nflTeam: row.nfl_team,
@@ -208,6 +207,19 @@ export async function resolvePlayerIdentity(
     yahooId: row.yahoo_id,
     sleeperId: row.sleeper_id,
   }))
+}
 
+// DB-backed entry point for resolving a SINGLE player — fetches the active
+// player_mappings universe fresh and delegates to the pure resolver above.
+// Callers resolving many players at once (Packet 03's roster-sync
+// adapters) should call fetchActivePlayerMappings once themselves and use
+// resolvePlayerIdentityPure directly per player instead of calling this in
+// a loop.
+export async function resolvePlayerIdentity(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  admin: SupabaseClient<any, any, any>,
+  input: PlayerIdentityInput
+): Promise<PlayerIdentityResolution> {
+  const candidates = await fetchActivePlayerMappings(admin)
   return resolvePlayerIdentityPure(candidates, input)
 }

@@ -172,7 +172,7 @@ interface SleeperLeague {
   roster_positions: string[]
 }
 
-interface SleeperRoster {
+export interface SleeperRoster {
   roster_id: number
   owner_id: string
   league_id: string
@@ -207,7 +207,7 @@ interface SleeperDraftPick {
   }
 }
 
-interface SleeperDraft {
+export interface SleeperDraft {
   draft_id: string
   // Mock drafts (started from sleeper.com/mockdraft, not tied to a real
   // league) always report league_id: null — confirmed against a live mock
