@@ -98,11 +98,159 @@ export function normalizeSleeperRoster(raw: any, leagueId: string): Roster {
 // ─── Yahoo normalization ───────────────────────────────────────────────────────
 // Yahoo returns XML-to-JSON. Shape varies — normalize aggressively.
 
+// Packet 02: extracts league_keys from the /users;use_login=1/games/leagues
+// collection response (getYahooLeagues). UNVERIFIED against a live
+// authorized response — no real Yahoo account has completed OAuth yet (see
+// Packet 02's completion report). Grounded in Yahoo's documented count-keyed
+// collection pattern (fantasy_content.users.<n>.user[1].games.<n>.game[1]
+// .leagues.<n>.league[0]) — the same numeric-string-key-or-array shape
+// already confirmed live elsewhere in this file (normalizeYahooPlayers,
+// normalizeYahooDraftResults) — not invented from nothing, but still not a
+// substitute for a real captured fixture. Defensive against both the
+// numeric-string-keyed object form and a plain array, same dual-handling
+// already used for roster_positions below.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function extractYahooLeagueKeys(raw: any): string[] {
+  const usersObj = raw?.fantasy_content?.users ?? {}
+  const userEntries = collectionValues(usersObj)
+  const keys: string[] = []
+
+  for (const userEntry of userEntries) {
+    const games = userEntry?.user?.[1]?.games ?? userEntry?.games ?? {}
+    const gameEntries = collectionValues(games)
+    for (const gameEntry of gameEntries) {
+      const leagues = gameEntry?.game?.[1]?.leagues ?? gameEntry?.leagues ?? {}
+      const leagueEntries = collectionValues(leagues)
+      for (const leagueEntry of leagueEntries) {
+        const leagueKey = leagueEntry?.league?.[0]?.league_key ?? leagueEntry?.league_key
+        if (leagueKey) keys.push(leagueKey)
+      }
+    }
+  }
+
+  return keys
+}
+
+// Yahoo's "count" collections come back as an object keyed "0", "1", ...,
+// "count" (not a JSON array) — this pulls just the numeric-keyed entries in
+// order, tolerating a plain array too (some SDKs/proxies normalize it
+// already). Shared by every collection-shaped Yahoo parser in this file.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function collectionValues(collection: unknown): any[] {
+  if (Array.isArray(collection)) return collection
+  if (collection && typeof collection === 'object') {
+    return Object.entries(collection as Record<string, unknown>)
+      .filter(([key]) => key !== 'count')
+      .sort(([a], [b]) => Number(a) - Number(b))
+      .map(([, value]) => value)
+  }
+  return []
+}
+
+// Packet 02: finds the team owned by the currently logged-in Yahoo user
+// from a /league/{key}/teams response (getYahooLeagueTeams) — deliberately
+// checks is_owned_by_current_login rather than assuming team index 0 (see
+// getYahooLeagueTeams's own comment: that ordering assumption is
+// unverified). UNVERIFIED against a live response — same caveat as
+// extractYahooLeagueKeys above.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function extractYahooOwnedTeam(raw: any): { teamKey: string; teamName: string } | null {
+  const teamsObj = raw?.fantasy_content?.league?.[1]?.teams ?? {}
+  const teamEntries = collectionValues(teamsObj)
+
+  for (const entry of teamEntries) {
+    const teamMeta: unknown[] = entry?.team?.[0] ?? []
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const info: Record<string, any> = {}
+    for (const item of teamMeta) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const i = item as any
+      if (i?.team_key) info.teamKey = i.team_key
+      if (i?.name) info.name = i.name
+      if (i?.is_owned_by_current_login) info.isOwned = i.is_owned_by_current_login
+    }
+    if (info.isOwned && (info.isOwned === 1 || info.isOwned === '1')) {
+      return { teamKey: info.teamKey ?? '', teamName: info.name ?? '' }
+    }
+  }
+
+  return null
+}
+
+// Packet 02: draft status/timing from a league settings response. Field
+// names (draft_status, draft_time as a unix-seconds string) per Yahoo's
+// publicly documented league-settings resource — UNVERIFIED against a live
+// authorized response.
+export interface NormalizedYahooDraftInfo {
+  status: 'not_started' | 'in_progress' | 'complete' | 'unknown'
+  scheduledAt: string | null
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function parseYahooDraftInfo(settings: any): NormalizedYahooDraftInfo {
+  const draftStatus: string | undefined = settings?.draft_status
+  const status: NormalizedYahooDraftInfo['status'] =
+    draftStatus === 'predraft' ? 'not_started'
+    : draftStatus === 'drafting' ? 'in_progress'
+    : draftStatus === 'postdraft' ? 'complete'
+    : 'unknown'
+
+  const draftTimeRaw = settings?.draft_time
+  const draftTimeSeconds = draftTimeRaw != null ? Number(draftTimeRaw) : NaN
+  const scheduledAt = Number.isFinite(draftTimeSeconds) && draftTimeSeconds > 0
+    ? new Date(draftTimeSeconds * 1000).toISOString()
+    : null
+
+  return { status, scheduledAt }
+}
+
+// Packet 02: waiver settings from a league settings response. Field names
+// (waiver_type: 'R'=rolling/'FR' or similar=FAAB per community-documented
+// values, uses_faab, waiver_time as a day-count integer string) per Yahoo's
+// publicly documented league-settings resource — UNVERIFIED against a live
+// authorized response. waiver_time's exact semantics (day offset vs. a
+// specific weekday) are NOT confirmed, so it's intentionally not mapped
+// onto connected_leagues.waiver_cutoff_day/hour (a different, already-shipped
+// feature — lib/rostiroState.ts's cutoff detection — that a wrong guess
+// here could silently corrupt); it's only surfaced in the returned
+// NormalizedLeague, not persisted to those specific columns.
+export interface NormalizedYahooWaiverSettings {
+  type: 'faab' | 'rolling' | 'reverse_standings' | 'unknown'
+  faabBudget: number | null
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function parseYahooWaiverSettings(settings: any): NormalizedYahooWaiverSettings {
+  const usesFaab = settings?.uses_faab === 1 || settings?.uses_faab === '1'
+  if (usesFaab) {
+    const budget = settings?.faab_balance ?? settings?.max_faab_bid
+    return {
+      type: 'faab',
+      faabBudget: budget != null && Number.isFinite(Number(budget)) ? Number(budget) : null,
+    }
+  }
+
+  const waiverType: string | undefined = settings?.waiver_type
+  if (waiverType === 'R') return { type: 'rolling', faabBudget: null }
+  if (waiverType === 'FR' || waiverType === 'BB') return { type: 'reverse_standings', faabBudget: null }
+  return { type: 'unknown', faabBudget: null }
+}
+
+// Shared by normalizeYahooLeague and toNormalizedYahooLeague
+// (lib/platforms/yahoo.ts) so both operate on the exact same settings
+// object, not two independent (and potentially divergent) unwrappings of
+// the same raw response.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function extractYahooSettings(raw: any): any {
+  const lg = raw?.fantasy_content?.league?.[0] ?? raw?.league ?? raw
+  return lg?.settings ?? {}
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function normalizeYahooLeague(raw: any): League {
   const lg = raw?.fantasy_content?.league?.[0] ?? raw?.league ?? raw
 
-  const settings = lg?.settings ?? {}
+  const settings = extractYahooSettings(raw)
   const statCategories = settings?.stat_categories?.stats?.stat ?? []
 
   const getStat = (statId: number): number => {
