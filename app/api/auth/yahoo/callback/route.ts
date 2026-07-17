@@ -1,6 +1,8 @@
 import { exchangeYahooCode } from '@/lib/yahoo'
 import { encrypt } from '@/lib/encrypt'
 import { createSSRClient, createAdminClient } from '@/lib/supabase'
+import { logAppError } from '@/lib/errorLog'
+import { YahooAPIError } from '@/types'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function GET(request: NextRequest) {
@@ -45,7 +47,13 @@ export async function GET(request: NextRequest) {
     response.cookies.delete('yahoo_oauth_state')
     return response
   } catch (err) {
-    console.error('[Yahoo callback]', err)
-    return NextResponse.redirect(`${appUrl}/onboarding?error=yahoo_token_failed`)
+    // err is always a YahooAPIError with an already-sanitized message (see
+    // exchangeYahooCode) — never the raw code, tokens, client secret, or a
+    // full Yahoo response body. Safe to log as-is.
+    await logAppError('auth/yahoo/callback', err, { userId: user.id })
+    const errorParam = err instanceof YahooAPIError && err.code === 'YAHOO_RECONNECT_REQUIRED'
+      ? 'yahoo_reconnect_required'
+      : 'yahoo_token_failed'
+    return NextResponse.redirect(`${appUrl}/onboarding?error=${errorParam}`)
   }
 }

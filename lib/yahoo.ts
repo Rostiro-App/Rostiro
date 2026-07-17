@@ -1,6 +1,9 @@
 // T-05: Yahoo Fantasy Sports API client
-// Official REST API, OAuth 2.0. Full read + write.
-// Lead platform for all write-back features (lineup, waiver, trade).
+// Official REST API, OAuth 2.0. Read-only — Yahoo has approved Rostiro for
+// read access only (write access requires a separate, not-yet-granted
+// app-registration tier). The write functions and XML builders below are
+// currently unreachable dead code kept only for the Packet 02 removal pass;
+// do not add new call sites for them.
 // Attribution required: "Fantasy data provided by Yahoo Fantasy"
 
 import { YahooAPIError } from '@/types'
@@ -28,15 +31,29 @@ export function getYahooAuthUrl(state: string): string {
     redirect_uri: redirectUri,
     response_type: 'code',
     // Yahoo's Fantasy Sports permission is a single app-level grant (Read
-    // or Read/Write, chosen at app registration) — not a combinable OAuth
-    // scope list. Requesting "fspt-r fspt-w" together is an invalid scope
-    // and Yahoo rejects it before ever showing the consent screen. fspt-w
-    // (Read/Write) is a superset of read, matching what Rostiro needs.
-    scope: 'fspt-w',
+    // or Read/Write, chosen at app registration), not a combinable OAuth
+    // scope list — requesting a level the app isn't registered for fails
+    // with error=invalid_scope before ever showing the consent screen.
+    // Rostiro's app is registered read-only today (write access was
+    // requested but not granted), so fspt-w is rejected outright — this
+    // was confirmed live: every real OAuth attempt was failing with
+    // exactly that error until this was corrected to fspt-r.
+    scope: 'fspt-r',
     state,
   })
 
   return `${YAHOO_AUTH_URL}?${params.toString()}`
+}
+
+// Yahoo returns the scope it actually granted in the token response — this
+// can differ from what was requested (e.g. an app-registration change, or
+// Yahoo silently downgrading). Never assume the requested scope was what
+// was actually issued; validate the token is usable for read operations
+// before persisting it, so a misconfiguration surfaces as a clear
+// reconnect-required error instead of a token that silently can't do
+// anything once used.
+export function isReadCompatibleScope(scope: string): boolean {
+  return scope.split(/\s+/).includes('fspt-r') || scope.split(/\s+/).includes('fspt-w')
 }
 
 export interface YahooTokens {
@@ -71,9 +88,12 @@ export async function exchangeYahooCode(code: string): Promise<YahooTokens> {
   })
 
   if (!res.ok) {
-    const body = await res.text()
+    // Never surface Yahoo's raw error body — never confirmed not to
+    // contain anything sensitive, and the status code plus our own code
+    // is enough for callers to act on. If deeper diagnosis is ever needed,
+    // log body server-side only, not in the thrown/user-facing error.
     throw new YahooAPIError(
-      `Yahoo token exchange failed: ${body}`,
+      `Yahoo token exchange failed (HTTP ${res.status})`,
       'YAHOO_TOKEN_EXCHANGE_ERROR',
       res.status
     )
@@ -85,6 +105,17 @@ export async function exchangeYahooCode(code: string): Promise<YahooTokens> {
     expires_in: number
     token_type: string
     scope: string
+  }
+
+  if (!isReadCompatibleScope(data.scope)) {
+    // Yahoo issued a token, but not one that can do what Rostiro needs —
+    // a config error, not a transient failure. Fail loudly with a
+    // reconnect-required code rather than persisting an unusable token.
+    throw new YahooAPIError(
+      'Yahoo granted a scope that does not support read access',
+      'YAHOO_RECONNECT_REQUIRED',
+      502
+    )
   }
 
   return {
@@ -119,24 +150,41 @@ export async function refreshYahooTokens(refreshToken: string): Promise<YahooTok
   })
 
   if (!res.ok) {
-    const body = await res.text()
-    throw new YahooAPIError(
-      `Yahoo token refresh failed: ${body}`,
-      'YAHOO_TOKEN_REFRESH_ERROR',
-      res.status
-    )
+    // A 400/401 here typically means the refresh token itself is dead
+    // (revoked, expired past Yahoo's grace window) — unrecoverable without
+    // the user reconnecting. Anything else (5xx, network-shaped) is
+    // transient. Distinguish so callers don't treat a Yahoo outage as a
+    // reason to force a reconnect prompt. Never include the raw response
+    // body in the thrown error — see exchangeYahooCode's error handling.
+    const code = res.status === 400 || res.status === 401
+      ? 'YAHOO_RECONNECT_REQUIRED'
+      : 'YAHOO_TOKEN_REFRESH_ERROR'
+    throw new YahooAPIError(`Yahoo token refresh failed (HTTP ${res.status})`, code, res.status)
   }
 
   const data = await res.json() as {
     access_token: string
-    refresh_token: string
+    refresh_token?: string
     expires_in: number
     scope: string
   }
 
+  if (!isReadCompatibleScope(data.scope)) {
+    throw new YahooAPIError(
+      'Yahoo granted a scope that does not support read access',
+      'YAHOO_RECONNECT_REQUIRED',
+      502
+    )
+  }
+
   return {
     accessToken: data.access_token,
-    refreshToken: data.refresh_token,
+    // Yahoo may legally omit refresh_token on a refresh response, meaning
+    // "the existing one is still valid" — NOT "there is no refresh token
+    // anymore". Overwriting with an empty/undefined value here would
+    // silently break every future refresh for this user. Fall back to the
+    // refresh token that was actually used for this call.
+    refreshToken: data.refresh_token ?? refreshToken,
     expiresAt: new Date(Date.now() + data.expires_in * 1000),
     scope: data.scope,
   }
@@ -149,6 +197,16 @@ export async function refreshYahooTokens(refreshToken: string): Promise<YahooTok
 // caller of this; lineup/waiver/trade writes should switch to it too.
 
 const REFRESH_BUFFER_MS = 2 * 60 * 1000 // refresh if expiring within 2 minutes
+
+// Serializes concurrent refreshes for the same user within this process.
+// This is a best-effort, single-instance guard, not a distributed lock —
+// on serverless (Vercel), two truly concurrent requests for the same user
+// can still land on different function instances and each hold their own
+// map, so this cannot prevent every possible race. It does prevent the
+// easily-avoidable case (multiple concurrent calls within one warm
+// instance all deciding to refresh at once), which was the realistic
+// common case for this app's traffic shape.
+const inFlightRefreshes = new Map<string, Promise<string>>()
 
 export async function getValidYahooAccessToken(userId: string): Promise<string> {
   const admin = createAdminClient()
@@ -168,19 +226,31 @@ export async function getValidYahooAccessToken(userId: string): Promise<string> 
     return decrypt(row.access_token)
   }
 
-  const refreshed = await refreshYahooTokens(decrypt(row.refresh_token))
+  const existing = inFlightRefreshes.get(userId)
+  if (existing) return existing
 
-  await admin
-    .from('yahoo_tokens')
-    .update({
-      access_token: encrypt(refreshed.accessToken),
-      refresh_token: encrypt(refreshed.refreshToken),
-      expires_at: refreshed.expiresAt.toISOString(),
-      scope: refreshed.scope,
-    })
-    .eq('user_id', userId)
+  const refreshPromise = (async () => {
+    try {
+      const refreshed = await refreshYahooTokens(decrypt(row.refresh_token))
 
-  return refreshed.accessToken
+      await admin
+        .from('yahoo_tokens')
+        .update({
+          access_token: encrypt(refreshed.accessToken),
+          refresh_token: encrypt(refreshed.refreshToken),
+          expires_at: refreshed.expiresAt.toISOString(),
+          scope: refreshed.scope,
+        })
+        .eq('user_id', userId)
+
+      return refreshed.accessToken
+    } finally {
+      inFlightRefreshes.delete(userId)
+    }
+  })()
+
+  inFlightRefreshes.set(userId, refreshPromise)
+  return refreshPromise
 }
 
 // ─── Core API fetcher ─────────────────────────────────────────────────────────

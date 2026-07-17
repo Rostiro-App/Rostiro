@@ -11,6 +11,7 @@ export async function GET() {
   response.cookies.set('yahoo_oauth_state', state, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
     maxAge: 600, // 10 minutes
     path: '/',
   })
