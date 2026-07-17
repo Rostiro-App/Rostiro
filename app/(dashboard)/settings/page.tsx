@@ -5,11 +5,12 @@
 // disconnect, and notification prefs (UI ready ahead of push, T-66).
 // Disconnect uses a two-step inline confirm instead of a browser dialog.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { setGlobalMode, useMode, type Mode } from '@/components/nav/AppShell'
 import { bigAnimationsEnabled, setBigAnimationsEnabled } from '@/lib/animationPrefs'
 import { useHints } from '@/components/hints/HintProvider'
+import YahooConnectionPanel from '@/components/settings/YahooConnectionPanel'
 
 interface SettingsData {
   email: string
@@ -80,6 +81,16 @@ export default function SettingsPage() {
       return next
     })
   }
+
+  const reloadSettings = useCallback(async () => {
+    try {
+      const res = await fetch('/api/settings')
+      if (!res.ok) throw new Error('Failed to load settings')
+      setData(await res.json())
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load settings')
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -252,6 +263,7 @@ export default function SettingsPage() {
 
           {/* ─── Connected leagues ───────────────────────────────────── */}
           <Section title="Connected leagues">
+            <YahooConnectionPanel onChanged={reloadSettings} />
             {data.leagues.length === 0 ? (
               <div className="flex items-center justify-between py-1">
                 <p className="text-sm" style={{ color: 'var(--t2)' }}>No leagues connected.</p>

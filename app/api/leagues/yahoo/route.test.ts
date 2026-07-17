@@ -262,6 +262,88 @@ describe('POST /api/leagues/yahoo', () => {
   })
 })
 
+describe('GET /api/leagues/yahoo — connection status', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.doUnmock('@/lib/supabase')
+    vi.doUnmock('@/lib/yahoo')
+  })
+
+  function mockSupabaseWithLeagues(leagueRows: Array<Record<string, unknown>>) {
+    vi.doMock('@/lib/supabase', () => ({
+      createSSRClient: vi.fn(() => Promise.resolve({
+        auth: { getUser: () => Promise.resolve({ data: { user: mockUser } }) },
+      })),
+      createAdminClient: vi.fn(() => ({
+        from: vi.fn(() => ({
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ data: leagueRows })) })),
+          })),
+        })),
+      })),
+    }))
+  }
+
+  it('rejects an unauthenticated request', async () => {
+    vi.doMock('@/lib/supabase', () => ({
+      createSSRClient: vi.fn(() => Promise.resolve({ auth: { getUser: () => Promise.resolve({ data: { user: null } }) } })),
+      createAdminClient: vi.fn(() => ({})),
+    }))
+    const { GET } = await import('./route')
+    const res = await GET()
+    expect(res.status).toBe(401)
+  })
+
+  it('reports not connected when no Yahoo token exists', async () => {
+    const { YahooAPIError } = await import('@/types')
+    mockSupabaseWithLeagues([])
+    vi.doMock('@/lib/yahoo', () => ({
+      getValidYahooAccessToken: vi.fn(() => Promise.reject(new YahooAPIError('none', 'YAHOO_NOT_CONNECTED', 404))),
+    }))
+    const { GET } = await import('./route')
+    const res = await GET()
+    const body = await res.json()
+    expect(body.connected).toBe(false)
+    expect(body.needsReconnect).toBe(false)
+  })
+
+  it('reports needsReconnect when the token is unrecoverably dead', async () => {
+    const { YahooAPIError } = await import('@/types')
+    mockSupabaseWithLeagues([])
+    vi.doMock('@/lib/yahoo', () => ({
+      getValidYahooAccessToken: vi.fn(() => Promise.reject(new YahooAPIError('dead', 'YAHOO_RECONNECT_REQUIRED', 502))),
+    }))
+    const { GET } = await import('./route')
+    const res = await GET()
+    const body = await res.json()
+    expect(body.needsReconnect).toBe(true)
+  })
+
+  it('reports connected with league and failure counts when everything is healthy-ish', async () => {
+    mockSupabaseWithLeagues([
+      { id: '1', league_name: 'A', sync_status: 'ok' },
+      { id: '2', league_name: 'B', sync_status: 'ok' },
+      { id: '3', league_name: 'C', sync_status: 'error', sync_error: 'Yahoo API error 500' },
+    ])
+    vi.doMock('@/lib/yahoo', () => ({ getValidYahooAccessToken: vi.fn(() => Promise.resolve('token')) }))
+    const { GET } = await import('./route')
+    const res = await GET()
+    const body = await res.json()
+    expect(body.connected).toBe(true)
+    expect(body.needsReconnect).toBe(false)
+    expect(body.leagueCount).toBe(3)
+    expect(body.failedCount).toBe(1)
+  })
+
+  it('reports a transient check failure as 502, not as not-connected or needing reconnect', async () => {
+    mockSupabaseWithLeagues([])
+    vi.doMock('@/lib/yahoo', () => ({ getValidYahooAccessToken: vi.fn(() => Promise.reject(new Error('network blip'))) }))
+    const { GET } = await import('./route')
+    const res = await GET()
+    expect(res.status).toBe(502)
+  })
+})
+
 describe('DELETE /api/leagues/yahoo', () => {
   beforeEach(() => {
     vi.resetModules()

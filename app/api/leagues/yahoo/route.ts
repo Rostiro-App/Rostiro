@@ -26,6 +26,56 @@ interface SyncFailure {
   error: string
 }
 
+// Workstream G: the one real signal every connection-state UI decision
+// needs — whether a token exists, whether it still works (a lazy refresh
+// attempt is cheap: getValidYahooAccessToken only calls Yahoo at all when
+// the stored token is actually near expiry, otherwise it's a single DB
+// read), and the imported-league/failure counts already persisted by the
+// POST handler above. Deliberately read-only and side-effect-free beyond
+// the refresh getValidYahooAccessToken may already perform as part of its
+// normal contract.
+export async function GET() {
+  const supabase = await createSSRClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const admin = createAdminClient()
+
+  let connected = true
+  let needsReconnect = false
+  try {
+    await getValidYahooAccessToken(user.id)
+  } catch (err) {
+    if (err instanceof YahooAPIError && err.code === 'YAHOO_NOT_CONNECTED') {
+      connected = false
+    } else if (err instanceof YahooAPIError && err.code === 'YAHOO_RECONNECT_REQUIRED') {
+      needsReconnect = true
+    } else {
+      // A transient Yahoo/network error shouldn't be reported as "not
+      // connected" or "needs reconnect" — those are both actionable,
+      // durable states; a blip is neither.
+      return NextResponse.json({ error: 'Could not check Yahoo connection status' }, { status: 502 })
+    }
+  }
+
+  const { data: leagues } = await admin
+    .from('connected_leagues')
+    .select('id, league_name, team_name, sync_status, sync_error, last_synced_at')
+    .eq('user_id', user.id)
+    .eq('platform', 'yahoo')
+
+  const leagueRows = leagues ?? []
+  const failedCount = leagueRows.filter((l) => l.sync_status === 'error').length
+
+  return NextResponse.json({
+    connected,
+    needsReconnect,
+    leagueCount: leagueRows.length,
+    failedCount,
+    leagues: leagueRows,
+  })
+}
+
 export async function POST() {
   const supabase = await createSSRClient()
   const { data: { user } } = await supabase.auth.getUser()
