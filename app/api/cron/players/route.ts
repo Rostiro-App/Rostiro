@@ -8,10 +8,10 @@ import { getSleeperPlayers, SEASON } from '@/lib/sleeper'
 import { fetchPlayerUsageSnapshots } from '@/lib/nflverseUsage'
 import { NextResponse, type NextRequest } from 'next/server'
 import { recordCronRun } from '@/lib/cronHeartbeat'
+import { isAuthorizedCronRequest } from '@/lib/cronAuth'
 
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isAuthorizedCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

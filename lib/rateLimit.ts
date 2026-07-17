@@ -4,18 +4,27 @@
 // here is the only thing standing between the public Claude-calling
 // endpoint and an open cost/abuse vector.
 //
-// Postgres-backed (public.rate_limit_events, migration_rate_limit.sql)
-// rather than in-memory — a serverless function's memory doesn't persist
-// across invocations, so an in-process counter would silently do nothing
-// on Vercel. Same upsert-and-check pattern as usage_counters; acceptable
-// at current traffic, revisit with Upstash/Vercel KV if this route's
-// volume ever makes per-request Postgres round trips a real cost.
+// Launch security hardening (Codex Packet 01): the original select-then-
+// upsert implementation had two real problems. First, it wasn't
+// concurrency-safe — two requests could both read count=N before either
+// wrote N+1, letting both through when only one should have passed
+// (classic TOCTOU race). Second, it failed OPEN on any database error,
+// which for a cost-bearing public Claude-calling route meant a transient
+// DB hiccup silently became unlimited access. Both are fixed by routing
+// through public.increment_rate_limit (migration_launch_security.sql), a
+// single atomic SECURITY DEFINER function — the increment-and-decide
+// happens as one statement, and any RPC failure now returns
+// `allowed: false, reason: 'service_unavailable'` instead of granting
+// access. Callers that need to distinguish "you hit the limit" (429) from
+// "we couldn't verify, failing safe" (503) can read `reason`; existing
+// callers that only destructure `allowed` get the safer behavior for free.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export interface RateLimitResult {
   allowed: boolean
   remaining: number
+  reason?: 'rate_limited' | 'service_unavailable'
 }
 
 function currentWindowStart(windowSeconds: number): string {
@@ -31,28 +40,27 @@ export async function checkRateLimit(
 ): Promise<RateLimitResult> {
   const windowStart = currentWindowStart(windowSeconds)
 
-  const { data: existing } = await admin
-    .from('rate_limit_events')
-    .select('count')
-    .eq('rate_key', key)
-    .eq('window_start', windowStart)
-    .maybeSingle()
+  const { data, error } = await admin.rpc('increment_rate_limit', {
+    p_rate_key: key,
+    p_window_start: windowStart,
+    p_limit: limit,
+  })
 
-  const current = existing?.count ?? 0
-  if (current >= limit) {
-    return { allowed: false, remaining: 0 }
+  // Fail CLOSED, not open — an RPC failure (migration not run, transient
+  // DB issue) must never be interpreted as "unlimited allowance" for a
+  // cost-bearing route. This is the corrected shared default; there is no
+  // route-specific opt-out today, per the explicit instruction not to make
+  // fail-open the default anywhere.
+  if (error || !data || data.length === 0) {
+    return { allowed: false, remaining: 0, reason: 'service_unavailable' }
   }
 
-  const { error } = await admin.from('rate_limit_events').upsert(
-    { rate_key: key, window_start: windowStart, count: current + 1 },
-    { onConflict: 'rate_key,window_start' }
-  )
-  // Fail open: if the rate-limit table itself errors (migration not run
-  // yet, transient issue), don't take down the route it's protecting —
-  // same tradeoff the rest of the codebase makes for missing migrations.
-  if (error) return { allowed: true, remaining: limit - (current + 1) }
-
-  return { allowed: true, remaining: limit - (current + 1) }
+  const row = data[0] as { allowed: boolean; remaining: number }
+  return {
+    allowed: row.allowed,
+    remaining: row.remaining,
+    reason: row.allowed ? undefined : 'rate_limited',
+  }
 }
 
 // Best-effort client IP for Vercel/proxied requests. Not spoof-proof

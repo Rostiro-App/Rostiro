@@ -1,12 +1,15 @@
 // Dev-only Simulation Suite — the Developer Override Panel's backend.
-// Gated to the founder's own account by email (ADMIN_EMAIL) rather than a
-// NODE_ENV check, so it works identically on localhost and the deployed
-// Vercel app (needed for the panel to be usable for recording/demoing, not
-// just local dev). No new role/permissions system — this account is the
-// only real user in the DB, and the check runs against a real authenticated
-// session either way, never a bypassable client-side flag.
+// Launch security hardening (Codex Packet 01): previously gated by session
+// email matching ADMIN_EMAIL — works, but couples admin identity to a
+// mutable field. Now uses lib/adminAuth.ts's ADMIN_USER_ID check instead,
+// consistent with app/api/admin/errors/route.ts and
+// lib/simScenarios.ts's loadFounderLeagues (same admin-identity surface).
+// Still not a NODE_ENV check, so it works identically on localhost and the
+// deployed Vercel app (needed for the panel to be usable for
+// recording/demoing, not just local dev).
 
-import { createSSRClient, createAdminClient } from '@/lib/supabase'
+import { requireAdmin } from '@/lib/adminAuth'
+import { createAdminClient } from '@/lib/supabase'
 import { invalidateSimCache } from '@/lib/simTime'
 import { runScenario1, runScenario2, runScenario3, runScenario4, clearSimulation, loadFounderLeagues, appendRestore } from '@/lib/simScenarios'
 import {
@@ -31,14 +34,6 @@ const VALID_STATES: readonly RostiroState[] = ['draft', 'standard', 'waiver_day'
 // every `.plan` check in production code, not simulate a future plan.
 const VALID_PLANS: readonly UserPlan[] = ['free', 'starter', 'pro', 'commissioner']
 
-async function requireAdmin() {
-  const supabase = await createSSRClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  const adminEmail = process.env.ADMIN_EMAIL
-  if (!user || !adminEmail || user.email !== adminEmail) return null
-  return user
-}
-
 export async function GET() {
   const user = await requireAdmin()
   if (!user) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -48,8 +43,10 @@ export async function GET() {
   // Live read, not sim_state — plan is a real column mutation (like
   // players_cache.injury_status in the scenarios), not an ephemeral
   // override, so "current plan" always reflects what production code
-  // itself would see right now.
-  const { data: founder } = await admin.from('users').select('plan').eq('email', process.env.ADMIN_EMAIL).maybeSingle()
+  // itself would see right now. Looked up by user.id (the requireAdmin()
+  // caller's own verified id) rather than ADMIN_EMAIL — no separate email
+  // lookup needed now that requireAdmin() already resolved the real admin session.
+  const { data: founder } = await admin.from('users').select('plan').eq('id', user.id).maybeSingle()
   // Real, persistent production setting — deliberately read from its own
   // table (promo_windows), never sim_state, so "Clear simulation" below
   // can never accidentally wipe it.

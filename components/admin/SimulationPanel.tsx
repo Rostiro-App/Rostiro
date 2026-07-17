@@ -3,10 +3,11 @@
 // Dev-only Simulation Suite — the Developer Override Panel. Self-hides for
 // everyone except the founder's own account: GET /api/admin/simulate
 // returns a plain 404 (not 401/403 — this shouldn't announce its own
-// existence) to anyone whose session email doesn't match ADMIN_EMAIL, and
-// this component renders nothing at all until that check succeeds. Works
-// identically on localhost and the deployed app — see the route's own
-// header comment for why NODE_ENV alone wasn't the right gate.
+// existence) to anyone whose session user id doesn't match ADMIN_USER_ID
+// (lib/adminAuth.ts), and this component renders nothing at all until that
+// check succeeds. Works identically on localhost and the deployed app —
+// see the route's own header comment for why NODE_ENV alone wasn't the
+// right gate.
 
 import { useEffect, useState } from 'react'
 import type { RostiroState } from '@/types'

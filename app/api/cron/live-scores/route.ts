@@ -14,12 +14,12 @@ import { classifyDeltas } from '@/lib/liveEvents'
 import { detectAndSendWindowRecaps, detectAndSendLiveUnlockPush } from '@/lib/windowRecap'
 import { NextResponse, type NextRequest } from 'next/server'
 import { recordCronRun } from '@/lib/cronHeartbeat'
+import { isAuthorizedCronRequest } from '@/lib/cronAuth'
 
 const GAME_DURATION_HOURS = 4 // matches lib/rostiroState.ts's window
 
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isAuthorizedCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

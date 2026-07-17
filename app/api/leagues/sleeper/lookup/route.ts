@@ -12,8 +12,11 @@ const RATE_WINDOW_SECONDS = 60
 export async function GET(request: NextRequest) {
   const admin = createAdminClient()
   const ip = getClientIp(request)
-  const { allowed } = await checkRateLimit(admin, `sleeper-lookup:${ip}`, RATE_LIMIT, RATE_WINDOW_SECONDS)
+  const { allowed, reason } = await checkRateLimit(admin, `sleeper-lookup:${ip}`, RATE_LIMIT, RATE_WINDOW_SECONDS)
   if (!allowed) {
+    if (reason === 'service_unavailable') {
+      return NextResponse.json({ error: 'Temporarily unavailable — try again shortly.' }, { status: 503 })
+    }
     return NextResponse.json({ error: 'Too many requests — slow down and try again shortly.' }, { status: 429 })
   }
 

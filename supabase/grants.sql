@@ -9,7 +9,6 @@ grant all on all sequences in schema public to service_role;
 
 -- authenticated: full access to their own rows (RLS enforces row-level isolation)
 grant select, insert, update, delete on
-  public.users,
   public.connected_leagues,
   public.yahoo_tokens,
   public.espn_credentials,
@@ -19,6 +18,18 @@ grant select, insert, update, delete on
   public.ai_queries,
   public.push_subscriptions
 to authenticated;
+
+-- public.users: launch-security hardening (migration_launch_security.sql).
+-- authenticated gets select on the whole row (RLS restricts to their own),
+-- but insert/update/delete are NOT table-wide — server-owned columns
+-- (plan, stripe_customer_id, stripe_subscription_id, trial_ends_at,
+-- season_pass_expires_at, intelligence_addon, founding_number, email) must
+-- only ever be written by the service role. Column-level update grants for
+-- the settings a user can legitimately self-serve are in
+-- migration_launch_security.sql, immediately below the table itself, so a
+-- fresh environment gets the secure grants from the start rather than
+-- table-wide CRUD followed by a later revoke.
+grant select on public.users to authenticated;
 
 -- authenticated read-only (shared reference data)
 grant select on

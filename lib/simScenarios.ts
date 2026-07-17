@@ -23,6 +23,7 @@
 import { getSleeperRosters } from '@/lib/sleeper'
 import { detectTouchdownSwings, type ScoreDelta } from '@/lib/engagementTriggers'
 import { createAdminClient } from '@/lib/supabase'
+import { requireAdminUserId } from '@/lib/adminAuth'
 
 export type AdminClient = ReturnType<typeof createAdminClient>
 
@@ -54,14 +55,18 @@ export interface RestoreEntry {
 // "Clear simulation" button that actually cleans up everything, not two
 // separate tracking systems.
 export async function loadFounderLeagues(admin: AdminClient): Promise<{ userId: string; leagues: ConnectedLeague[] }> {
-  const { data: founder } = await admin.from('users').select('id').eq('email', process.env.ADMIN_EMAIL).maybeSingle()
-  if (!founder) throw new Error('Admin account not found — check ADMIN_EMAIL matches a real signed-up user')
+  // Launch security hardening (Codex Packet 01): resolves the founder's
+  // account via ADMIN_USER_ID (lib/adminAuth.ts), not an email lookup —
+  // same admin-identity surface as app/api/admin/errors and
+  // app/api/admin/simulate. requireAdminUserId() throws if unconfigured,
+  // which is the correct fail-closed behavior for a dev-only tool.
+  const userId = requireAdminUserId()
   const { data: leagues } = await admin
     .from('connected_leagues')
     .select('id, league_id, league_name, team_id')
-    .eq('user_id', founder.id)
+    .eq('user_id', userId)
     .eq('platform', 'sleeper')
-  return { userId: founder.id as string, leagues: (leagues ?? []) as ConnectedLeague[] }
+  return { userId, leagues: (leagues ?? []) as ConnectedLeague[] }
 }
 
 export async function pickRealStarter(admin: AdminClient, league: ConnectedLeague): Promise<RealStarter | null> {

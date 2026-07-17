@@ -48,8 +48,16 @@ const RATE_WINDOW_SECONDS = 60
 export async function POST(request: Request) {
   const admin = createAdminClient()
   const ip = getClientIp(request)
-  const { allowed } = await checkRateLimit(admin, `draft-recommend:${ip}`, RATE_LIMIT, RATE_WINDOW_SECONDS)
+  const { allowed, reason } = await checkRateLimit(admin, `draft-recommend:${ip}`, RATE_LIMIT, RATE_WINDOW_SECONDS)
   if (!allowed) {
+    // service_unavailable = the rate-limit check itself failed (fail
+    // closed, launch security hardening) — distinct from a genuine
+    // rate_limited so this cost-bearing public Claude route never reads a
+    // DB hiccup as unlimited access, and a 503 here is honest about what
+    // actually happened rather than implying the caller did something wrong.
+    if (reason === 'service_unavailable') {
+      return NextResponse.json({ error: 'Temporarily unavailable — try again shortly.' }, { status: 503 })
+    }
     return NextResponse.json({ error: 'Too many requests — slow down and try again shortly.' }, { status: 429 })
   }
 
