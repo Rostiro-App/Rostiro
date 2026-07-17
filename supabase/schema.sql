@@ -98,8 +98,15 @@ create table public.yahoo_tokens (
 
 alter table public.yahoo_tokens enable row level security;
 
-create policy "Users can manage own Yahoo tokens" on public.yahoo_tokens
-  for all using (auth.uid() = user_id);
+-- Packet 02 token-custody hardening: encrypted Yahoo OAuth tokens are
+-- server credentials even ciphertext-encrypted. Every real read/write path
+-- (app/api/auth/yahoo/callback/route.ts, lib/yahoo.ts's
+-- getValidYahooAccessToken) already uses the service-role admin client,
+-- never the user's own session — authenticated never legitimately needed
+-- direct access to this table. Same pattern as rate_limit_events/
+-- app_error_log (migration_rate_limit.sql, migration_error_log.sql).
+create policy "Service role can manage Yahoo tokens" on public.yahoo_tokens
+  for all using (auth.role() = 'service_role');
 
 -- ─── ESPN Credentials ─────────────────────────────────────────────────────────
 -- espn_s2 and SWID stored AES-256 encrypted.

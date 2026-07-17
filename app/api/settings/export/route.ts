@@ -5,14 +5,24 @@
 // OAuth/session secrets) — connection status is exported, the secret itself
 // is not, since a downloaded export file is far more likely to end up
 // pasted somewhere insecure than the database is.
+//
+// Packet 02 token-custody hardening: yahoo_tokens no longer grants
+// authenticated any access at all (migration_yahoo_token_custody.sql), so
+// this route's own safe-status lookup (created_at only, never the token
+// ciphertext) has to go through the admin client instead — explicitly
+// scoped to `.eq('user_id', user.id)` so it can only ever return this
+// caller's own row, same discipline the SSR client's RLS was providing
+// before. Every other table here is unaffected and stays on the SSR client.
 
-import { createSSRClient } from '@/lib/supabase'
+import { createSSRClient, createAdminClient } from '@/lib/supabase'
 import { NextResponse } from 'next/server'
 
 export async function GET() {
   const supabase = await createSSRClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const admin = createAdminClient()
 
   const [profile, leagues, pulseItems, aiQueries, engagementLog, usageCounters, pushSubs, yahooToken, espnCred] =
     await Promise.all([
@@ -48,7 +58,7 @@ export async function GET() {
         .from('push_subscriptions')
         .select('created_at')
         .eq('user_id', user.id),
-      supabase.from('yahoo_tokens').select('created_at').eq('user_id', user.id).maybeSingle(),
+      admin.from('yahoo_tokens').select('created_at').eq('user_id', user.id).maybeSingle(),
       supabase.from('espn_credentials').select('created_at, is_valid').eq('user_id', user.id).maybeSingle(),
     ])
 

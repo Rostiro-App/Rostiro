@@ -10,7 +10,6 @@ grant all on all sequences in schema public to service_role;
 -- authenticated: full access to their own rows (RLS enforces row-level isolation)
 grant select, insert, update, delete on
   public.connected_leagues,
-  public.yahoo_tokens,
   public.espn_credentials,
   public.roster_snapshots,
   public.draft_sessions,
@@ -18,6 +17,16 @@ grant select, insert, update, delete on
   public.ai_queries,
   public.push_subscriptions
 to authenticated;
+
+-- public.yahoo_tokens: Packet 02 token-custody hardening
+-- (migration_yahoo_token_custody.sql). Deliberately NOT included in the
+-- shared grant above — encrypted OAuth tokens are server credentials even
+-- ciphertext-encrypted, and every real write/read path
+-- (app/api/auth/yahoo/callback/route.ts, lib/yahoo.ts's
+-- getValidYahooAccessToken) already uses the service-role admin client,
+-- never the user's own session. authenticated never legitimately needed
+-- this table at all.
+grant select, insert, update, delete on public.yahoo_tokens to service_role;
 
 -- public.users: launch-security hardening (migration_launch_security.sql).
 -- authenticated gets select on the whole row (RLS restricts to their own),
