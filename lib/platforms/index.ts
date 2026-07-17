@@ -33,3 +33,11 @@ export {
   sleeperReadAvailablePlayers,
   sleeperReadDraftMetadata,
 } from './sleeper'
+export {
+  ESPN_CAPABILITIES,
+  espnIntelligenceAdapter,
+  espnReadOwnedRoster,
+  espnReadMatchup,
+  espnReadAvailablePlayers,
+  espnReadDraftMetadata,
+} from './espn'
