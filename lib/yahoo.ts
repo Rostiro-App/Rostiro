@@ -1,9 +1,11 @@
 // T-05: Yahoo Fantasy Sports API client
 // Official REST API, OAuth 2.0. Read-only — Yahoo has approved Rostiro for
 // read access only (write access requires a separate, not-yet-granted
-// app-registration tier). The write functions and XML builders below are
-// currently unreachable dead code kept only for the Packet 02 removal pass;
-// do not add new call sites for them.
+// app-registration tier). Lineup/waiver/trade writes were removed here in
+// Packet 02 (they were dead code with zero call sites even before this —
+// see git history if a write-access grant ever changes this). Use the
+// deep-link helpers at the bottom of this file to send the user to Yahoo
+// to make the actual move.
 // Attribution required: "Fantasy data provided by Yahoo Fantasy"
 
 import { YahooAPIError } from '@/types'
@@ -398,82 +400,10 @@ export async function getYahooLeagueTeams(
   return yahooFetch(`/league/${leagueKey}/teams`, accessToken)
 }
 
-// ─── Write operations ──────────────────────────────────────────────────────────
-// All writes are wrapped in try/catch. On failure, callers must show error
-// AND provide a deep-link fallback. Never silently fail a write.
-
-export async function submitYahooLineup(
-  teamKey: string,
-  starterPlayerKeys: string[],
-  accessToken: string
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    const body = buildLineupXml(teamKey, starterPlayerKeys)
-    await yahooFetch(`/team/${teamKey}/roster`, accessToken, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/xml' },
-      body,
-    })
-    return { success: true }
-  } catch (err) {
-    const message = err instanceof YahooAPIError ? err.message : 'Unknown error submitting lineup'
-    return { success: false, error: message }
-  }
-}
-
-export async function submitYahooWaiverClaim(
-  leagueKey: string,
-  teamKey: string,
-  addPlayerKey: string,
-  dropPlayerKey: string | null,
-  faabBid: number,
-  accessToken: string
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    const body = buildWaiverXml(leagueKey, teamKey, addPlayerKey, dropPlayerKey, faabBid)
-    await yahooFetch(`/league/${leagueKey}/transactions`, accessToken, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/xml' },
-      body,
-    })
-    return { success: true }
-  } catch (err) {
-    const message = err instanceof YahooAPIError ? err.message : 'Unknown error submitting waiver claim'
-    return { success: false, error: message }
-  }
-}
-
-export async function proposeYahooTrade(
-  leagueKey: string,
-  senderTeamKey: string,
-  recipientTeamKey: string,
-  senderPlayerKeys: string[],
-  recipientPlayerKeys: string[],
-  note: string,
-  accessToken: string
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    const body = buildTradeXml(
-      leagueKey,
-      senderTeamKey,
-      recipientTeamKey,
-      senderPlayerKeys,
-      recipientPlayerKeys,
-      note
-    )
-    await yahooFetch(`/league/${leagueKey}/transactions`, accessToken, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/xml' },
-      body,
-    })
-    return { success: true }
-  } catch (err) {
-    const message = err instanceof YahooAPIError ? err.message : 'Unknown error proposing trade'
-    return { success: false, error: message }
-  }
-}
-
 // ─── Deep-link helpers ─────────────────────────────────────────────────────────
+// No write operations exist below this point — Yahoo has approved read
+// access only. Every "make this move" action sends the user to Yahoo
+// directly via these links instead.
 
 export { yahooLeagueUrl } from '@/lib/leagueLinks'
 
@@ -499,110 +429,3 @@ export function yahooDraftUrl(leagueKey: string): string {
   return `https://football.fantasysports.yahoo.com/f1/${leagueId}/draftclient`
 }
 
-// ─── XML builders ─────────────────────────────────────────────────────────────
-
-function buildLineupXml(teamKey: string, starterPlayerKeys: string[]): string {
-  const players = starterPlayerKeys
-    .map(
-      (key) => `
-        <player>
-          <player_key>${key}</player_key>
-          <position>BN</position>
-        </player>`
-    )
-    .join('')
-
-  return `<?xml version="1.0"?>
-<fantasy_content>
-  <roster>
-    <coverage_type>week</coverage_type>
-    <players>${players}
-    </players>
-  </roster>
-</fantasy_content>`
-}
-
-function buildWaiverXml(
-  leagueKey: string,
-  teamKey: string,
-  addPlayerKey: string,
-  dropPlayerKey: string | null,
-  faabBid: number
-): string {
-  const dropXml = dropPlayerKey
-    ? `<player>
-          <player_key>${dropPlayerKey}</player_key>
-          <transaction_data>
-            <type>drop</type>
-            <source_team_key>${teamKey}</source_team_key>
-          </transaction_data>
-        </player>`
-    : ''
-
-  return `<?xml version="1.0"?>
-<fantasy_content>
-  <transaction>
-    <type>add/drop</type>
-    <faab_bid>${faabBid}</faab_bid>
-    <players>
-      <player>
-        <player_key>${addPlayerKey}</player_key>
-        <transaction_data>
-          <type>add</type>
-          <destination_team_key>${teamKey}</destination_team_key>
-        </transaction_data>
-      </player>
-      ${dropXml}
-    </players>
-  </transaction>
-</fantasy_content>`
-}
-
-function buildTradeXml(
-  leagueKey: string,
-  senderTeamKey: string,
-  recipientTeamKey: string,
-  senderPlayerKeys: string[],
-  recipientPlayerKeys: string[],
-  note: string
-): string {
-  const senderPlayers = senderPlayerKeys
-    .map(
-      (key) => `
-        <player>
-          <player_key>${key}</player_key>
-          <transaction_data>
-            <type>trade</type>
-            <source_team_key>${senderTeamKey}</source_team_key>
-            <destination_team_key>${recipientTeamKey}</destination_team_key>
-          </transaction_data>
-        </player>`
-    )
-    .join('')
-
-  const recipientPlayers = recipientPlayerKeys
-    .map(
-      (key) => `
-        <player>
-          <player_key>${key}</player_key>
-          <transaction_data>
-            <type>trade</type>
-            <source_team_key>${recipientTeamKey}</source_team_key>
-            <destination_team_key>${senderTeamKey}</destination_team_key>
-          </transaction_data>
-        </player>`
-    )
-    .join('')
-
-  return `<?xml version="1.0"?>
-<fantasy_content>
-  <transaction>
-    <type>pending_trade</type>
-    <trader_team_key>${senderTeamKey}</trader_team_key>
-    <tradee_team_key>${recipientTeamKey}</tradee_team_key>
-    <trade_note>${note}</trade_note>
-    <players>${senderPlayers}${recipientPlayers}
-    </players>
-  </transaction>
-</fantasy_content>`
-}

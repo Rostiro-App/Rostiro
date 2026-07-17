@@ -22,8 +22,9 @@ export default function YahooConnect({
       </button>
       <h2 className="text-white font-semibold mb-1">Connect Yahoo</h2>
       <p className="text-sm mb-5" style={{ color: 'var(--t2)' }}>
-        You&apos;ll be redirected to Yahoo to authorize Rostiro. This allows Rostiro to read your leagues
-        and submit lineup changes on your behalf.
+        You&apos;ll be redirected to Yahoo to authorize Rostiro with read-only access. Rostiro reads your
+        leagues, rosters, and matchups to build recommendations — you make the actual move on Yahoo,
+        one tap away.
       </p>
 
       <div className="rounded-lg p-4 mb-5" style={{ backgroundColor: 'rgba(6, 11, 19, 0.55)', border: '1px solid var(--hairline)' }}>
@@ -33,9 +34,8 @@ export default function YahooConnect({
         <ul className="space-y-1.5">
           {[
             'Read your leagues, rosters, and matchups',
-            'Submit lineup changes directly',
-            'Add/drop players on waivers',
-            'Propose trades',
+            'Build lineup, waiver, and trade recommendations',
+            'Link straight to Yahoo to make the move',
           ].map((item) => (
             <li key={item} className="text-sm flex items-start gap-2" style={{ color: 'var(--t2)' }}>
               <span className="mt-0.5" style={{ color: 'var(--live)' }}>✓</span>

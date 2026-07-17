@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 
 const PLATFORMS = [
   { key: 'sleeper', name: 'Sleeper', description: 'No login needed, just your username.' },
-  { key: 'yahoo', name: 'Yahoo', description: 'Connect with Yahoo OAuth. Full read + write.' },
+  { key: 'yahoo', name: 'Yahoo', description: 'Connect with Yahoo OAuth. Read-only.' },
   { key: 'espn', name: 'Unlock ESPN', description: 'Browser cookies. Read-only. Takes 2 minutes.' },
 ] as const
 

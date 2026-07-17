@@ -42,7 +42,7 @@ export default function AddLeaguePage() {
           />
           <PlatformCard
             name="Yahoo"
-            description="Connect with Yahoo OAuth. Full read + write."
+            description="Connect with Yahoo OAuth. Read-only."
             onClick={() => setStep('yahoo')}
           />
           <PlatformCard

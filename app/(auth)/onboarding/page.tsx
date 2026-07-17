@@ -77,7 +77,7 @@ function OnboardingFlow() {
             />
             <PlatformCard
               name="Yahoo"
-              description="Connect with Yahoo OAuth. Full read + write."
+              description="Connect with Yahoo OAuth. Read-only."
               connected={connected.includes('yahoo')}
               onClick={() => setStep('yahoo')}
             />
