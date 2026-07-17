@@ -13,7 +13,7 @@ import type {
   Platform,
 } from '@/types'
 
-const SEASON = 2026
+export const SEASON = 2026
 
 // ─── Sleeper normalization ─────────────────────────────────────────────────────
 

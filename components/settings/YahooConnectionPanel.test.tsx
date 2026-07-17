@@ -60,4 +60,47 @@ describe('YahooConnectionPanel', () => {
     expect(screen.getByText('Confirm')).toBeTruthy()
     expect(screen.getByText('Cancel')).toBeTruthy()
   })
+
+  it('shows the last successful sync time and a View Yahoo Leagues control when leagues exist', async () => {
+    mockFetchOnce({ connected: true, needsReconnect: false, leagueCount: 2, failedCount: 0, lastSyncedAt: '2026-07-17T12:00:00.000Z' })
+    render(<YahooConnectionPanel onChanged={() => {}} />)
+    await waitFor(() => expect(screen.getByText(/Last synced/)).toBeTruthy())
+    expect(screen.getByText('View Yahoo Leagues')).toBeTruthy()
+  })
+
+  it('does not show a last-synced line when nothing has synced yet', async () => {
+    mockFetchOnce({ connected: false, needsReconnect: true, leagueCount: 0, failedCount: 0, lastSyncedAt: null })
+    render(<YahooConnectionPanel onChanged={() => {}} />)
+    await waitFor(() => expect(screen.getByText('Reconnect required')).toBeTruthy())
+    expect(screen.queryByText(/Last synced/)).toBeNull()
+    expect(screen.queryByText('View Yahoo Leagues')).toBeNull()
+  })
+
+  it('shows a safe error and preserves the retry path when disconnect fails — never silently ignored', async () => {
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
+      if (init?.method === 'DELETE') {
+        return Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({ error: 'db down' }) } as Response)
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ connected: true, needsReconnect: false, leagueCount: 1, failedCount: 0 }),
+      } as Response)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const onChanged = vi.fn()
+
+    render(<YahooConnectionPanel onChanged={onChanged} />)
+    await waitFor(() => expect(screen.getByText('Disconnect Yahoo')).toBeTruthy())
+
+    fireEvent.click(screen.getByText('Disconnect Yahoo'))
+    fireEvent.click(screen.getByText('Confirm'))
+
+    await waitFor(() => expect(screen.getByText('Could not disconnect Yahoo — try again.')).toBeTruthy())
+    // Retry path preserved: Confirm/Cancel are still there, not collapsed
+    // back to the single "Disconnect Yahoo" button.
+    expect(screen.getByText('Confirm')).toBeTruthy()
+    expect(screen.getByText('Cancel')).toBeTruthy()
+    // A failed disconnect must never be treated as if it succeeded.
+    expect(onChanged).not.toHaveBeenCalled()
+  })
 })

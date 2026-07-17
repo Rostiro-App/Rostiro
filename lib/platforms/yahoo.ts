@@ -44,7 +44,18 @@ export function toNormalizedYahooLeague(
   const draftInfo = parseYahooDraftInfo(rawSettings)
   const waiverInfo = parseYahooWaiverSettings(rawSettings)
 
-  const warnings: DataQualityWarning[] = []
+  const warnings: DataQualityWarning[] = [
+    // Packet 02 correction pass: leagueStatus used to be DERIVED from
+    // draft.status ('complete' draft -> 'complete' league) — wrong. A
+    // league whose draft finished stays active for the entire regular
+    // season and playoffs; conflating "draft done" with "season over"
+    // would have misreported every in-season league as complete the
+    // moment its draft wrapped. No Yahoo field for genuine league-season
+    // status (as opposed to draft status) has been identified and
+    // verified yet, so this reports 'unknown' honestly instead of
+    // guessing from an unrelated field.
+    { field: 'leagueStatus', message: 'Real Yahoo league-season status is not yet verified — reporting unknown rather than deriving it from draft status' },
+  ]
   if (draftInfo.status === 'unknown') {
     warnings.push({ field: 'draft.status', message: 'Could not determine draft status from Yahoo response' })
   }
@@ -54,7 +65,7 @@ export function toNormalizedYahooLeague(
 
   return {
     ...league,
-    leagueStatus: draftInfo.status === 'complete' ? 'complete' : draftInfo.status === 'unknown' ? 'unknown' : 'active',
+    leagueStatus: 'unknown',
     draft: draftInfo,
     waiver: { type: waiverInfo.type, faabBudget: waiverInfo.faabBudget, waiverDay: null, waiverHour: null },
     capabilities: YAHOO_CAPABILITIES,

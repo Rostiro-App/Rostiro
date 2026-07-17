@@ -32,14 +32,13 @@ const GROUPS: FaqGroup[] = [
               once and tells you what to do about what it sees.
             </p>
             <p className="mt-3">
-              For Yahoo leagues, Rostiro can also set your lineup, claim a waiver, or propose a trade
-              directly, since Yahoo&apos;s API supports that. For ESPN and Sleeper, Rostiro deep-links you to
-              the exact right screen on their own site to make the move yourself. It never pretends to take
-              an action neither platform actually lets a third party take.
+              Rostiro connects to ESPN, Yahoo, and Sleeper read-only and deep-links you to the exact right
+              screen on each platform&apos;s own site to make the move yourself. It never pretends to take an
+              action a platform doesn&apos;t actually let a third party take.
             </p>
           </>
         ),
-        answerText: "No, and that's deliberate. Rostiro doesn't run your league, score your matchups, or host your draft. ESPN, Yahoo, and Sleeper still do all of that. Rostiro watches all three at once and tells you what to do about what it sees. For Yahoo leagues, Rostiro can also set your lineup, claim a waiver, or propose a trade directly, since Yahoo's API supports that. For ESPN and Sleeper, Rostiro deep-links you to the exact right screen on their own site to make the move yourself.",
+        answerText: "No, and that's deliberate. Rostiro doesn't run your league, score your matchups, or host your draft. ESPN, Yahoo, and Sleeper still do all of that. Rostiro watches all three at once and tells you what to do about what it sees. Rostiro connects to all three read-only and deep-links you to the exact right screen on each platform's own site to make the move yourself.",
       },
       {
         question: 'Which platforms and league types are supported?',
@@ -113,29 +112,28 @@ const GROUPS: FaqGroup[] = [
             </p>
             <ul className="mt-3 space-y-2">
               <li><strong style={{ color: 'var(--t1)' }}>Sleeper.</strong> Public, read-only API, no credentials at all. There&apos;s nothing to steal because nothing is stored.</li>
-              <li><strong style={{ color: 'var(--t1)' }}>Yahoo.</strong> Official OAuth 2.0. Rostiro never sees your Yahoo password, only a scoped access token, encrypted at rest with AES-256-GCM.</li>
+              <li><strong style={{ color: 'var(--t1)' }}>Yahoo.</strong> Official OAuth 2.0, read-only. Rostiro never sees your Yahoo password, only a scoped access token, encrypted at rest with AES-256-GCM.</li>
               <li><strong style={{ color: 'var(--t1)' }}>ESPN.</strong> ESPN has no official API, so private leagues require a browser cookie handshake (espn_s2/SWID). That cookie is encrypted at rest the same way, AES-256-GCM, and used only to read your league&apos;s own data.</li>
             </ul>
             <p className="mt-3">
-              Sleeper and ESPN access is read-only by construction. Rostiro can&apos;t write anything back to
-              either platform even if it wanted to. Full detail is in the{' '}
+              Access to all three platforms is read-only by construction. Rostiro can&apos;t write anything
+              back to any of them even if it wanted to. Full detail is in the{' '}
               <a href="/privacy" className="underline" style={{ color: 'var(--signal)' }}>Privacy Policy</a>.
             </p>
           </>
         ),
-        answerText: "Rostiro connects to your leagues read-mostly, and encrypts anything sensitive it has to store. Sleeper: public, read-only API, no credentials stored at all. Yahoo: official OAuth 2.0, Rostiro never sees your password, only a scoped access token encrypted at rest with AES-256-GCM. ESPN: a browser cookie handshake for private leagues, encrypted at rest the same way and used only to read your league's own data.",
+        answerText: "Rostiro connects to your leagues read-only, and encrypts anything sensitive it has to store. Sleeper: public, read-only API, no credentials stored at all. Yahoo: official OAuth 2.0, read-only, Rostiro never sees your password, only a scoped access token encrypted at rest with AES-256-GCM. ESPN: a browser cookie handshake for private leagues, encrypted at rest the same way and used only to read your league's own data.",
       },
       {
         question: 'Can Rostiro make changes to my team without me knowing?',
         answer: (
           <p>
-            Only where a platform&apos;s own API allows it, and only when you tap to confirm. Yahoo is the
-            one platform where Rostiro can submit a lineup, waiver claim, or trade proposal directly, and
-            every one of those is a deliberate action you take, never automatic. ESPN and Sleeper moves
-            always deep-link you to that platform&apos;s own site to finish the action yourself.
+            No. Rostiro doesn&apos;t submit a lineup, claim a waiver, or propose a trade on any platform —
+            ESPN, Yahoo, and Sleeper are all read-only connections. Every recommendation deep-links you to
+            the exact right screen on that platform&apos;s own site, and you&apos;re the one who makes the move.
           </p>
         ),
-        answerText: "Only where a platform's own API allows it, and only when you tap to confirm. Yahoo is the one platform where Rostiro can submit a lineup, waiver claim, or trade proposal directly, and every one of those is a deliberate action you take, never automatic. ESPN and Sleeper moves always deep-link you to that platform's own site to finish the action yourself.",
+        answerText: "No. Rostiro doesn't submit a lineup, claim a waiver, or propose a trade on any platform — ESPN, Yahoo, and Sleeper are all read-only connections. Every recommendation deep-links you to the exact right screen on that platform's own site, and you're the one who makes the move.",
       },
       {
         question: 'Can I delete my data?',

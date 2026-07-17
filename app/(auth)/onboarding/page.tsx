@@ -17,6 +17,13 @@ const CONNECT_ERRORS: Record<string, string> = {
 function OnboardingFlow() {
   const searchParams = useSearchParams()
   const errorParam = searchParams.get('error')
+  // Set by the Yahoo OAuth callback on success (app/api/auth/yahoo/
+  // callback/route.ts) — a stored token isn't a completed connection yet,
+  // so this lands the user back on the 'yahoo' step to visibly import
+  // before anything is marked connected, never at 'mode' (a full-page
+  // redirect remounts this component fresh, and 'mode' was the previous,
+  // wrong default for this case).
+  const yahooImporting = searchParams.get('yahoo') === 'importing'
   const router = useRouter()
 
   // A failed OAuth/cookie connect redirects back here as a full page
@@ -24,14 +31,14 @@ function OnboardingFlow() {
   // and would otherwise silently drop the user back to step 1 with no
   // indication anything failed. Land on 'connect' with the error surfaced
   // instead of resetting the whole flow.
-  const [step, setStep] = useState<Step>(errorParam ? 'connect' : 'mode')
+  const [step, setStep] = useState<Step>(errorParam ? 'connect' : yahooImporting ? 'yahoo' : 'mode')
   const [connected, setConnected] = useState<string[]>([])
   const [connectError, setConnectError] = useState<string | null>(
     errorParam ? (CONNECT_ERRORS[errorParam] ?? 'That connection failed. Please try again.') : null
   )
 
   useEffect(() => {
-    if (errorParam) router.replace('/onboarding')
+    if (errorParam || yahooImporting) router.replace('/onboarding')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -110,7 +117,11 @@ function OnboardingFlow() {
           <SleeperConnect onBack={() => setStep('connect')} onConnected={() => onConnected('sleeper')} />
         )}
         {step === 'yahoo' && (
-          <YahooConnect onBack={() => setStep('connect')} onConnected={() => onConnected('yahoo')} />
+          <YahooConnect
+            onBack={() => setStep('connect')}
+            onConnected={() => onConnected('yahoo')}
+            startImporting={yahooImporting}
+          />
         )}
         {step === 'espn' && (
           <EspnConnect onBack={() => setStep('connect')} onConnected={() => onConnected('espn')} />

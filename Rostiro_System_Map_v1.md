@@ -19,7 +19,7 @@ The outside world. Real fantasy + NFL data, plus inbound billing events.
 |---|---|
 | **Sleeper API** (`api.sleeper.app`) | leagues · rosters · players · live drafts |
 | **ESPN API** (`fantasy.espn.com`) | leagues · projections · live scores · news RSS |
-| **Yahoo API** *(pending review)* | leagues · write-back — code ready (`lib/yahoo.ts`), waiting on access |
+| **Yahoo API** *(pending Yahoo approval — corrected 2026-07-17)* | leagues, read-only. Write-back was never granted and the code path was removed (`lib/yahoo.ts` requests `fspt-r` only); even read access has not been approved yet as of this correction — no real OAuth flow can complete until Yahoo grants it. |
 | **nflverse** (`raw.githubusercontent.com`) | player stats · cross-platform id mappings |
 | **Stripe events** (inbound webhook) | checkout · renewals · payment failures |
 | **User actions** | connect league · edit lineup · save note |

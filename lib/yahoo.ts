@@ -215,12 +215,21 @@ export async function getValidYahooAccessToken(userId: string): Promise<string> 
 
   const { data: row, error } = await admin
     .from('yahoo_tokens')
-    .select('access_token, refresh_token, expires_at')
+    .select('access_token, refresh_token, expires_at, scope')
     .eq('user_id', userId)
     .single()
 
   if (error || !row) {
     throw new YahooAPIError('No Yahoo account connected', 'YAHOO_NOT_CONNECTED', 404)
+  }
+
+  // Least-privilege check: a historical token (minted before this app's
+  // read-only correction) or any unexpectedly broad/foreign scope must
+  // never be trusted silently just because a row exists. Storing a token
+  // is not the same as it being usable under the currently-approved
+  // configuration — force a reconnect rather than assume it's fine.
+  if (!isReadCompatibleScope(row.scope)) {
+    throw new YahooAPIError('Stored Yahoo token scope is not read-compatible', 'YAHOO_RECONNECT_REQUIRED', 403)
   }
 
   const expiresAt = new Date(row.expires_at).getTime()
@@ -235,7 +244,7 @@ export async function getValidYahooAccessToken(userId: string): Promise<string> 
     try {
       const refreshed = await refreshYahooTokens(decrypt(row.refresh_token))
 
-      await admin
+      const { error: persistError } = await admin
         .from('yahoo_tokens')
         .update({
           access_token: encrypt(refreshed.accessToken),
@@ -244,6 +253,15 @@ export async function getValidYahooAccessToken(userId: string): Promise<string> 
           scope: refreshed.scope,
         })
         .eq('user_id', userId)
+
+      if (persistError) {
+        // The refresh with Yahoo succeeded, but Rostiro couldn't persist
+        // the (possibly rotated) refresh token — reporting success here
+        // would risk a future call using a refresh token Yahoo has
+        // already invalidated by rotation, failing silently later
+        // instead of loudly now. Treat this refresh attempt as failed.
+        throw new YahooAPIError('Could not persist refreshed Yahoo token', 'YAHOO_TOKEN_PERSIST_ERROR', 500)
+      }
 
       return refreshed.accessToken
     } finally {

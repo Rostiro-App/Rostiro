@@ -9,6 +9,10 @@ export default defineConfig({
   // didn't have anywhere to run before this, since no app/api test glob
   // existed at all. components/settings/**/*.test.{ts,tsx} added for
   // Packet 02's Yahoo connection UX tests — same gap, a different folder.
-  test: { environment: 'jsdom', globals: true, include: ['app/demo/**/*.test.{ts,tsx}', 'components/marketing/scenes/**/*.test.{ts,tsx}', 'components/interrupt/**/*.test.{ts,tsx}', 'components/settings/**/*.test.{ts,tsx}', 'lib/**/*.test.ts', 'app/api/**/*.test.ts'], setupFiles: ['./app/demo/test-setup.ts'] },
+  // components/onboarding/**/*.test.{ts,tsx} and app/(auth)/**/*.test.{ts,tsx}
+  // added for the Packet 02 correction pass's OAuth-lifecycle regression
+  // tests — same recurring gap, yet more folders. app/faq/**/*.test.{ts,tsx}
+  // added for the same pass's FAQ write-access-copy regression test.
+  test: { environment: 'jsdom', globals: true, include: ['app/demo/**/*.test.{ts,tsx}', 'components/marketing/scenes/**/*.test.{ts,tsx}', 'components/interrupt/**/*.test.{ts,tsx}', 'components/settings/**/*.test.{ts,tsx}', 'components/onboarding/**/*.test.{ts,tsx}', 'app/[(]auth[)]/**/*.test.{ts,tsx}', 'app/faq/**/*.test.{ts,tsx}', 'lib/**/*.test.ts', 'app/api/**/*.test.ts'], setupFiles: ['./app/demo/test-setup.ts'] },
   resolve: { alias: { '@': fileURLToPath(new URL('.', import.meta.url)) } },
 })

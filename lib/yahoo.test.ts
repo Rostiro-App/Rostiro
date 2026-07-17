@@ -151,3 +151,92 @@ describe('refreshYahooTokens', () => {
     await expect(refreshYahooTokens('some-token')).rejects.toMatchObject({ code: 'YAHOO_TOKEN_REFRESH_ERROR' })
   })
 })
+
+describe('getValidYahooAccessToken', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.doUnmock('@/lib/supabase')
+    vi.doUnmock('@/lib/encrypt')
+    vi.doMock('@/lib/encrypt', () => ({
+      encrypt: (v: string) => `enc(${v})`,
+      decrypt: (v: string) => v.replace(/^enc\(/, '').replace(/\)$/, ''),
+    }))
+  })
+
+  function mockAdmin(row: Record<string, unknown> | null, updateError: { message: string } | null = null) {
+    return {
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({ single: vi.fn(() => Promise.resolve(row ? { data: row, error: null } : { data: null, error: { message: 'not found' } })) })),
+        })),
+        update: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ error: updateError })) })),
+      })),
+    }
+  }
+
+  it('throws YAHOO_NOT_CONNECTED when no token row exists', async () => {
+    vi.doMock('@/lib/supabase', () => ({ createAdminClient: vi.fn(() => mockAdmin(null)) }))
+    const { getValidYahooAccessToken } = await import('./yahoo')
+    await expect(getValidYahooAccessToken('user-1')).rejects.toMatchObject({ code: 'YAHOO_NOT_CONNECTED' })
+  })
+
+  it('returns the decrypted access token directly when it is not near expiry', async () => {
+    vi.doMock('@/lib/supabase', () => ({
+      createAdminClient: vi.fn(() => mockAdmin({
+        access_token: 'enc(valid-at)',
+        refresh_token: 'enc(valid-rt)',
+        expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        scope: 'fspt-r',
+      })),
+    }))
+    const { getValidYahooAccessToken } = await import('./yahoo')
+    await expect(getValidYahooAccessToken('user-1')).resolves.toBe('valid-at')
+  })
+
+  it('requires reconnect when the stored scope is not read-compatible — a historical or unexpectedly broad/foreign scope must not silently bypass the read-only configuration', async () => {
+    vi.doMock('@/lib/supabase', () => ({
+      createAdminClient: vi.fn(() => mockAdmin({
+        access_token: 'enc(at)',
+        refresh_token: 'enc(rt)',
+        expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        scope: 'openid profile', // never approved for this app
+      })),
+    }))
+    const { getValidYahooAccessToken } = await import('./yahoo')
+    await expect(getValidYahooAccessToken('user-1')).rejects.toMatchObject({ code: 'YAHOO_RECONNECT_REQUIRED' })
+  })
+
+  it('still accepts a legacy fspt-w token as read-capable (a strict superset), rather than forcing every existing user to reconnect', async () => {
+    vi.doMock('@/lib/supabase', () => ({
+      createAdminClient: vi.fn(() => mockAdmin({
+        access_token: 'enc(at)',
+        refresh_token: 'enc(rt)',
+        expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        scope: 'fspt-w',
+      })),
+    }))
+    const { getValidYahooAccessToken } = await import('./yahoo')
+    await expect(getValidYahooAccessToken('user-1')).resolves.toBe('at')
+  })
+
+  it('does not report success if the refreshed token could not be persisted', async () => {
+    vi.doMock('@/lib/supabase', () => ({
+      createAdminClient: vi.fn(() => mockAdmin({
+        access_token: 'enc(old-at)',
+        refresh_token: 'enc(old-rt)',
+        expires_at: new Date(Date.now() - 1000).toISOString(), // already expired -> triggers refresh
+        scope: 'fspt-r',
+      }, { message: 'db unavailable' })),
+    }))
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({ access_token: 'new-at', refresh_token: 'new-rt', expires_in: 3600, scope: 'fspt-r' }),
+    } as Response)))
+    process.env.YAHOO_CLIENT_ID = 'id'
+    process.env.YAHOO_CLIENT_SECRET = 'secret'
+
+    const { getValidYahooAccessToken } = await import('./yahoo')
+    await expect(getValidYahooAccessToken('user-1')).rejects.toMatchObject({ code: 'YAHOO_TOKEN_PERSIST_ERROR' })
+    vi.unstubAllGlobals()
+  })
+})

@@ -1,14 +1,79 @@
 'use client'
 
+// Packet 02 correction pass: a successful OAuth callback used to redirect
+// straight to "?yahoo=connected" — but a stored token isn't a completed
+// connection. This component now owns the actual "connected" moment: when
+// it mounts with startImporting=true (the parent detected "?yahoo=
+// importing" from the callback redirect), it shows a visible importing
+// state, calls the Yahoo sync itself, and only calls onConnected() once
+// that call actually returns successfully.
+
+import { useEffect, useState } from 'react'
+
 export default function YahooConnect({
   onBack,
-  onConnected: _onConnected,
+  onConnected,
+  startImporting = false,
 }: {
   onBack: () => void
   onConnected: () => void
+  startImporting?: boolean
 }) {
+  const [importing, setImporting] = useState(startImporting)
+  const [importError, setImportError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!startImporting) return
+    let cancelled = false
+
+    ;(async () => {
+      try {
+        const res = await fetch('/api/leagues/yahoo', { method: 'POST' })
+        if (cancelled) return
+        if (res.ok) {
+          onConnected()
+          return
+        }
+        const body = await res.json().catch(() => ({}))
+        setImportError(
+          body.code === 'YAHOO_RECONNECT_REQUIRED'
+            ? 'Yahoo needs to be reconnected — try again.'
+            : 'Yahoo is connected, but importing your leagues failed — you can retry from Settings.'
+        )
+        setImporting(false)
+      } catch {
+        if (!cancelled) {
+          setImportError('Could not reach Rostiro to import your leagues — you can retry from Settings.')
+          setImporting(false)
+        }
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+    // Runs once, driven only by the initial startImporting prop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   function handleConnect() {
-    window.location.href = '/api/auth/yahoo'
+    // returnTo tells the callback which real flow to send the user back
+    // to — validated server-side against an explicit allowlist
+    // (lib/yahooReturnTo.ts) before ever being trusted as a redirect
+    // target, so this can't be turned into an open redirect.
+    window.location.href = `/api/auth/yahoo?returnTo=${encodeURIComponent(window.location.pathname)}`
+  }
+
+  if (importing) {
+    return (
+      <div
+        className="rounded-xl p-6 text-center"
+        style={{ backgroundColor: 'rgba(8, 15, 26, 0.6)', border: '1.5px solid var(--hairline)' }}
+      >
+        <p className="text-white font-semibold mb-1">Importing your Yahoo leagues…</p>
+        <p className="text-sm" style={{ color: 'var(--t2)' }}>This only takes a moment.</p>
+      </div>
+    )
   }
 
   return (
@@ -47,6 +112,10 @@ export default function YahooConnect({
           Fantasy data provided by Yahoo Fantasy.
         </p>
       </div>
+
+      {importError && (
+        <p className="text-sm mb-3" style={{ color: 'var(--crit)' }}>{importError}</p>
+      )}
 
       <button
         onClick={handleConnect}

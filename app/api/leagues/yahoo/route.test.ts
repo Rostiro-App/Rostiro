@@ -31,7 +31,7 @@ function mockLeague(overrides: Partial<Record<string, unknown>> = {}) {
 function mockNormalized(league: ReturnType<typeof mockLeague>) {
   return {
     ...league,
-    leagueStatus: 'active',
+    leagueStatus: 'unknown',
     draft: { status: 'not_started', scheduledAt: null },
     waiver: { type: 'unknown', faabBudget: null, waiverDay: null, waiverHour: null },
     capabilities: {
@@ -53,6 +53,8 @@ async function loadRouteWithMocks(opts: {
   existingLookup?: { data: unknown }
   upsertResult?: { data: unknown; error: unknown }
   canConnectResult?: { allowed: boolean }
+  leagueOverrides?: Partial<Record<string, unknown>>
+  ownedTeam?: { teamKey: string; teamName: string } | null
 }) {
   const {
     getValidYahooAccessToken = () => Promise.resolve('valid-token'),
@@ -61,6 +63,8 @@ async function loadRouteWithMocks(opts: {
     existingLookup = { data: null },
     upsertResult = { data: { id: 'row-1' }, error: null },
     canConnectResult = { allowed: true },
+    leagueOverrides = {},
+    ownedTeam,
   } = opts
 
   vi.doMock('@/lib/supabase', () => ({
@@ -70,19 +74,17 @@ async function loadRouteWithMocks(opts: {
     createAdminClient: vi.fn(() => ({
       from: vi.fn((table: string) => {
         if (table === 'connected_leagues') {
+          // Arity-agnostic chain — persistLeagueFailure's existence check
+          // (3 .eq()s) and the success path's (4 .eq()s, incl. season)
+          // both hit this same select().
+          const selectChain: Record<string, unknown> = {}
+          selectChain.eq = vi.fn(() => selectChain)
+          selectChain.maybeSingle = vi.fn(() => Promise.resolve(existingLookup))
           return {
-            select: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                eq: vi.fn(() => ({
-                  eq: vi.fn(() => ({
-                    eq: vi.fn(() => ({ maybeSingle: vi.fn(() => Promise.resolve(existingLookup)) })),
-                  })),
-                })),
-              })),
-            })),
+            select: vi.fn(() => selectChain),
             upsert: vi.fn(() => makeUpsertChain(upsertResult)),
-            update: vi.fn(() => ({ eq: vi.fn(() => ({ eq: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ error: null })) })) })) })),
-            delete: vi.fn(() => ({ eq: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ error: null })) })) })),
+            update: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ error: null })) })),
+            delete: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ error: null })) })),
           }
         }
         if (table === 'yahoo_tokens') {
@@ -100,12 +102,13 @@ async function loadRouteWithMocks(opts: {
     getYahooLeagueTeams: vi.fn(() => Promise.resolve({})),
   }))
 
-  const league = mockLeague()
+  const league = mockLeague(leagueOverrides)
   vi.doMock('@/lib/normalize', () => ({
     normalizeYahooLeague: vi.fn(() => ({ ...league })),
     extractYahooLeagueKeys: vi.fn(() => leagueKeys),
-    extractYahooOwnedTeam: vi.fn(() => ({ teamKey: league.myTeamId, teamName: league.myTeamName })),
+    extractYahooOwnedTeam: vi.fn(() => ownedTeam !== undefined ? ownedTeam : { teamKey: league.myTeamId, teamName: league.myTeamName }),
     extractYahooSettings: vi.fn(() => ({})),
+    SEASON: 2026,
   }))
 
   vi.doMock('@/lib/platforms/yahoo', () => ({
@@ -218,10 +221,17 @@ describe('POST /api/leagues/yahoo', () => {
       createAdminClient: vi.fn(() => ({
         from: vi.fn((table: string) => {
           if (table === 'connected_leagues') {
+            // Chainable mock supporting any number of .eq() calls before a
+            // terminal .maybeSingle() — persistLeagueFailure's existence
+            // check (3 .eq()s) and the success path's existence check (4
+            // .eq()s, including season) both hit this same select().
+            const selectChain: Record<string, unknown> = {}
+            selectChain.eq = vi.fn(() => selectChain)
+            selectChain.maybeSingle = vi.fn(() => Promise.resolve({ data: null }))
             return {
-              select: vi.fn(() => ({ eq: vi.fn(() => ({ eq: vi.fn(() => ({ eq: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: vi.fn(() => Promise.resolve({ data: null })) })) })) })) })) })),
+              select: vi.fn(() => selectChain),
               upsert: vi.fn(() => makeUpsertChain({ data: { id: 'row-ok' }, error: null })),
-              update: vi.fn(() => ({ eq: vi.fn(() => ({ eq: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ error: null })) })) })) })),
+              update: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ error: null })) })),
             }
           }
           return {}
@@ -236,6 +246,7 @@ describe('POST /api/leagues/yahoo', () => {
         extractYahooLeagueKeys: vi.fn(() => ['449.l.good', '449.l.bad']),
         extractYahooOwnedTeam: vi.fn(() => ({ teamKey: league.myTeamId, teamName: league.myTeamName })),
         extractYahooSettings: vi.fn(() => ({})),
+    SEASON: 2026,
       }
     })
     vi.doMock('@/lib/platforms/yahoo', () => ({ toNormalizedYahooLeague: vi.fn((l: ReturnType<typeof mockLeague>) => mockNormalized(l)) }))
@@ -260,6 +271,144 @@ describe('POST /api/leagues/yahoo', () => {
     // raw response body or credential.
     expect(body.failures[0].error).not.toContain('token')
   })
+
+  it('preserves a first-time sync failure by inserting a placeholder row (no prior row existed), so it survives a reload', async () => {
+    const { YahooAPIError } = await import('@/types')
+    let upsertCalled = false
+    let upsertPayload: Record<string, unknown> | null = null
+    vi.doMock('@/lib/supabase', () => ({
+      createSSRClient: vi.fn(() => Promise.resolve({ auth: { getUser: () => Promise.resolve({ data: { user: mockUser } }) } })),
+      createAdminClient: vi.fn(() => ({
+        from: vi.fn(() => {
+          const selectChain: Record<string, unknown> = {}
+          selectChain.eq = vi.fn(() => selectChain)
+          // No existing row for this league — the first-time-failure case.
+          selectChain.maybeSingle = vi.fn(() => Promise.resolve({ data: null }))
+          return {
+            select: vi.fn(() => selectChain),
+            upsert: vi.fn((payload: Record<string, unknown>) => {
+              upsertCalled = true
+              upsertPayload = payload
+              return makeUpsertChain({ data: { id: 'row' }, error: null })
+            }),
+            update: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ error: null })) })),
+          }
+        }),
+      })),
+    }))
+    vi.doMock('@/lib/usageLimits', () => ({ canConnectNewLeague: vi.fn(() => Promise.resolve({ allowed: true })) }))
+    vi.doMock('@/lib/normalize', () => ({
+      normalizeYahooLeague: vi.fn(() => mockLeague()),
+      extractYahooLeagueKeys: vi.fn(() => ['449.l.bad']),
+      extractYahooOwnedTeam: vi.fn(() => ({ teamKey: 't', teamName: 'T' })),
+      extractYahooSettings: vi.fn(() => ({})),
+      SEASON: 2026,
+    }))
+    vi.doMock('@/lib/platforms/yahoo', () => ({ toNormalizedYahooLeague: vi.fn((l: ReturnType<typeof mockLeague>) => mockNormalized(l)) }))
+    vi.doMock('@/lib/yahoo', () => ({
+      getValidYahooAccessToken: vi.fn(() => Promise.resolve('token')),
+      getYahooLeagues: vi.fn(() => Promise.resolve({})),
+      getYahooLeague: vi.fn(() => Promise.reject(new YahooAPIError('boom', 'YAHOO_HTTP_ERROR', 500))),
+      getYahooLeagueTeams: vi.fn(() => Promise.resolve({})),
+    }))
+
+    const { POST } = await import('./route')
+    await POST()
+
+    expect(upsertCalled).toBe(true)
+    expect(upsertPayload).toMatchObject({ league_id: '449.l.bad', sync_status: 'error', platform: 'yahoo' })
+  })
+
+  it('preserves a repeat sync failure by updating the existing row, never clobbering its real data with a placeholder', async () => {
+    const { YahooAPIError } = await import('@/types')
+    let updateCalled = false
+    let updatePayload: Record<string, unknown> | null = null
+    let upsertCalled = false
+    vi.doMock('@/lib/supabase', () => ({
+      createSSRClient: vi.fn(() => Promise.resolve({ auth: { getUser: () => Promise.resolve({ data: { user: mockUser } }) } })),
+      createAdminClient: vi.fn(() => ({
+        from: vi.fn(() => {
+          const selectChain: Record<string, unknown> = {}
+          selectChain.eq = vi.fn(() => selectChain)
+          // An existing row for this league already — a repeat failure.
+          selectChain.maybeSingle = vi.fn(() => Promise.resolve({ data: { id: 'existing-row-id' } }))
+          return {
+            select: vi.fn(() => selectChain),
+            upsert: vi.fn(() => {
+              upsertCalled = true
+              return makeUpsertChain({ data: { id: 'row' }, error: null })
+            }),
+            update: vi.fn((payload: Record<string, unknown>) => {
+              updateCalled = true
+              updatePayload = payload
+              return { eq: vi.fn(() => Promise.resolve({ error: null })) }
+            }),
+          }
+        }),
+      })),
+    }))
+    vi.doMock('@/lib/usageLimits', () => ({ canConnectNewLeague: vi.fn(() => Promise.resolve({ allowed: true })) }))
+    vi.doMock('@/lib/normalize', () => ({
+      normalizeYahooLeague: vi.fn(() => mockLeague()),
+      extractYahooLeagueKeys: vi.fn(() => ['449.l.bad']),
+      extractYahooOwnedTeam: vi.fn(() => ({ teamKey: 't', teamName: 'T' })),
+      extractYahooSettings: vi.fn(() => ({})),
+      SEASON: 2026,
+    }))
+    vi.doMock('@/lib/platforms/yahoo', () => ({ toNormalizedYahooLeague: vi.fn((l: ReturnType<typeof mockLeague>) => mockNormalized(l)) }))
+    vi.doMock('@/lib/yahoo', () => ({
+      getValidYahooAccessToken: vi.fn(() => Promise.resolve('token')),
+      getYahooLeagues: vi.fn(() => Promise.resolve({})),
+      getYahooLeague: vi.fn(() => Promise.reject(new YahooAPIError('boom again', 'YAHOO_HTTP_ERROR', 500))),
+      getYahooLeagueTeams: vi.fn(() => Promise.resolve({})),
+    }))
+
+    const { POST } = await import('./route')
+    await POST()
+
+    expect(updateCalled).toBe(true)
+    expect(upsertCalled).toBe(false)
+    expect(updatePayload).toMatchObject({ sync_status: 'error' })
+    // Never sent a placeholder league_name that would clobber real data.
+    expect(updatePayload).not.toHaveProperty('league_name')
+  })
+
+  it('fails a league with an empty normalized league key, never importing it', async () => {
+    const { POST } = await loadRouteWithMocks({ leagueOverrides: { leagueId: '' } })
+    const res = await POST()
+    const body = await res.json()
+    expect(body.imported).toBe(0)
+    expect(body.failed).toBe(1)
+    expect(body.failures[0].error).toContain('league key')
+  })
+
+  it('fails a league with an unusable (blank) league name, never importing it', async () => {
+    const { POST } = await loadRouteWithMocks({ leagueOverrides: { leagueName: '   ' } })
+    const res = await POST()
+    const body = await res.json()
+    expect(body.imported).toBe(0)
+    expect(body.failed).toBe(1)
+    expect(body.failures[0].error).toContain('league name')
+  })
+
+  it('fails a league when extractYahooOwnedTeam cannot confidently identify the owned team, never falling back to any default team', async () => {
+    const { POST } = await loadRouteWithMocks({ ownedTeam: null })
+    const res = await POST()
+    const body = await res.json()
+    expect(body.imported).toBe(0)
+    expect(body.failed).toBe(1)
+    expect(body.leagues).toHaveLength(0)
+    expect(body.failures[0].error).toContain('team you own')
+  })
+
+  it('fails a league when extractYahooOwnedTeam returns an empty team key', async () => {
+    const { POST } = await loadRouteWithMocks({ ownedTeam: { teamKey: '', teamName: 'Somebody' } })
+    const res = await POST()
+    const body = await res.json()
+    expect(body.imported).toBe(0)
+    expect(body.failed).toBe(1)
+  })
+
 })
 
 describe('GET /api/leagues/yahoo — connection status', () => {
@@ -335,6 +484,28 @@ describe('GET /api/leagues/yahoo — connection status', () => {
     expect(body.failedCount).toBe(1)
   })
 
+  it('reports the most recent last_synced_at across all leagues, ignoring failed (null) leagues', async () => {
+    mockSupabaseWithLeagues([
+      { id: '1', league_name: 'A', sync_status: 'ok', last_synced_at: '2026-07-15T10:00:00.000Z' },
+      { id: '2', league_name: 'B', sync_status: 'ok', last_synced_at: '2026-07-17T10:00:00.000Z' },
+      { id: '3', league_name: 'C', sync_status: 'error', sync_error: 'boom', last_synced_at: null },
+    ])
+    vi.doMock('@/lib/yahoo', () => ({ getValidYahooAccessToken: vi.fn(() => Promise.resolve('token')) }))
+    const { GET } = await import('./route')
+    const res = await GET()
+    const body = await res.json()
+    expect(body.lastSyncedAt).toBe('2026-07-17T10:00:00.000Z')
+  })
+
+  it('reports lastSyncedAt as null when no league has ever synced successfully', async () => {
+    mockSupabaseWithLeagues([{ id: '1', league_name: 'A', sync_status: 'error', last_synced_at: null }])
+    vi.doMock('@/lib/yahoo', () => ({ getValidYahooAccessToken: vi.fn(() => Promise.resolve('token')) }))
+    const { GET } = await import('./route')
+    const res = await GET()
+    const body = await res.json()
+    expect(body.lastSyncedAt).toBeNull()
+  })
+
   it('reports a transient check failure as 502, not as not-connected or needing reconnect', async () => {
     mockSupabaseWithLeagues([])
     vi.doMock('@/lib/yahoo', () => ({ getValidYahooAccessToken: vi.fn(() => Promise.reject(new Error('network blip'))) }))
@@ -395,5 +566,61 @@ describe('DELETE /api/leagues/yahoo', () => {
     expect(res.status).toBe(200)
     expect(deleteCalls).toContain('connected_leagues')
     expect(deleteCalls).toContain('yahoo_tokens')
+  })
+
+  it('deletes the token before the leagues, not in parallel — order matters for the failure modes', async () => {
+    const deleteOrder: string[] = []
+    vi.doMock('@/lib/supabase', () => ({
+      createSSRClient: vi.fn(() => Promise.resolve({ auth: { getUser: () => Promise.resolve({ data: { user: mockUser } }) } })),
+      createAdminClient: vi.fn(() => ({
+        from: vi.fn((table: string) => {
+          deleteOrder.push(table)
+          return { delete: vi.fn(() => ({ eq: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ error: null })) })) })) }
+        }),
+      })),
+    }))
+    const { DELETE } = await import('./route')
+    await DELETE()
+    expect(deleteOrder[0]).toBe('yahoo_tokens')
+    expect(deleteOrder[1]).toBe('connected_leagues')
+  })
+
+  it('reports a clear error and never attempts the leagues delete when the token delete fails', async () => {
+    let leaguesDeleteAttempted = false
+    vi.doMock('@/lib/supabase', () => ({
+      createSSRClient: vi.fn(() => Promise.resolve({ auth: { getUser: () => Promise.resolve({ data: { user: mockUser } }) } })),
+      createAdminClient: vi.fn(() => ({
+        from: vi.fn((table: string) => {
+          if (table === 'yahoo_tokens') {
+            return { delete: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ error: { message: 'db down' } })) })) }
+          }
+          leaguesDeleteAttempted = true
+          return { delete: vi.fn(() => ({ eq: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ error: null })) })) })) }
+        }),
+      })),
+    }))
+    const { DELETE } = await import('./route')
+    const res = await DELETE()
+    expect(res.status).toBe(500)
+    expect(leaguesDeleteAttempted).toBe(false)
+  })
+
+  it('reports an error (not a silent 200) if the token delete succeeds but the leagues delete fails', async () => {
+    vi.doMock('@/lib/supabase', () => ({
+      createSSRClient: vi.fn(() => Promise.resolve({ auth: { getUser: () => Promise.resolve({ data: { user: mockUser } }) } })),
+      createAdminClient: vi.fn(() => ({
+        from: vi.fn((table: string) => {
+          if (table === 'yahoo_tokens') {
+            return { delete: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ error: null })) })) }
+          }
+          return { delete: vi.fn(() => ({ eq: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ error: { message: 'db down' } })) })) })) }
+        }),
+      })),
+    }))
+    const { DELETE } = await import('./route')
+    const res = await DELETE()
+    expect(res.status).toBe(500)
+    const body = await res.json()
+    expect(body.error).toBeTruthy()
   })
 })

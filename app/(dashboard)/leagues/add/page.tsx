@@ -8,19 +8,43 @@
 // authenticated app (AppShell chrome, not a full-page takeover) and
 // actually returns to /leagues when done.
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import SleeperConnect from '@/components/onboarding/SleeperConnect'
 import YahooConnect from '@/components/onboarding/YahooConnect'
 import EspnConnect from '@/components/onboarding/EspnConnect'
 
 type Step = 'pick' | 'sleeper' | 'yahoo' | 'espn'
 
-export default function AddLeaguePage() {
+const CONNECT_ERRORS: Record<string, string> = {
+  yahoo_auth_failed: 'Yahoo connection failed. Please try again.',
+  yahoo_token_failed: 'Yahoo connection failed. Please try again.',
+  yahoo_reconnect_required: 'Yahoo needs to be reconnected. Please try again.',
+  espn_auth_failed: 'ESPN connection failed. Check your cookies and try again.',
+}
+
+function AddLeagueFlow() {
   const router = useRouter()
-  const [step, setStep] = useState<Step>('pick')
+  const searchParams = useSearchParams()
+  const errorParam = searchParams.get('error')
+  // Same reasoning as app/(auth)/onboarding/page.tsx: a successful Yahoo
+  // OAuth callback lands here with "?yahoo=importing", not "?yahoo=
+  // connected" — a stored token isn't a completed connection until the
+  // league sync it triggers actually returns.
+  const yahooImporting = searchParams.get('yahoo') === 'importing'
+
+  const [step, setStep] = useState<Step>(errorParam || yahooImporting ? 'yahoo' : 'pick')
+  const [connectError, setConnectError] = useState<string | null>(
+    errorParam ? (CONNECT_ERRORS[errorParam] ?? 'That connection failed. Please try again.') : null
+  )
+
+  useEffect(() => {
+    if (errorParam || yahooImporting) router.replace('/leagues/add')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function handleConnected() {
+    setConnectError(null)
     router.push('/leagues')
   }
 
@@ -32,6 +56,15 @@ export default function AddLeaguePage() {
           Rostiro checks every connected league on every sync.
         </p>
       </div>
+
+      {connectError && (
+        <div
+          className="mb-4 rounded-lg px-4 py-3 text-sm"
+          style={{ backgroundColor: 'rgba(226,75,74,0.12)', border: '1px solid rgba(226,75,74,0.35)', color: '#E24B4A' }}
+        >
+          {connectError}
+        </div>
+      )}
 
       {step === 'pick' && (
         <div className="space-y-3">
@@ -57,12 +90,24 @@ export default function AddLeaguePage() {
         <SleeperConnect onBack={() => setStep('pick')} onConnected={handleConnected} />
       )}
       {step === 'yahoo' && (
-        <YahooConnect onBack={() => setStep('pick')} onConnected={handleConnected} />
+        <YahooConnect
+          onBack={() => setStep('pick')}
+          onConnected={handleConnected}
+          startImporting={yahooImporting}
+        />
       )}
       {step === 'espn' && (
         <EspnConnect onBack={() => setStep('pick')} onConnected={handleConnected} />
       )}
     </div>
+  )
+}
+
+export default function AddLeaguePage() {
+  return (
+    <Suspense fallback={null}>
+      <AddLeagueFlow />
+    </Suspense>
   )
 }
 

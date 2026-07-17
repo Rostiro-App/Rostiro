@@ -14,6 +14,14 @@ interface YahooStatus {
   needsReconnect: boolean
   leagueCount: number
   failedCount: number
+  lastSyncedAt: string | null
+}
+
+function formatLastSynced(iso: string | null): string | null {
+  if (!iso) return null
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return null
+  return date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
 interface SyncResult {
@@ -29,6 +37,8 @@ export default function YahooConnectionPanel({ onChanged }: { onChanged: () => v
   const [syncing, setSyncing] = useState(false)
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false)
+  const [disconnecting, setDisconnecting] = useState(false)
+  const [disconnectError, setDisconnectError] = useState<string | null>(null)
 
   async function loadStatus() {
     try {
@@ -80,10 +90,25 @@ export default function YahooConnectionPanel({ onChanged }: { onChanged: () => v
   }
 
   async function disconnect() {
-    await fetch('/api/leagues/yahoo', { method: 'DELETE' })
-    setConfirmingDisconnect(false)
-    await loadStatus()
-    onChanged()
+    setDisconnecting(true)
+    setDisconnectError(null)
+    try {
+      const res = await fetch('/api/leagues/yahoo', { method: 'DELETE' })
+      if (!res.ok) {
+        // Never silently ignore this — show a safe error and keep the
+        // confirm step open so the user can retry immediately rather
+        // than having to click "Disconnect Yahoo" all over again.
+        setDisconnectError('Could not disconnect Yahoo — try again.')
+        return
+      }
+      setConfirmingDisconnect(false)
+      await loadStatus()
+      onChanged()
+    } catch {
+      setDisconnectError('Could not reach Rostiro — try again.')
+    } finally {
+      setDisconnecting(false)
+    }
   }
 
   if (loading || !status) return null
@@ -112,12 +137,26 @@ export default function YahooConnectionPanel({ onChanged }: { onChanged: () => v
           <p className="text-xs mt-0.5" style={{ color: 'var(--t3)' }}>
             Read-only — Rostiro reads your Yahoo leagues to build recommendations; roster moves happen on Yahoo.
           </p>
+          {formatLastSynced(status.lastSyncedAt) && (
+            <p className="text-xs mt-1" style={{ color: 'var(--t3)' }}>
+              Last synced {formatLastSynced(status.lastSyncedAt)}
+            </p>
+          )}
           {syncMessage && (
             <p className="text-xs mt-1" style={{ color: 'var(--t2)' }}>{syncMessage}</p>
           )}
         </div>
 
         <div className="flex items-center gap-1.5 flex-shrink-0">
+          {status.leagueCount > 0 && (
+            <a
+              href="/leagues"
+              className="text-xs px-2.5 py-1.5 rounded-lg"
+              style={{ color: 'var(--t3)', border: '1px solid var(--hairline)' }}
+            >
+              View Yahoo Leagues
+            </a>
+          )}
           {status.needsReconnect ? (
             <a
               href="/api/auth/yahoo"
@@ -141,13 +180,15 @@ export default function YahooConnectionPanel({ onChanged }: { onChanged: () => v
             <>
               <button
                 onClick={disconnect}
-                className="text-xs font-semibold px-2.5 py-1.5 rounded-lg"
+                disabled={disconnecting}
+                className="text-xs font-semibold px-2.5 py-1.5 rounded-lg disabled:opacity-50"
                 style={{ backgroundColor: 'rgba(232,80,74,.13)', color: 'var(--crit)' }}
               >
-                Confirm
+                {disconnecting ? 'Disconnecting…' : 'Confirm'}
               </button>
               <button
-                onClick={() => setConfirmingDisconnect(false)}
+                onClick={() => { setConfirmingDisconnect(false); setDisconnectError(null) }}
+                disabled={disconnecting}
                 className="text-xs px-2.5 py-1.5 rounded-lg"
                 style={{ color: 'var(--t2)' }}
               >
@@ -165,6 +206,9 @@ export default function YahooConnectionPanel({ onChanged }: { onChanged: () => v
           )}
         </div>
       </div>
+      {disconnectError && (
+        <p className="text-xs mt-2" style={{ color: 'var(--crit)' }}>{disconnectError}</p>
+      )}
     </div>
   )
 }

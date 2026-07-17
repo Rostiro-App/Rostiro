@@ -409,10 +409,12 @@ Users who complete it feel like they've done something — not jumped through a 
 
 ### 5.1 Read / Write / Deep-Link Framework
 
+> **OBSOLETE — corrected 2026-07-17 (Packet 02):** the "Yahoo | Read + Write" row below describes a plan that never happened. Yahoo has approved Rostiro for read access only; write access (`fspt-w`) was requested but never granted, and requesting it made the OAuth flow fail outright in production (confirmed live: `error=invalid_scope`). The write functions this table describes (`submitYahooLineup`, `submitYahooWaiverClaim`, `proposeYahooTrade`) have been removed from `lib/yahoo.ts` entirely — they were dead code with zero real call sites even before removal. Kept below for history, not as current status; see 5.3's correction note for the same thing in more detail.
+
 | Platform | Access level | Notes |
 |---|---|---|
 | ESPN | Read only | Unofficial v3 endpoints + espn_s2/SWID cookie auth. No write API. Deep-link to all action pages. |
-| Yahoo | Read + Write | Official REST API, OAuth 2.0. Full read + write: lineup submission, waiver claims, trade proposals. Lead all write features here. |
+| Yahoo | ~~Read + Write~~ **Read only** | Official REST API, OAuth 2.0. Read-only: Yahoo has not granted write access. Deep-link to Yahoo for lineup/waiver/trade actions, same as ESPN. |
 | Sleeper | Read only | Public REST API, no auth. Username lookup. Full read. No official write. Deep-link for actions. |
 
 ### 5.2 ESPN
@@ -438,14 +440,18 @@ Users who complete it feel like they've done something — not jumped through a 
 
 ### 5.3 Yahoo
 
-> **STATUS:** Official REST API with OAuth 2.0. Full read and write. Attribution required: "Fantasy data provided by Yahoo Fantasy" plus the official Yahoo Fantasy logo — Yahoo's API Access and Use Agreement requires the logo specifically wherever the integration is shown on a third-party site, not just the text attribution.
+> **OBSOLETE STATUS BLOCK BELOW — corrected 2026-07-17 (Packet 02).** The plan described here (write access pending review, write-back ships as a fast-follow, no engineering lead time since `lib/yahoo.ts` is "already built and waiting") did not happen. As of this correction: Yahoo has approved Rostiro's app for **read access only** — write access was requested but not granted, and there is no indication that will change. The write functions (`submitYahooLineup`, `submitYahooWaiverClaim`, `proposeYahooTrade`) and their XML request builders have been **removed from `lib/yahoo.ts`** — confirmed dead code with zero real call sites even before removal. All "Full read and write" / "Full read + write" copy across onboarding, Add League, and marketing surfaces has been corrected to "Read-only." The real, current blocker (as of 2026-07-17) is that **even read access has not yet been approved for the live app** — every real OAuth attempt currently fails with Yahoo returning `error=invalid_scope`. See `docs/yahoo-verification-checklist.md` for what's blocked pending that approval. The paragraph below is preserved for historical record of the investigation, not as current status.
 >
-> **Access status (as of July 3, 2026):** Fantasy Sports API access is a separate, gated application process from basic app registration — confirmed by reading Yahoo's own developer documentation. It is not a checkbox on the app's settings page (which is why the app shows up in the developer console with nothing flagged as blocked); it requires submitting an application describing organization, product, and use case, followed by a Yahoo review. **Application submitted July 1, 2026; currently in Yahoo's review queue (day 3 as of this writing), turnaround time unknown.** This does not block MVP launch: Sleeper and ESPN alone are sufficient to market and launch on August 1 (see 5.2, 5.4). Yahoo write-back ships as a fast-follow the moment access is granted, whether that's days or weeks out — the codebase is already built and waiting (`lib/yahoo.ts`), so there's no additional engineering lead time once approval lands, only the wait itself.
+> **STATUS (historical, superseded above):** Official REST API with OAuth 2.0. Full read and write. Attribution required: "Fantasy data provided by Yahoo Fantasy" plus the official Yahoo Fantasy logo — Yahoo's API Access and Use Agreement requires the logo specifically wherever the integration is shown on a third-party site, not just the text attribution.
+>
+> **Access status (as of July 3, 2026, historical):** Fantasy Sports API access is a separate, gated application process from basic app registration — confirmed by reading Yahoo's own developer documentation. It is not a checkbox on the app's settings page (which is why the app shows up in the developer console with nothing flagged as blocked); it requires submitting an application describing organization, product, and use case, followed by a Yahoo review. **Application submitted July 1, 2026; currently in Yahoo's review queue (day 3 as of this writing), turnaround time unknown.** This does not block MVP launch: Sleeper and ESPN alone are sufficient to market and launch on August 1 (see 5.2, 5.4). Yahoo write-back ships as a fast-follow the moment access is granted, whether that's days or weeks out — the codebase is already built and waiting (`lib/yahoo.ts`), so there's no additional engineering lead time once approval lands, only the wait itself.
 
-**Write operations available (Phase 1):**
-- Submit lineup changes
-- Add/drop players
-- Propose trades
+**Write operations (Phase 1 plan) — REMOVED 2026-07-17, never had write access to use them:**
+- ~~Submit lineup changes~~
+- ~~Add/drop players~~
+- ~~Propose trades~~
+
+Deep-link to Yahoo for all three instead, same pattern as ESPN (5.2) and Sleeper (5.4).
 
 ### 5.4 Sleeper
 
@@ -469,7 +475,7 @@ Users who complete it feel like they've done something — not jumped through a 
 | Platform | Status | Notes |
 |---|---|---|
 | Sleeper | **Shipped** | `GET /draft/{draft_id}/picks`, public, no auth, poll every 10s. See 5.4. |
-| Yahoo | **Pending Yahoo review (submitted July 1, 2026)** | Official API already has `getYahooDraftResults()` (`/league/{leagueKey}/draft/results`) in `lib/yahoo.ts`, unused until now. Yahoo's own docs: "If called during the draft, it includes the players that have been drafted thus far" — confirmed live-capable, not just post-draft, on paper. Live end-to-end test surfaced that Fantasy Sports API access is a separate gated application, not a self-serve permission toggle (see 5.3) — application already submitted July 1, in Yahoo's review queue as of this writing, turnaround unknown. A combined-scope encoding bug (`fspt-r fspt-w`) was found and fixed in the same investigation but was not the root blocker. No code work remains on this — `lib/yahoo.ts` is ready and waiting on Yahoo's approval. |
+| Yahoo | **Still pending Yahoo review as of 2026-07-17 — see 5.3's correction note** | Official API already has `getYahooDraftResults()` (`/league/{leagueKey}/draft/results`) in `lib/yahoo.ts`, unused until now. Yahoo's own docs: "If called during the draft, it includes the players that have been drafted thus far" — confirmed live-capable, not just post-draft, on paper. Live end-to-end test surfaced that Fantasy Sports API access is a separate gated application, not a self-serve permission toggle (see 5.3) — application already submitted July 1, in Yahoo's review queue as of this writing, turnaround unknown. A combined-scope encoding bug (`fspt-r fspt-w`) was found and fixed in the same investigation but was not the root blocker. **Correction (2026-07-17): "no code work remains" was wrong — the OAuth scope itself was live-broken in production (`fspt-w` → `error=invalid_scope`) and has since been fixed to `fspt-r`, but even that corrected read-only request still cannot complete until Yahoo grants read access, which has not happened yet.** |
 | ESPN | **Confirmed viable (verified July 3, 2026)** | Live-tested against a real connected private league (see 5.2): `mDraftDetail` is reachable and correctly reflected a real mock draft going live (`inProgress` flipped exactly at scheduled kickoff). Did not directly witness the `picks` array populating pick-by-pick — the mock room was auto-deleted right after completing, before a clean re-poll. Reachability and real-time state transition are proven; recommend one more clean confirmation pass before Draft Copilot depends on this for ESPN, but no reason at this point to expect it won't work. |
 | MyFantasyLeague (MFL) | **Recommended next after Yahoo** | See 5.5 — no OAuth, confirmed live-capable including auction state. |
 | Fantrax | **Candidate** | See 5.5 — no-auth endpoints, documented as live-capable. |
