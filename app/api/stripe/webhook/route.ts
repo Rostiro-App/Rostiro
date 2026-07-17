@@ -84,15 +84,14 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        const update: Record<string, unknown> = { plan }
-        if (plan === 'pro') {
-          update.stripe_subscription_id = typeof session.subscription === 'string' ? session.subscription : null
-        }
-        if (plan === 'starter') {
-          update.season_pass_expires_at = SEASON_PASS_EXPIRES_AT.toISOString()
-        }
-
-        const { error } = await admin.from('users').update(update).eq('id', userId)
+        const { error } = await admin.rpc('stripe_finalize_checkout_plan', {
+          p_user_id: userId,
+          p_plan: plan,
+          p_stripe_subscription_id: plan === 'pro'
+            ? (typeof session.subscription === 'string' ? session.subscription : null)
+            : null,
+          p_season_pass_expires_at: plan === 'starter' ? SEASON_PASS_EXPIRES_AT.toISOString() : null,
+        })
         if (error) throw new Error(error.message)
 
         const email = currentUserRow?.email
@@ -116,11 +115,9 @@ export async function POST(request: NextRequest) {
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription
         const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id
-        const { data: updatedRows, error } = await admin
-          .from('users')
-          .update({ plan: 'free', stripe_subscription_id: null })
-          .eq('stripe_customer_id', customerId)
-          .select('email')
+        const { data: updatedRows, error } = await admin.rpc('stripe_finalize_cancellation', {
+          p_customer_id: customerId,
+        })
         if (error) throw new Error(error.message)
 
         const email = updatedRows?.[0]?.email
