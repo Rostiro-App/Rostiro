@@ -43,12 +43,14 @@ function mockAdmin(opts: {
   }
 }
 
+const REAL_UUID = '550e8400-e29b-41d4-a716-446655440000'
+
 describe('resolvePlayerIdentityForRoute — compatibility lookup at the route boundary', () => {
-  it('resolves a real canonical player_mappings.id directly', async () => {
+  it('resolves a real canonical player_mappings.id directly (UUID-shaped param)', async () => {
     const { resolvePlayerIdentityForRoute } = await import('./playerIntelligence')
-    const admin = mockAdmin({ mappingLookups: { 'id:canon-1': { id: 'canon-1' } } }) as never
-    const result = await resolvePlayerIdentityForRoute(admin, 'canon-1')
-    expect(result).toEqual({ canonicalPlayerId: 'canon-1', sourcePlatform: null, sourcePlayerId: null })
+    const admin = mockAdmin({ mappingLookups: { [`id:${REAL_UUID}`]: { id: REAL_UUID } } }) as never
+    const result = await resolvePlayerIdentityForRoute(admin, REAL_UUID)
+    expect(result).toEqual({ canonicalPlayerId: REAL_UUID, sourcePlatform: null, sourcePlayerId: null })
   })
 
   it('PROOF: a legacy raw Sleeper ID resolves via sleeper_id compatibility lookup, not treated as already-canonical', async () => {
@@ -72,10 +74,10 @@ describe('resolvePlayerIdentityForRoute — compatibility lookup at the route bo
     expect(result).toEqual({ canonicalPlayerId: null, sourcePlatform: 'sleeper', sourcePlayerId: 'unmapped-123' })
   })
 
-  it('PROOF (P3-11 correction): a Supabase error on the first (id) lookup throws, never falls through as if unmapped', async () => {
+  it('PROOF (P3-11 correction): a Supabase error on the first (id) lookup throws, never falls through as if unmapped (UUID-shaped param)', async () => {
     const { resolvePlayerIdentityForRoute } = await import('./playerIntelligence')
-    const admin = mockAdmin({ mappingLookupError: { 'id:canon-1': { message: 'connection reset' } } }) as never
-    await expect(resolvePlayerIdentityForRoute(admin, 'canon-1')).rejects.toThrow(/connection reset/)
+    const admin = mockAdmin({ mappingLookupError: { [`id:${REAL_UUID}`]: { message: 'connection reset' } } }) as never
+    await expect(resolvePlayerIdentityForRoute(admin, REAL_UUID)).rejects.toThrow(/connection reset/)
   })
 
   it('PROOF (P3-11 correction): a Supabase error on a later (espn_id) lookup throws, never falls through to the legacy sourcePlayerId guess', async () => {
@@ -85,6 +87,57 @@ describe('resolvePlayerIdentityForRoute — compatibility lookup at the route bo
       mappingLookupError: { 'espn_id:4426515': { message: 'query timeout' } },
     }) as never
     await expect(resolvePlayerIdentityForRoute(admin, '4426515')).rejects.toThrow(/query timeout/)
+  })
+
+  it('PROOF (P3-11 P0 hotfix): a non-UUID raw Sleeper ID ("4984") never queries player_mappings.id — skips straight to sleeper_id', async () => {
+    const { resolvePlayerIdentityForRoute, isUuidShaped } = await import('./playerIntelligence')
+    expect(isUuidShaped('4984')).toBe(false)
+    // If the id lookup were ever sent for a non-UUID value, this mock
+    // would throw — proving the fix by absence of that error, not just
+    // presence of the right answer.
+    const admin = mockAdmin({
+      mappingLookupError: { 'id:4984': { message: 'invalid input syntax for type uuid: "4984"' } },
+      mappingLookups: { 'sleeper_id:4984': { id: 'canon-josh-allen' } },
+    }) as never
+    const result = await resolvePlayerIdentityForRoute(admin, '4984')
+    expect(result.canonicalPlayerId).toBe('canon-josh-allen')
+  })
+
+  it('PROOF (P3-11 P0 hotfix): a non-UUID raw ESPN numeric ID never queries player_mappings.id — skips straight to espn_id', async () => {
+    const { resolvePlayerIdentityForRoute, isUuidShaped } = await import('./playerIntelligence')
+    expect(isUuidShaped('4426515')).toBe(false)
+    const admin = mockAdmin({
+      mappingLookupError: { 'id:4426515': { message: 'invalid input syntax for type uuid: "4426515"' } },
+      mappingLookups: { 'sleeper_id:4426515': null, 'espn_id:4426515': { id: 'canon-espn-player' } },
+    }) as never
+    const result = await resolvePlayerIdentityForRoute(admin, '4426515')
+    expect(result.canonicalPlayerId).toBe('canon-espn-player')
+  })
+
+  it('PROOF (P3-11 P0 hotfix): a UUID-shaped value not found as a canonical id still continues through the provider-ID lookups', async () => {
+    const { resolvePlayerIdentityForRoute } = await import('./playerIntelligence')
+    const admin = mockAdmin({
+      mappingLookups: { [`id:${REAL_UUID}`]: null, [`sleeper_id:${REAL_UUID}`]: { id: 'canon-fallback' } },
+    }) as never
+    const result = await resolvePlayerIdentityForRoute(admin, REAL_UUID)
+    expect(result.canonicalPlayerId).toBe('canon-fallback')
+  })
+
+})
+
+describe('isUuidShaped', () => {
+  it('accepts a real, canonical-shaped UUID', async () => {
+    const { isUuidShaped } = await import('./playerIntelligence')
+    expect(isUuidShaped(REAL_UUID)).toBe(true)
+    expect(isUuidShaped(REAL_UUID.toUpperCase())).toBe(true)
+  })
+
+  it('rejects raw Sleeper/ESPN numeric IDs and other non-UUID strings', async () => {
+    const { isUuidShaped } = await import('./playerIntelligence')
+    expect(isUuidShaped('4984')).toBe(false)
+    expect(isUuidShaped('4426515')).toBe(false)
+    expect(isUuidShaped('unmapped-123')).toBe(false)
+    expect(isUuidShaped('')).toBe(false)
   })
 })
 

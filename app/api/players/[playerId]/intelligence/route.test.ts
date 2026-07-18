@@ -95,6 +95,65 @@ describe('GET /api/players/[playerId]/intelligence — P3-7 backward compatibili
     expect(body.player.canonicalPlayerId).toBe('canon-1')
   })
 
+  it('PROOF (P3-11 P0 hotfix): GET /api/players/4984/intelligence — a raw Sleeper ID never fails on UUID parsing (uses the REAL resolvePlayerIdentityForRoute, not mocked)', async () => {
+    // Deliberately does NOT mock '@/lib/playerIntelligence' — this test
+    // exercises the real resolvePlayerIdentityForRoute against a mocked
+    // admin client shaped like the real player_mappings table, proving
+    // the route survives end-to-end for the real production request
+    // shape (a raw Sleeper ID in the URL), not just that some mock
+    // returns a canned answer.
+    const REAL_UUID = '3a51b1c4-1111-2222-3333-444455556666'
+    const isUuidShaped = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)
+    vi.doMock('@/lib/supabase', () => ({
+      createSSRClient: () => Promise.resolve(mockSSRClient()),
+      createAdminClient: vi.fn(() => ({
+        from: vi.fn((table: string) => {
+          if (table === 'player_mappings') {
+            return {
+              select: vi.fn(() => ({
+                eq: vi.fn((col: string, val: string) => ({
+                  maybeSingle: vi.fn(() => {
+                    // A real Postgres would reject the id (uuid) column
+                    // with 22P02 for a non-UUID value like "4984" —
+                    // simulated here so this test fails loudly if the
+                    // hotfix regresses and that query is ever sent again.
+                    // A UUID-shaped id query (the route's OWN separate
+                    // player_mappings lookup, once resolvePlayerIdentityForRoute
+                    // has already resolved a canonical id) is legitimate
+                    // and must not throw.
+                    if (col === 'id' && !isUuidShaped(val)) throw new Error(`invalid input syntax for type uuid: "${val}"`)
+                    if (col === 'id' && val === REAL_UUID) return Promise.resolve({ data: { sleeper_id: '4984', espn_id: null, yahoo_id: null }, error: null })
+                    if (col === 'sleeper_id' && val === '4984') return Promise.resolve({ data: { id: REAL_UUID }, error: null })
+                    return Promise.resolve({ data: null, error: null })
+                  }),
+                })),
+              })),
+            }
+          }
+          return {}
+        }),
+      })),
+    }))
+    vi.doMock('@/lib/playerIntelligence', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('@/lib/playerIntelligence')>()
+      return {
+        ...actual,
+        computePlayerIntelligence: vi.fn(() =>
+          Promise.resolve({ identity: { canonicalPlayerId: REAL_UUID, sourcePlatform: null, sourcePlayerId: null }, leagues: [] })
+        ),
+      }
+    })
+
+    const { GET } = await import('./route')
+    const res = await GET(new Request('http://localhost') as never, { params: Promise.resolve({ playerId: '4984' }) })
+
+    expect(res.status).not.toBe(503)
+    expect(res.status).not.toBe(500)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.player.canonicalPlayerId).toBe(REAL_UUID)
+  })
+
   it('returns 401 when not authenticated', async () => {
     vi.doMock('@/lib/supabase', () => ({
       createSSRClient: () => Promise.resolve({ auth: { getUser: () => Promise.resolve({ data: { user: null } }) } }),

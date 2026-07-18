@@ -49,6 +49,22 @@ interface ConnectedLeagueRow {
   team_id: string | null
 }
 
+// P3-11 P0 hotfix (2026-07-18): player_mappings.id is a uuid column —
+// querying it with a non-UUID-shaped value (e.g. a raw Sleeper ID like
+// "4984") makes Postgres reject the comparison outright with 22P02
+// (invalid_text_representation) before the query can even run, not a "no
+// rows found" result. That is not a real database failure — it is fully
+// predictable and 100% of the time for every legacy raw-provider-ID
+// caller (Draft Kit, Lineups, trades, ⌘K search — see this file's header
+// comment). Checking isUuidShaped first means the invalid query is never
+// sent at all, rather than sent-and-caught: PostgreSQL error 22P02 is
+// never special-cased or suppressed here, because it's never produced.
+const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export function isUuidShaped(value: string): boolean {
+  return UUID_SHAPE.test(value)
+}
+
 /**
  * Compatibility lookup — resolves whatever the route received (a real
  * canonical player_mappings.id, OR a legacy raw Sleeper/ESPN player ID
@@ -66,9 +82,16 @@ export async function resolvePlayerIdentityForRoute(
   // lookup (or ultimately to "no mapping found") — a real DB failure on
   // any one of these four queries must never be indistinguishable from a
   // genuinely unresolved player.
-  const { data: byId, error: byIdError } = await admin.from('player_mappings').select('id').eq('id', rawParam).maybeSingle()
-  if (byIdError) throw new Error(`player_mappings lookup by id failed: ${byIdError.message}`)
-  if (byId) return { canonicalPlayerId: byId.id, sourcePlatform: null, sourcePlayerId: null }
+  //
+  // P3-11 P0 hotfix: the player_mappings.id (uuid) lookup only ever runs
+  // when rawParam is actually UUID-shaped — a raw provider ID never is,
+  // so it skips straight to the provider-ID lookups below instead of
+  // sending a query Postgres would reject.
+  if (isUuidShaped(rawParam)) {
+    const { data: byId, error: byIdError } = await admin.from('player_mappings').select('id').eq('id', rawParam).maybeSingle()
+    if (byIdError) throw new Error(`player_mappings lookup by id failed: ${byIdError.message}`)
+    if (byId) return { canonicalPlayerId: byId.id, sourcePlatform: null, sourcePlayerId: null }
+  }
 
   // Legacy compatibility: every caller before P3-7 passes a raw
   // platform-specific ID (Sleeper today, the only platform the UI
