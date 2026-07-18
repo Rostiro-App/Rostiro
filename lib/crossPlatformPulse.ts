@@ -1,11 +1,12 @@
-// Packet 03, P3-8: canonical cross-platform Pulse items. Covers the two
-// item types whose logic already generalizes cleanly across platforms —
-// roster_grade (reuses lib/crossPlatformPortfolio.ts's
-// computeCrossPlatformLeagueHealth verbatim) and waiver_alert (reuses the
-// SAME "never infer availability from roster absence" discipline
-// lib/playerIntelligence.ts's computePlayerStateForLeague already
-// established: a candidate is only ever surfaced after a real,
-// successful adapter.readAvailablePlayers call confirms it).
+// Packet 03, P3-8 (corrected P3-11 audit, 2026-07-18): canonical
+// cross-platform Pulse items. Covers the two item types whose logic
+// already generalizes cleanly across platforms — roster_grade (reuses
+// lib/crossPlatformPortfolio.ts's computeCrossPlatformLeagueHealth
+// verbatim) and waiver_alert (reuses the SAME "never infer availability
+// from roster absence" discipline lib/playerIntelligence.ts's
+// computePlayerStateForLeague already established: a candidate is only
+// ever surfaced after a real, successful adapter.readAvailablePlayers
+// call confirms it).
 //
 // Sleeper's existing item types (injury_alert, lineup_decision,
 // opportunity_surge, player_news, touchdown_swing, etc.) are NOT
@@ -18,6 +19,18 @@
 // returns null for 'yahoo' (no adapter shipped; still approval-pending),
 // so a Yahoo league is silently skipped, never represented as live
 // intelligence.
+//
+// CORRECTION (independent P3-11 audit, 2026-07-18):
+//  - Stale leagues now get a coverage entry but produce ZERO Pulse
+//    recommendation items — an actionable "grab this free agent"
+//    suggestion built on data that might already be out of date is a
+//    real risk in a way a passive "here's your exposure" Portfolio number
+//    isn't. Only 'fresh' snapshots generate roster_grade/waiver_alert.
+//  - The real, authenticated user ID is now threaded through to every
+//    adapter context (was previously a hardcoded empty string).
+//  - Every Supabase query here now checks its own error — a real DB
+//    failure surfaces as a 'failed' coverage entry, never silently
+//    treated the same as "no data yet."
 
 import { createAdminClient } from '@/lib/supabase'
 import { getIntelligenceAdapter, type ConnectedLeagueContext, type SnapshotFreshness, type NormalizedRosterSnapshot } from '@/lib/platforms'
@@ -51,7 +64,9 @@ export interface CrossPlatformPulseItem {
 
 // P3-8B: so the UI can show "1 ESPN league is stale" or "unavailable —
 // hasn't synced yet" instead of a stale/unavailable league silently
-// looking identical to "nothing needs attention" (zero items either way).
+// looking identical to "nothing needs attention." P3-11 correction:
+// 'included_stale' now means "coverage only, zero recommendation items"
+// — see buildCrossPlatformPulseItemsForLeague.
 export type PulseLeagueCoverageStatus = 'included_fresh' | 'included_stale' | 'unavailable' | 'unsupported' | 'approval_pending' | 'failed'
 
 export interface PulseLeagueCoverageEntry {
@@ -70,8 +85,14 @@ interface ConnectedLeagueRow {
   team_id: string | null
 }
 
-async function fetchLatestSnapshot(admin: AdminClient, connectedLeagueId: string, teamId: string) {
-  const { data } = await admin
+interface SnapshotFetchResult {
+  snapshot: NormalizedRosterSnapshot | null
+  snappedAt: string | null
+  error: string | null
+}
+
+async function fetchLatestSnapshot(admin: AdminClient, connectedLeagueId: string, teamId: string): Promise<SnapshotFetchResult> {
+  const { data, error } = await admin
     .from('roster_snapshots')
     .select('snapshot_json, snapped_at')
     .eq('league_id', connectedLeagueId)
@@ -79,14 +100,20 @@ async function fetchLatestSnapshot(admin: AdminClient, connectedLeagueId: string
     .order('snapped_at', { ascending: false })
     .limit(1)
     .maybeSingle()
-  if (!data) return null
-  return { snapshot: data.snapshot_json as NormalizedRosterSnapshot, snappedAt: data.snapped_at as string }
+  if (error) return { snapshot: null, snappedAt: null, error: error.message }
+  if (!data) return { snapshot: null, snappedAt: null, error: null }
+  return { snapshot: data.snapshot_json as NormalizedRosterSnapshot, snappedAt: data.snapped_at as string, error: null }
 }
 
 interface IdentifiedPlayer {
   canonicalPlayerId: string | null
   sourcePlatform: Platform
   sourcePlayerId: string
+}
+
+interface AdpLookupResult {
+  lookup: Map<string, PlayerAdpRow>
+  error: string | null
 }
 
 // Builds ADP lookup entries for the roster snapshot's own players PLUS any
@@ -98,18 +125,19 @@ async function buildAdpLookup(
   admin: AdminClient,
   platform: Platform,
   players: IdentifiedPlayer[]
-): Promise<Map<string, PlayerAdpRow>> {
+): Promise<AdpLookupResult> {
   const lookup = new Map<string, PlayerAdpRow>()
   const sourcePlayerIds = players.map((p) => p.sourcePlayerId)
-  if (sourcePlayerIds.length === 0) return lookup
+  if (sourcePlayerIds.length === 0) return { lookup, error: null }
 
-  const { data } = await admin
+  const { data, error } = await admin
     .from('players_cache')
     .select('player_id, adp_consensus, adp_sleeper, adp_espn, injury_status')
     .eq('platform', platform)
     .in('player_id', sourcePlayerIds)
-  const byPlayerId = new Map((data ?? []).map((r) => [r.player_id as string, r]))
+  if (error) return { lookup, error: error.message }
 
+  const byPlayerId = new Map((data ?? []).map((r) => [r.player_id as string, r]))
   for (const player of players) {
     const row = byPlayerId.get(player.sourcePlayerId)
     const key = player.canonicalPlayerId ?? `${player.sourcePlatform}:${player.sourcePlayerId}`
@@ -120,7 +148,7 @@ async function buildAdpLookup(
       injuryStatus: row?.injury_status ?? null,
     })
   }
-  return lookup
+  return { lookup, error: null }
 }
 
 function baseAffectedLeague(
@@ -163,10 +191,14 @@ function coverageEntry(league: ConnectedLeagueRow, status: PulseLeagueCoverageSt
  * contributes zero items but STILL gets a real coverage entry, so the UI
  * can distinguish "nothing needs attention" from "this league hasn't
  * synced yet."
+ *
+ * Requires the real, authenticated user ID — passed through to every
+ * adapter context, never a placeholder.
  */
 export async function buildCrossPlatformPulseItemsForLeague(
   admin: AdminClient,
-  league: ConnectedLeagueRow
+  league: ConnectedLeagueRow,
+  userId: string
 ): Promise<LeagueItemsResult> {
   if (!league.team_id) return { items: [], coverage: coverageEntry(league, 'unavailable', 'No team assigned yet') }
   const adapter = getIntelligenceAdapter(league.platform)
@@ -176,19 +208,35 @@ export async function buildCrossPlatformPulseItemsForLeague(
     return { items: [], coverage: coverageEntry(league, status, `No intelligence adapter for platform '${league.platform}'`) }
   }
 
-  const latest = await fetchLatestSnapshot(admin, league.id, league.team_id)
+  const snapshotResult = await fetchLatestSnapshot(admin, league.id, league.team_id)
+  if (snapshotResult.error) {
+    // A real DB failure reading roster_snapshots — distinct from "no
+    // snapshot yet," which is a normal, expected state for a brand-new
+    // league. Never collapsed into the same 'unavailable' bucket.
+    return { items: [], coverage: coverageEntry(league, 'failed', snapshotResult.error) }
+  }
+
   const freshness = computeSnapshotFreshness({
-    lastSnapshotAt: latest?.snappedAt ?? null,
+    lastSnapshotAt: snapshotResult.snappedAt,
     now: new Date(),
     capabilitiesSupportRosterRead: adapter.capabilities.rosterRead,
     approvalPending: false,
   })
-  if (!latest || (freshness !== 'fresh' && freshness !== 'stale')) {
+  if (!snapshotResult.snapshot || (freshness !== 'fresh' && freshness !== 'stale')) {
     return { items: [], coverage: coverageEntry(league, 'unavailable', 'No successful roster snapshot has been captured yet') }
+  }
+
+  // P3-11 correction: stale data gets a coverage entry but never an
+  // actionable recommendation — a waiver/roster-grade suggestion built on
+  // data that might already be out of date is a real risk a passive
+  // exposure number isn't. Only 'fresh' generates real Pulse items.
+  if (freshness === 'stale') {
+    return { items: [], coverage: coverageEntry(league, 'included_stale', null) }
   }
 
   const actionCapability = actionCapabilityFor(adapter.capabilities)
   const items: CrossPlatformPulseItem[] = []
+  const snapshot = snapshotResult.snapshot
 
   // Fetch available players FIRST (if supported) so the ADP lookup below
   // can cover both the owned roster AND any real waiver/free-agent
@@ -196,7 +244,7 @@ export async function buildCrossPlatformPulseItemsForLeague(
   // would otherwise never get an ADP row to compare against.
   const context: ConnectedLeagueContext = {
     connectedLeagueId: league.id,
-    userId: '',
+    userId,
     platform: league.platform,
     externalLeagueId: league.league_id,
     externalTeamId: league.team_id,
@@ -211,10 +259,17 @@ export async function buildCrossPlatformPulseItemsForLeague(
   }
   const availableCandidates = availableResult?.status === 'ok' ? (availableResult.data ?? []) : []
 
-  const adpLookup = await buildAdpLookup(admin, league.platform, [...latest.snapshot.players, ...availableCandidates])
+  const { lookup: adpLookup, error: adpError } = await buildAdpLookup(admin, league.platform, [...snapshot.players, ...availableCandidates])
+  if (adpError) {
+    // ADP lookup failed — health/waiver math would be built on incomplete
+    // data. Report this league as failed rather than silently computing
+    // with an empty lookup (which would read as "no ADP data anywhere,"
+    // not "the query broke").
+    return { items: [], coverage: coverageEntry(league, 'failed', adpError) }
+  }
 
   // ─── Roster grade (same computeLeagueHealth, cross-platform input) ─────
-  const healthResult = computeCrossPlatformLeagueHealth(latest.snapshot, adpLookup, null, null)
+  const healthResult = computeCrossPlatformLeagueHealth(snapshot, adpLookup, null, null)
   if (healthResult.health.score !== null) {
     items.push({
       fingerprint: `roster_grade:${league.id}`,
@@ -230,39 +285,37 @@ export async function buildCrossPlatformPulseItemsForLeague(
 
   // ─── Waiver opportunity — ONLY from a real, successful readAvailablePlayers ──
   if (availableCandidates.length > 0) {
-    {
-      let best: { candidate: typeof availableCandidates[number]; adp: number } | null = null
-      for (const candidate of availableCandidates) {
-        const key = candidate.canonicalPlayerId ?? `${candidate.sourcePlatform}:${candidate.sourcePlayerId}`
-        const row = adpLookup.get(key)
-        const adp = row?.adpConsensus ?? row?.adpPlatformSpecific ?? null
-        if (adp === null) continue
-        if (!best || adp < best.adp) best = { candidate, adp }
+    let best: { candidate: typeof availableCandidates[number]; adp: number } | null = null
+    for (const candidate of availableCandidates) {
+      const key = candidate.canonicalPlayerId ?? `${candidate.sourcePlatform}:${candidate.sourcePlayerId}`
+      const row = adpLookup.get(key)
+      const adp = row?.adpConsensus ?? row?.adpPlatformSpecific ?? null
+      if (adp === null) continue
+      if (!best || adp < best.adp) best = { candidate, adp }
+    }
+    if (best) {
+      const leagueDetail: AffectedLeague = {
+        ...baseAffectedLeague(league, freshness, actionCapability),
+        canonicalPlayerId: best.candidate.canonicalPlayerId,
+        providerPlayerId: best.candidate.sourcePlayerId,
+        status: best.candidate.availability === 'waivers' ? 'waivers' : 'free_agent',
       }
-      if (best) {
-        const leagueDetail: AffectedLeague = {
-          ...baseAffectedLeague(league, freshness, actionCapability),
-          canonicalPlayerId: best.candidate.canonicalPlayerId,
-          providerPlayerId: best.candidate.sourcePlayerId,
-          status: best.candidate.availability === 'waivers' ? 'waivers' : 'free_agent',
-        }
-        items.push({
-          fingerprint: `waiver:${league.id}:${leagueDetail.providerPlayerId}`,
-          type: 'waiver_alert',
-          priority: 'info',
-          headline: `${best.candidate.displayName} is available in ${league.league_name}`,
-          reasoning: `${best.candidate.displayName} is unrostered in ${league.league_name} (ADP ${Math.round(best.adp)}), confirmed via ${league.platform}'s real waiver/free-agent data — not inferred from your own roster.`,
-          affectedLeagues: [leagueDetail],
-          deadline: null,
-          actionUrl: waiverActionUrl(league.platform, league.league_id),
-        })
-      }
+      items.push({
+        fingerprint: `waiver:${league.id}:${leagueDetail.providerPlayerId}`,
+        type: 'waiver_alert',
+        priority: 'info',
+        headline: `${best.candidate.displayName} is available in ${league.league_name}`,
+        reasoning: `${best.candidate.displayName} is unrostered in ${league.league_name} (ADP ${Math.round(best.adp)}), confirmed via ${league.platform}'s real waiver/free-agent data — not inferred from your own roster.`,
+        affectedLeagues: [leagueDetail],
+        deadline: null,
+        actionUrl: waiverActionUrl(league.platform, league.league_id),
+      })
     }
   }
   // A non-'ok' status (failed/unsupported/unverified/a thrown error) means
   // no waiver_alert for this league — never guessed from absence.
 
-  return { items, coverage: coverageEntry(league, freshness === 'fresh' ? 'included_fresh' : 'included_stale', null) }
+  return { items, coverage: coverageEntry(league, 'included_fresh', null) }
 }
 
 export interface CrossPlatformPulseUserResult {
@@ -273,14 +326,21 @@ export interface CrossPlatformPulseUserResult {
 
 export async function buildCrossPlatformPulseItemsForUser(userId: string): Promise<CrossPlatformPulseUserResult> {
   const admin = createAdminClient()
-  const { data: leagues } = await admin
+  const { data: leagues, error } = await admin
     .from('connected_leagues')
     .select('id, platform, league_id, league_name, team_id')
     .eq('user_id', userId)
     .neq('platform', 'sleeper') // Sleeper stays on lib/pulse.ts's existing path
+
+  if (error) {
+    // A real DB failure fetching the league list itself — must not be
+    // silently reported as "this user has zero cross-platform leagues."
+    throw new Error(`Failed to load connected leagues: ${error.message}`)
+  }
+
   const rows = (leagues ?? []) as ConnectedLeagueRow[]
 
-  const results = await Promise.allSettled(rows.map((league) => buildCrossPlatformPulseItemsForLeague(admin, league)))
+  const results = await Promise.allSettled(rows.map((league) => buildCrossPlatformPulseItemsForLeague(admin, league, userId)))
   const items = results.flatMap((r) => (r.status === 'fulfilled' ? r.value.items : []))
   const coverage = results.map((r, i) =>
     r.status === 'fulfilled'

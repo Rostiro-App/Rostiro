@@ -789,19 +789,16 @@ function PulseCard({
               className="mono-data text-[10.5px] px-2.5 py-1 rounded-[7px] transition-all hover:shadow-[0_0_12px_rgba(75,163,245,.25)]"
               style={{ color: 'var(--signal)', border: '1px solid rgba(75,163,245,.35)' }}
             >
-              {// An external deep link (e.g. ESPN's real waiver page) gets
-              // the platform-specific label; an internal Rostiro route
-              // (e.g. /leagues for roster_grade) keeps its plain "Open ↗".
-              item.actionUrl.startsWith('http')
-                ? actionCapabilityLabel(item.affectedLeagues[0]?.actionCapability, item.affectedLeagues[0]?.platform ?? item.platform)
-                : 'Open ↗'}
+              {navigationLabel(item.actionUrl, item.affectedLeagues[0]?.platform ?? item.platform)}
             </a>
           ) : item.affectedLeagues[0]?.actionCapability !== undefined ? (
             // P3-8B: honest — no adapter has real write capability today,
             // so this is plain text, never a button that implies an action
-            // Rostiro can't actually take.
+            // Rostiro can't actually take. Only reached when there's no
+            // actionUrl at all (navigationLabel(null, ...) is always
+            // 'Advice only'), so this never competes with a real link.
             <span className="mono-data text-[10.5px]" style={{ color: 'var(--t3)' }}>
-              {actionCapabilityLabel(item.affectedLeagues[0]?.actionCapability, item.affectedLeagues[0]?.platform ?? item.platform)}
+              {navigationLabel(item.actionUrl, item.affectedLeagues[0]?.platform ?? item.platform)}
             </span>
           ) : null}
           {mode === 'savant' && (
@@ -866,6 +863,23 @@ function actionCapabilityLabel(actionCapability?: string | null, platform?: stri
   if (actionCapability === 'lineup') return `Set lineup on ${platformLabel(platform)} →`
   if (actionCapability === 'waiver') return `Review on ${platformLabel(platform)} →`
   return 'Advice only'
+}
+
+// P3-11 correction: navigation destination (does a real link exist to
+// click through to?) is a SEPARATE question from write capability (can
+// Rostiro itself take an action there?) — actionCapabilityLabel above
+// describes the latter and is correctly "Advice only" for every platform
+// today (no write API exists anywhere yet). But a real external deep link
+// (e.g. ESPN's read-only waiver page, lib/espn.ts's espnWaiverUrl) is
+// still a genuine, clickable navigation target even though Rostiro can't
+// write there — labeling that clickable link "Advice only" would be a lie
+// about what clicking it does. This function governs ONLY the clickable
+// link's own text, driven by actionUrl's presence/shape, never by
+// actionCapability.
+function navigationLabel(actionUrl: string | null, platform?: string | null): string {
+  if (!actionUrl) return 'Advice only'
+  if (actionUrl.startsWith('http')) return `Review on ${platformLabel(platform)} →`
+  return 'Open ↗'
 }
 
 function platformLabel(platform?: string | null): string {
@@ -1059,9 +1073,7 @@ function DetailDrawer({
               className="mono-data text-[10.5px] px-3 py-1.5 rounded-[7px] transition-all hover:shadow-[0_0_12px_rgba(75,163,245,.25)]"
               style={{ color: 'var(--signal)', border: '1px solid rgba(75,163,245,.35)' }}
             >
-              {item.actionUrl.startsWith('http')
-                ? actionCapabilityLabel(item.affectedLeagues[0]?.actionCapability, item.affectedLeagues[0]?.platform ?? item.platform)
-                : 'Open ↗'}
+              {navigationLabel(item.actionUrl, item.affectedLeagues[0]?.platform ?? item.platform)}
             </a>
           )}
           {onAction && (

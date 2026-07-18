@@ -1,0 +1,54 @@
+-- Player mapping provenance columns (Packet 03, P3-11 correction pass,
+-- proposed 2026-07-18).
+--
+-- Status: PROPOSED — NOT APPLIED TO PRODUCTION. Do not run this against
+-- production without separate, explicit approval. This file is a proposal
+-- only, written in response to the independent P3-11 audit's finding that
+-- lib/playerMappingSeed.ts's `matchBasis` and `isTeamlessActivityUnverified`
+-- are computed at seed time but never persisted — a future reader of
+-- player_mappings (or a future seed re-run) has no durable way to tell
+-- "this row's cross-platform link was verified via provider_id_reuse" from
+-- "this row was only ever a name_team_unambiguous heuristic," which matters
+-- because those two carry meaningfully different confidence.
+--
+-- ─── What this adds ─────────────────────────────────────────────────────
+-- 1. mapping_basis: nullable text, constrained to the same three values
+--    lib/playerMappingSeed.ts's MatchBasis type already produces
+--    ('provider_id_reuse' | 'name_team_unambiguous' | 'single_platform').
+--    Nullable (not backfilled) because every row currently in production
+--    was written by the P3-4/P3-4B seed run BEFORE this column existed —
+--    there is no reliable way to reconstruct which basis applied to an
+--    already-written row without literally re-deriving it from
+--    players_cache at that point in time, and guessing would misrepresent
+--    confidence for existing data. New rows written by an updated seed
+--    write path (lib/playerMappingSeed.ts / scripts/seedPlayerMappings.mts)
+--    populate this explicitly; existing rows stay null (honestly
+--    "provenance not recorded"), not defaulted to any specific value.
+-- 2. teamless_activity_unverified: boolean, not null, default false. Same
+--    reasoning as lib/playerMappingSeed.ts's in-memory flag of the same
+--    name — a row with no nfl_team AND a real activity signal (ownership%
+--    or ADP) at seed time. Defaulting existing/untouched rows to false is
+--    safe here (unlike mapping_basis) because false is already the
+--    correct, conservative reading for any row this migration doesn't
+--    explicitly know otherwise about — "not marked as teamless-unverified"
+--    is the accurate state for a row this flag has never been computed
+--    for, and downstream consumers already treat false/absent as
+--    "no special caution required" by construction.
+--
+-- Both columns are additive (add column if not exists) and idempotent —
+-- safe to re-run, and applying this migration alone changes no existing
+-- row's meaning; it only makes room for the updated seed write path to
+-- start recording provenance going forward.
+--
+-- ─── What this does NOT do ──────────────────────────────────────────────
+-- This migration does NOT backfill mapping_basis for existing rows, does
+-- NOT upgrade any row's confidence, and does NOT change
+-- lib/playerIdentity.ts's resolution logic. It only adds the columns; the
+-- corresponding write-path change (persisting these values on new
+-- inserts/links) is a separate, already-reviewed code change gated on this
+-- migration being approved and applied first.
+
+alter table public.player_mappings
+  add column if not exists mapping_basis text
+    check (mapping_basis in ('provider_id_reuse', 'name_team_unambiguous', 'single_platform')),
+  add column if not exists teamless_activity_unverified boolean not null default false;

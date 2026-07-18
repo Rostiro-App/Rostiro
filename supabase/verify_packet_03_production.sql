@@ -8,6 +8,99 @@
 -- Run each section independently (e.g. paste one at a time into the
 -- Supabase SQL editor) or the whole file at once; every section returns
 -- its own labeled result set.
+--
+-- P3-11 correction: Section 0 below is a SINGLE consolidated PASS/FAIL
+-- table covering every check in this file that has an objectively correct
+-- answer (a count that should be 0, a column that should be nullable, an
+-- index that should exist). Run just Section 0 for a fast go/no-go — FAIL
+-- rows sort to the top. Sections 1-12 (informational: row counts,
+-- distributions, full listings) remain below as supporting detail for
+-- when a Section 0 check fails and you need to see the actual data.
+
+-- ─── 0. CONSOLIDATED PASS/FAIL — run this alone for a single go/no-go ──────
+with checks as (
+  select
+    'player_mappings.nfl_team is nullable' as check_name,
+    (select is_nullable = 'YES' from information_schema.columns
+     where table_schema = 'public' and table_name = 'player_mappings' and column_name = 'nfl_team') as pass,
+    coalesce((select is_nullable from information_schema.columns
+     where table_schema = 'public' and table_name = 'player_mappings' and column_name = 'nfl_team'), 'column not found') as detail
+
+  union all
+  select
+    'player_mappings has all 3 partial unique provider-ID indexes',
+    (select count(*) = 3 from pg_indexes
+     where schemaname = 'public' and tablename = 'player_mappings' and indexname like '%_id_unique'),
+    coalesce((select string_agg(indexname, ', ' order by indexname) from pg_indexes
+     where schemaname = 'public' and tablename = 'player_mappings' and indexname like '%_id_unique'), 'none found')
+
+  union all
+  select
+    'portfolio schema_version/player_id_space columns all present (3 expected)',
+    (select count(*) = 3 from information_schema.columns
+     where table_schema = 'public' and table_name in ('portfolio_exposure_snapshots', 'portfolio_health_snapshots')
+       and column_name in ('schema_version', 'player_id_space')),
+    coalesce((select string_agg(table_name || '.' || column_name, ', ' order by table_name, column_name) from information_schema.columns
+     where table_schema = 'public' and table_name in ('portfolio_exposure_snapshots', 'portfolio_health_snapshots')
+       and column_name in ('schema_version', 'player_id_space')), 'none found')
+
+  union all
+  select
+    'no duplicate provider IDs across player_mappings (espn/yahoo/sleeper)',
+    not exists (
+      select 1 from public.player_mappings where espn_id is not null group by espn_id having count(*) > 1
+      union all
+      select 1 from public.player_mappings where yahoo_id is not null group by yahoo_id having count(*) > 1
+      union all
+      select 1 from public.player_mappings where sleeper_id is not null group by sleeper_id having count(*) > 1
+    ),
+    (select count(*) from (
+       select espn_id from public.player_mappings where espn_id is not null group by espn_id having count(*) > 1
+       union all
+       select yahoo_id from public.player_mappings where yahoo_id is not null group by yahoo_id having count(*) > 1
+       union all
+       select sleeper_id from public.player_mappings where sleeper_id is not null group by sleeper_id having count(*) > 1
+     ) dupes)::text || ' duplicate group(s)'
+
+  union all
+  select
+    'no duplicate (name, nfl_team, season) rows',
+    not exists (select 1 from public.player_mappings group by name, nfl_team, season having count(*) > 1),
+    (select count(*) from (select 1 from public.player_mappings group by name, nfl_team, season having count(*) > 1) d)::text || ' duplicate group(s)'
+
+  union all
+  select
+    'no placeholder team strings (only real null or 2-4 char codes)',
+    not exists (select 1 from public.player_mappings where nfl_team is not null and length(nfl_team) not between 2 and 4),
+    (select count(distinct nfl_team) from public.player_mappings where nfl_team is not null and length(nfl_team) not between 2 and 4)::text || ' distinct bad value(s)'
+
+  union all
+  select
+    'Josh Johnson collision case resolves to exactly 1 row',
+    (select count(*) = 1 from public.player_mappings where name = 'Josh Johnson'),
+    (select count(*) from public.player_mappings where name = 'Josh Johnson')::text || ' row(s)'
+
+  union all
+  select
+    'every connected ESPN league has a real team_id',
+    not exists (select 1 from public.connected_leagues where platform = 'espn' and team_id is null),
+    (select count(*) from public.connected_leagues where platform = 'espn')::text || ' ESPN league(s), ' ||
+    (select count(*) from public.connected_leagues where platform = 'espn' and team_id is null)::text || ' missing team_id'
+
+  union all
+  select
+    'no leftover test rows (week_start = 1999-01-01) in portfolio snapshot tables',
+    (select count(*) from public.portfolio_health_snapshots where week_start = '1999-01-01') = 0
+      and (select count(*) from public.portfolio_exposure_snapshots where week_start = '1999-01-01') = 0,
+    (select count(*) from public.portfolio_health_snapshots where week_start = '1999-01-01')::text || ' health / ' ||
+    (select count(*) from public.portfolio_exposure_snapshots where week_start = '1999-01-01')::text || ' exposure'
+)
+select
+  case when pass then 'PASS' else 'FAIL' end as result,
+  check_name,
+  detail
+from checks
+order by pass asc, check_name;
 
 -- ─── 1. Migration presence: player_mappings constraints ────────────────────
 -- Expect: nfl_team is_nullable = YES; 3 unique indexes present.

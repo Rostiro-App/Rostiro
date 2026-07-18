@@ -1,15 +1,28 @@
-// Packet 03, P3-7: canonical-first Player Intelligence. Replaces
-// app/api/players/[playerId]/intelligence/route.ts's Sleeper-only,
-// raw-ID, direct-roster-scan logic with a cross-platform pipeline that
-// consumes roster_snapshots (never a raw per-platform roster refetch for
-// the "is this mine" check) and each adapter's own provider-confirmed
-// readAvailablePlayers for free-agent/waiver status.
+// Packet 03, P3-7 (corrected P3-11 audit, 2026-07-18): canonical-first
+// Player Intelligence. Replaces app/api/players/[playerId]/intelligence/
+// route.ts's Sleeper-only, raw-ID, direct-roster-scan logic with a
+// cross-platform pipeline that consumes roster_snapshots (never a raw
+// per-platform roster refetch for the "is this mine" check) and each
+// adapter's own provider-confirmed readAvailablePlayers for free-agent/
+// waiver status.
 //
 // Canonical player ID is the primary identity. A legacy raw Sleeper ID
 // (every existing caller of the route today) is resolved to canonical at
 // the ROUTE boundary via resolvePlayerIdentityForRoute — this file's
 // per-league computation always works in terms of an already-resolved
 // PlayerIdentityInput, never a bare string of unknown origin.
+//
+// CORRECTION (independent P3-11 audit, 2026-07-18): this file previously
+// inferred 'rostered_elsewhere' whenever a player was absent from
+// readAvailablePlayers's result — but every real adapter's available-
+// players read is a BOUNDED top-N pool (e.g. top 25 by ADP), not a
+// complete league-wide ownership read. A player genuinely available but
+// outside that bound would have been wrongly reported as owned by
+// someone else. Absence from a bounded list now correctly falls through
+// to 'unknown' — 'rostered_elsewhere' is no longer inferred anywhere in
+// this file, since no adapter here provides a complete-enough read to
+// support it. It's kept in the PlayerLeagueStatus union for a future
+// adapter that DOES expose a genuine full-league ownership read.
 
 import { createAdminClient } from '@/lib/supabase'
 import { getIntelligenceAdapter, type ConnectedLeagueContext, type SnapshotFreshness } from '@/lib/platforms'
@@ -106,15 +119,19 @@ function matchesIdentity(
  * One connected league's independent player state. Never infers
  * free-agent status from "absent from my roster" — a player not on my
  * own snapshot is only ever reported 'free_agent'/'waivers' after a real
- * provider-confirmed readAvailablePlayers call finds them there;
- * otherwise it's honestly 'rostered_elsewhere' (some other real team must
- * hold them, since the provider confirmed they are NOT a free agent) or
- * 'unknown' when even that can't be determined.
+ * provider-confirmed readAvailablePlayers call finds them there.
+ *
+ * Absence from that same (bounded) read is NOT proof of anything —
+ * readAvailablePlayers is a top-N pool, not a complete league-wide
+ * ownership read, so a real free agent outside that bound would
+ * otherwise be misreported as owned by someone else. The honest result
+ * when the bounded list doesn't contain the player is 'unknown'.
  */
 export async function computePlayerStateForLeague(
   admin: AdminClient,
   league: ConnectedLeagueRow,
-  identity: PlayerIdentityInput
+  identity: PlayerIdentityInput,
+  userId: string
 ): Promise<PlayerLeagueState> {
   const adapter = getIntelligenceAdapter(league.platform)
   if (!adapter || !league.team_id) {
@@ -130,7 +147,7 @@ export async function computePlayerStateForLeague(
     }
   }
 
-  const { data: latest } = await admin
+  const { data: latest, error: snapshotError } = await admin
     .from('roster_snapshots')
     .select('snapshot_json, snapped_at')
     .eq('league_id', league.id)
@@ -138,6 +155,22 @@ export async function computePlayerStateForLeague(
     .order('snapped_at', { ascending: false })
     .limit(1)
     .maybeSingle()
+
+  if (snapshotError) {
+    // A real DB failure is NOT the same as "no snapshot yet" — reporting
+    // it as 'unavailable' would hide a real infrastructure problem behind
+    // the same label a genuinely-never-synced league gets.
+    return {
+      connectedLeagueId: league.id,
+      leagueName: league.league_name,
+      platform: league.platform,
+      status: 'unknown',
+      isStarter: false,
+      freshness: 'unavailable',
+      actionCapability: actionCapabilityFor(adapter.capabilities),
+      unresolvedSourcePlayerId: null,
+    }
+  }
 
   const freshness = computeSnapshotFreshness({
     lastSnapshotAt: latest?.snapped_at ?? null,
@@ -169,10 +202,12 @@ export async function computePlayerStateForLeague(
 
   // Not on my own roster — check the provider-confirmed free-agent/waiver
   // pool before ever concluding anything. This is the "availability must
-  // come from league-wide roster or waiver data" boundary.
+  // come from league-wide roster or waiver data" boundary. The real,
+  // authenticated user ID is threaded through here — every adapter call
+  // must receive it, never an empty string.
   const context: ConnectedLeagueContext = {
     connectedLeagueId: league.id,
-    userId: '', // not needed for a read-only availability check
+    userId,
     platform: league.platform,
     externalLeagueId: league.league_id,
     externalTeamId: league.team_id,
@@ -194,19 +229,11 @@ export async function computePlayerStateForLeague(
             unresolvedSourcePlayerId: found.canonicalPlayerId ? null : found.sourcePlayerId,
           }
         }
-        // Provider confirmed the free-agent/waiver pool and this player
-        // wasn't in it — a real, non-guessed basis for "someone else in
-        // this league owns them."
-        return {
-          connectedLeagueId: league.id,
-          leagueName: league.league_name,
-          platform: league.platform,
-          status: 'rostered_elsewhere',
-          isStarter: false,
-          freshness,
-          actionCapability,
-          unresolvedSourcePlayerId: null,
-        }
+        // The player wasn't in this BOUNDED pool — that proves nothing
+        // about who (if anyone) owns them. Never inferred as
+        // 'rostered_elsewhere' from a partial read; only a genuinely
+        // complete league-wide ownership read could support that
+        // conclusion, and no adapter here provides one.
       }
     } catch {
       // fall through to 'unknown' below
@@ -240,16 +267,25 @@ export async function computePlayerIntelligence(
   userId: string,
   identity: PlayerIdentityInput
 ): Promise<PlayerIntelligenceResult> {
-  const { data: leagues } = await admin
+  const { data: leagues, error } = await admin
     .from('connected_leagues')
     .select('id, platform, league_id, league_name, team_id')
     .eq('user_id', userId)
+
+  if (error) {
+    // A real DB failure fetching the league list itself — cannot report
+    // per-league states at all, so this must surface as a thrown error,
+    // never a silently empty leagues array (which would look identical
+    // to "this user has no connected leagues").
+    throw new Error(`Failed to load connected leagues: ${error.message}`)
+  }
+
   const rows = (leagues ?? []) as ConnectedLeagueRow[]
 
   const leagueStates = await Promise.all(
     rows.map(async (league) => {
       try {
-        return await computePlayerStateForLeague(admin, league, identity)
+        return await computePlayerStateForLeague(admin, league, identity, userId)
       } catch {
         // Isolated per-league failure — never removes another league's result.
         return {

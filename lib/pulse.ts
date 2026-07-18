@@ -670,10 +670,14 @@ export async function syncPulseItems(
     .filter((r) => r.status === 'snoozed' && r.snoozed_until && r.snoozed_until <= nowIso)
     .map((r) => r.id)
   if (wakeIds.length > 0) {
-    await admin
+    const { error: wakeError } = await admin
       .from('pulse_items')
       .update({ status: 'open', snoozed_until: null })
       .in('id', wakeIds)
+    // P3-11 correction: a failed mutation must never be silently treated
+    // as if it had succeeded — the caller's `false` return means "don't
+    // trust this sync happened," which is the honest state here.
+    if (wakeError) return false
     for (const r of rows) {
       if (wakeIds.includes(r.id)) r.status = 'open'
     }
@@ -685,7 +689,7 @@ export async function syncPulseItems(
   // Insert genuinely new intelligence.
   const toInsert = built.filter((b) => !byFingerprint.has(b.fingerprint))
   if (toInsert.length > 0) {
-    await admin.from('pulse_items').insert(
+    const { error: insertError } = await admin.from('pulse_items').insert(
       toInsert.map((b) => ({
         user_id: userId,
         type: b.type,
@@ -706,6 +710,7 @@ export async function syncPulseItems(
         status: 'open',
       }))
     )
+    if (insertError) return false
 
     // T-111: found while building LIVE that this pipeline never pushed at
     // all — only the 3 Game Day engagement triggers did. injury_alert is
@@ -721,11 +726,16 @@ export async function syncPulseItems(
   }
 
   // Refresh content on still-open items — a draft reminder's priority
-  // escalates to critical inside 48h under the same fingerprint.
+  // escalates to critical inside 48h under the same fingerprint. P3-11
+  // correction: also refresh affected_leagues_json and platform, which
+  // previously stayed frozen at whatever was true on first insert — a
+  // roster snapshot re-sync that changes freshness/actionCapability/
+  // canonicalPlayerId, or a platform correction, would otherwise never
+  // reach an already-open row.
   for (const b of built) {
     const row = byFingerprint.get(b.fingerprint)
     if (!row || row.status !== 'open') continue
-    await admin
+    const { error: updateError } = await admin
       .from('pulse_items')
       .update({
         priority: b.priority,
@@ -733,8 +743,11 @@ export async function syncPulseItems(
         reasoning: b.reasoning,
         deadline: b.deadline,
         action_url: b.actionUrl,
+        affected_leagues_json: b.affectedLeagues,
+        platform: b.affectedLeagues[0]?.platform ?? 'sleeper',
       })
       .eq('id', row.id)
+    if (updateError) return false
   }
 
   // Drop open items whose underlying signal vanished (player healthy again,
@@ -744,7 +757,8 @@ export async function syncPulseItems(
     .filter((r) => r.status === 'open' && !builtFingerprints.has(r.fingerprint))
     .map((r) => r.id)
   if (staleIds.length > 0) {
-    await admin.from('pulse_items').delete().in('id', staleIds)
+    const { error: deleteError } = await admin.from('pulse_items').delete().in('id', staleIds)
+    if (deleteError) return false
   }
 
   return true

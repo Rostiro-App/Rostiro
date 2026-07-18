@@ -274,11 +274,18 @@ function LeagueCard({
           )}
           {/* T-109 follow-up: "NO DATA YET" alone doesn't say why — a real
               user reported an ESPN league showing nothing here with no
-              explanation. Health/Pulse/Lineup are Sleeper-only today; say
-              so honestly rather than leaving an unexplained blank. */}
+              explanation. P3-11 correction: health scoring and Pulse are
+              now genuinely cross-platform (ESPN included, via P3-6B/P3-8)
+              — Yahoo remains the only platform with no adapter at all
+              (approval-pending), so it gets the honest "not supported yet"
+              copy; any OTHER platform showing 'unknown' health just hasn't
+              synced a real roster snapshot yet. Start/Sit recommendations
+              remain Sleeper-only regardless of platform. */}
           {health.status === 'unknown' && (
             <p className="text-[13px] mt-2.5" style={{ color: 'var(--t3)' }}>
-              Rostiro&apos;s live health scoring, Pulse, and Start/Sit only run on Sleeper leagues today — {PLATFORM_LABEL[league.platform] ?? league.platform} support is coming.
+              {league.platform === 'yahoo'
+                ? `Rostiro's live health scoring, Pulse, and Start/Sit don't support Yahoo yet — support is pending platform approval.`
+                : `Rostiro hasn't synced this league's roster yet, so health scoring and Pulse have nothing to grade. Start/Sit recommendations are Sleeper-only for now.`}
             </p>
           )}
         </div>

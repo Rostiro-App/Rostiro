@@ -102,6 +102,14 @@ async function loadExistingMappings(admin: ReturnType<typeof createAdminClient>,
   return rows
 }
 
+// P3-11 correction: persists matchBasis/isTeamlessActivityUnverified into
+// the mapping_basis/teamless_activity_unverified columns proposed in
+// supabase/migration_player_mapping_provenance.sql. That migration is
+// PROPOSED ONLY, not yet applied to production — running this script with
+// --write against a database that doesn't have those columns yet will fail
+// every insert/update with a real Supabase error (surfaced below, not
+// swallowed), which is the correct, honest failure mode until the
+// migration is separately approved and applied.
 async function applyActions(admin: ReturnType<typeof createAdminClient>, actions: SeedAction[]) {
   let inserted = 0
   let updated = 0
@@ -116,6 +124,8 @@ async function applyActions(admin: ReturnType<typeof createAdminClient>, actions
         sleeper_id: action.sleeperId,
         yahoo_id: action.yahooId,
         season: action.season,
+        mapping_basis: action.matchBasis,
+        teamless_activity_unverified: action.isTeamlessActivityUnverified,
       })
       if (error) {
         console.error(`  INSERT FAILED for ${action.name} (${action.nflTeam ?? 'no team on record'}): ${error.message}`)
@@ -123,7 +133,10 @@ async function applyActions(admin: ReturnType<typeof createAdminClient>, actions
       }
       inserted++
     } else if (action.type === 'update_team') {
-      const { error } = await admin.from('player_mappings').update({ nfl_team: action.newNflTeam }).eq('id', action.mappingId)
+      const { error } = await admin
+        .from('player_mappings')
+        .update({ nfl_team: action.newNflTeam, mapping_basis: action.matchBasis })
+        .eq('id', action.mappingId)
       if (error) {
         console.error(`  UPDATE FAILED for mapping ${action.mappingId}: ${error.message}`)
         continue
@@ -131,7 +144,19 @@ async function applyActions(admin: ReturnType<typeof createAdminClient>, actions
       updated++
     } else if (action.type === 'link_platform_id') {
       const column = action.platform === 'espn' ? 'espn_id' : 'sleeper_id'
-      const { error } = await admin.from('player_mappings').update({ [column]: action.newId }).eq('id', action.mappingId)
+      // The row's mapping_basis is set (not merely left as-is) here — a row
+      // previously written as 'single_platform' now has a second
+      // platform's ID attached via a name+team heuristic, which is a real,
+      // weaker-confidence fact about the WHOLE row going forward (see
+      // lib/playerIdentity.ts's resolvePlayerIdentityPure guard, which
+      // downgrades 'exact' to 'verified_alias' for any row whose
+      // mapping_basis is 'name_team_unambiguous'). This never silently
+      // upgrades confidence — it can only ever move a row from
+      // 'single_platform' to the more cautious 'name_team_unambiguous'.
+      const { error } = await admin
+        .from('player_mappings')
+        .update({ [column]: action.newId, mapping_basis: action.matchBasis })
+        .eq('id', action.mappingId)
       if (error) {
         console.error(`  LINK FAILED for mapping ${action.mappingId}: ${error.message}`)
         continue

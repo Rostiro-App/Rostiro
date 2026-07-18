@@ -196,7 +196,12 @@ create index idx_players_cache_position on public.players_cache (position);
 create table public.player_mappings (
   id          uuid primary key default uuid_generate_v4(),
   name        text not null,
-  nfl_team    text not null,
+  -- Nullable (Packet 03, P3-4B / migration_player_mapping_constraints.sql,
+  -- applied to production 2026-07-17): a player with a real activity
+  -- signal (ownership%/ADP) but no current NFL team on record is a
+  -- legitimate mapping — this must stay a real null, never a placeholder
+  -- string like '' or 'FA'.
+  nfl_team    text,
   position    text,
   espn_id     text,
   yahoo_id    text,
@@ -220,6 +225,24 @@ create policy "Service role can manage player mappings" on public.player_mapping
 create index idx_player_mappings_espn on public.player_mappings (espn_id);
 create index idx_player_mappings_yahoo on public.player_mappings (yahoo_id);
 create index idx_player_mappings_sleeper on public.player_mappings (sleeper_id);
+
+-- Partial uniqueness per non-null provider ID (P3-4 / migration_player_mapping_constraints.sql,
+-- applied to production 2026-07-17): defense-in-depth so a future seed-script
+-- bug or concurrent write can never insert two rows claiming the same
+-- platform's player ID — lib/playerIdentity.ts's exact-match step assumes at
+-- most one mapping row per provider ID. Partial (WHERE ... IS NOT NULL)
+-- because most rows only have ONE of these three populated.
+create unique index if not exists idx_player_mappings_espn_id_unique
+  on public.player_mappings (espn_id)
+  where espn_id is not null;
+
+create unique index if not exists idx_player_mappings_yahoo_id_unique
+  on public.player_mappings (yahoo_id)
+  where yahoo_id is not null;
+
+create unique index if not exists idx_player_mappings_sleeper_id_unique
+  on public.player_mappings (sleeper_id)
+  where sleeper_id is not null;
 
 -- ─── Draft Sessions ────────────────────────────────────────────────────────────
 -- Supports anonymous (user_id null) and authenticated sessions.

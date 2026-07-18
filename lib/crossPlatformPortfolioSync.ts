@@ -60,7 +60,7 @@ async function fetchLatestSnapshot(
   connectedLeagueId: string,
   teamId: string
 ): Promise<{ snapshot: NormalizedRosterSnapshot; snappedAt: string } | null> {
-  const { data } = await admin
+  const { data, error } = await admin
     .from('roster_snapshots')
     .select('snapshot_json, snapped_at')
     .eq('league_id', connectedLeagueId)
@@ -68,6 +68,11 @@ async function fetchLatestSnapshot(
     .order('snapped_at', { ascending: false })
     .limit(1)
     .maybeSingle()
+  // A real DB failure here must NOT be treated the same as "no snapshot
+  // yet" (which correctly produces 'unavailable') — thrown so the
+  // per-league try/catch below reports it as 'failed' instead, with the
+  // real error message preserved.
+  if (error) throw new Error(`roster_snapshots query failed: ${error.message}`)
   if (!data) return null
   return { snapshot: data.snapshot_json as NormalizedRosterSnapshot, snappedAt: data.snapped_at as string }
 }
@@ -77,11 +82,12 @@ async function buildAdpLookup(admin: AdminClient, snapshot: NormalizedRosterSnap
   const sourcePlayerIds = snapshot.players.map((p) => p.sourcePlayerId)
   if (sourcePlayerIds.length === 0) return lookup
 
-  const { data } = await admin
+  const { data, error } = await admin
     .from('players_cache')
     .select('player_id, adp_consensus, adp_sleeper, adp_espn, injury_status')
     .eq('platform', snapshot.platform)
     .in('player_id', sourcePlayerIds)
+  if (error) throw new Error(`players_cache ADP lookup failed: ${error.message}`)
 
   const byPlayerId = new Map((data ?? []).map((r) => [r.player_id as string, r]))
 
@@ -108,11 +114,12 @@ async function bestAvailableAdp(
   if (result.status !== 'ok' || !result.data || result.data.length === 0) return { adp: null, name: null }
 
   const ids = result.data.map((p) => p.sourcePlayerId)
-  const { data } = await admin
+  const { data, error } = await admin
     .from('players_cache')
     .select('player_id, adp_consensus, adp_sleeper, adp_espn')
     .eq('platform', context.platform)
     .in('player_id', ids)
+  if (error) throw new Error(`players_cache best-available-ADP lookup failed: ${error.message}`)
   const byId = new Map((data ?? []).map((r) => [r.player_id as string, r]))
 
   let best: { adp: number; name: string } | null = null
@@ -131,10 +138,14 @@ export async function computeUserCrossPlatformPortfolio(userId: string): Promise
   const snapshotEntries: LeagueSnapshotEntry[] = []
   const health: LeagueHealthReport[] = []
 
-  const { data: leagues } = await admin
+  const { data: leagues, error: leaguesError } = await admin
     .from('connected_leagues')
     .select('id, platform, league_id, league_name, team_id')
     .eq('user_id', userId)
+  if (leaguesError) {
+    // Must not be silently reported as "this user has zero leagues."
+    throw new Error(`Failed to load connected leagues: ${leaguesError.message}`)
+  }
   const rows = (leagues ?? []) as ConnectedLeagueRow[]
 
   for (const league of rows) {
@@ -164,6 +175,25 @@ export async function computeUserCrossPlatformPortfolio(userId: string): Promise
         continue
       }
 
+      const context: ConnectedLeagueContext = {
+        connectedLeagueId: league.id,
+        userId,
+        platform: league.platform,
+        externalLeagueId: league.league_id,
+        externalTeamId: league.team_id,
+      }
+      const [adpLookup, freeAgent] = await Promise.all([
+        buildAdpLookup(admin, latest.snapshot),
+        bestAvailableAdp(admin, adapter, context),
+      ])
+      const result = computeCrossPlatformLeagueHealth(latest.snapshot, adpLookup, freeAgent.adp, freeAgent.name)
+      health.push({ connectedLeagueId: league.id, leagueName: league.league_name, platform: league.platform, result })
+
+      // Coverage is pushed only after every step for this league (snapshot
+      // fetch, ADP lookup, free-agent lookup, health computation) has
+      // succeeded — otherwise a failure partway through would leave BOTH
+      // an 'included_fresh'/'included_stale' entry AND a 'failed' entry
+      // for the same league in the coverage array.
       snapshotEntries.push({
         connectedLeagueId: league.id,
         leagueName: league.league_name,
@@ -178,20 +208,6 @@ export async function computeUserCrossPlatformPortfolio(userId: string): Promise
         status: freshness === 'fresh' ? 'included_fresh' : 'included_stale',
         reason: null,
       })
-
-      const context: ConnectedLeagueContext = {
-        connectedLeagueId: league.id,
-        userId,
-        platform: league.platform,
-        externalLeagueId: league.league_id,
-        externalTeamId: league.team_id,
-      }
-      const [adpLookup, freeAgent] = await Promise.all([
-        buildAdpLookup(admin, latest.snapshot),
-        bestAvailableAdp(admin, adapter, context),
-      ])
-      const result = computeCrossPlatformLeagueHealth(latest.snapshot, adpLookup, freeAgent.adp, freeAgent.name)
-      health.push({ connectedLeagueId: league.id, leagueName: league.league_name, platform: league.platform, result })
     } catch (err) {
       // A single league's failure is isolated here — it becomes one
       // 'failed' coverage entry, never an exception that would blank

@@ -173,7 +173,7 @@ describe('P3-8B — PROOF: an ESPN item survives cron generation, persistence, c
       }),
     }
 
-    const { items: generatedItems } = await buildCrossPlatformPulseItemsForLeague(snapshotAdmin as never, league)
+    const { items: generatedItems } = await buildCrossPlatformPulseItemsForLeague(snapshotAdmin as never, league, 'user-1')
     const grade = generatedItems.find((i): i is CrossPlatformPulseItem => i.type === 'roster_grade')
     expect(grade).toBeDefined()
     expect(grade!.affectedLeagues[0]).toMatchObject({ platform: 'espn', freshness: 'fresh', actionCapability: 'none' })
@@ -232,5 +232,119 @@ describe('P3-8B — PROOF: an ESPN item survives cron generation, persistence, c
       freshness: 'fresh',
       actionCapability: 'none',
     })
+  })
+})
+
+describe('syncPulseItems — PROOF (P3-11 correction): every mutation error is checked, never silently treated as success', () => {
+  function builtItem(overrides: Partial<CrossPlatformPulseItem> = {}): CrossPlatformPulseItem {
+    return {
+      fingerprint: 'roster_grade:cl-1',
+      type: 'roster_grade',
+      priority: 'info',
+      headline: 'h',
+      reasoning: 'r',
+      affectedLeagues: [{ leagueId: 'cl-1', leagueName: 'L', platform: 'espn', freshness: 'fresh', actionCapability: 'none', canonicalPlayerId: null, providerPlayerId: null, status: null }],
+      deadline: null,
+      actionUrl: null,
+      ...overrides,
+    }
+  }
+
+  it('a failed insert returns false, never true', async () => {
+    const admin = {
+      from: vi.fn((table: string) => {
+        if (table === 'pulse_items') {
+          return {
+            select: vi.fn(() => ({ eq: vi.fn(() => ({ not: vi.fn(() => Promise.resolve({ data: [], error: null })) })) })),
+            insert: vi.fn(() => Promise.resolve({ error: { message: 'insert failed: unique violation' } })),
+          }
+        }
+        return {}
+      }),
+    }
+    const result = await syncPulseItems(admin as never, 'user-1', [builtItem()])
+    expect(result).toBe(false)
+  })
+
+  it('a failed update on an existing open row returns false, never true', async () => {
+    const admin = {
+      from: vi.fn((table: string) => {
+        if (table === 'pulse_items') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                not: vi.fn(() =>
+                  Promise.resolve({ data: [{ id: 'row-1', fingerprint: 'roster_grade:cl-1', status: 'open', snoozed_until: null }], error: null })
+                ),
+              })),
+            })),
+            update: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ error: { message: 'update failed: connection reset' } })) })),
+          }
+        }
+        return {}
+      }),
+    }
+    const result = await syncPulseItems(admin as never, 'user-1', [builtItem()])
+    expect(result).toBe(false)
+  })
+
+  it('a failed delete of stale items returns false, never true', async () => {
+    const admin = {
+      from: vi.fn((table: string) => {
+        if (table === 'pulse_items') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                not: vi.fn(() =>
+                  Promise.resolve({ data: [{ id: 'row-stale', fingerprint: 'roster_grade:vanished', status: 'open', snoozed_until: null }], error: null })
+                ),
+              })),
+            })),
+            delete: vi.fn(() => ({ in: vi.fn(() => Promise.resolve({ error: { message: 'delete failed' } })) })),
+          }
+        }
+        return {}
+      }),
+    }
+    // `built` is empty, so the one existing 'open' row (fingerprint
+    // 'roster_grade:vanished') is stale and must be deleted.
+    const result = await syncPulseItems(admin as never, 'user-1', [])
+    expect(result).toBe(false)
+  })
+
+  it('an existing open row gets affected_leagues_json and platform refreshed, not left stale from first insert', async () => {
+    let updatedPayload: Record<string, unknown> | null = null
+    const admin = {
+      from: vi.fn((table: string) => {
+        if (table === 'pulse_items') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                not: vi.fn(() =>
+                  Promise.resolve({ data: [{ id: 'row-1', fingerprint: 'roster_grade:cl-1', status: 'open', snoozed_until: null }], error: null })
+                ),
+              })),
+            })),
+            update: vi.fn((payload: Record<string, unknown>) => {
+              updatedPayload = payload
+              return { eq: vi.fn(() => Promise.resolve({ error: null })) }
+            }),
+          }
+        }
+        return {}
+      }),
+    }
+    // Freshness flips from 'fresh' (whatever was true at first insert) to
+    // 'stale' on this sync — the update payload must carry the NEW
+    // affectedLeagues metadata and platform, not silently keep the old one.
+    const updated = builtItem({
+      affectedLeagues: [{ leagueId: 'cl-1', leagueName: 'L', platform: 'espn', freshness: 'stale', actionCapability: 'none', canonicalPlayerId: null, providerPlayerId: null, status: null }],
+    })
+    const result = await syncPulseItems(admin as never, 'user-1', [updated])
+    expect(result).toBe(true)
+    expect(updatedPayload).not.toBeNull()
+    expect(updatedPayload!.affected_leagues_json).toEqual(updated.affectedLeagues)
+    expect((updatedPayload!.affected_leagues_json as typeof updated.affectedLeagues)[0].freshness).toBe('stale')
+    expect(updatedPayload!.platform).toBe('espn')
   })
 })

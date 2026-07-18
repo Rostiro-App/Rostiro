@@ -21,14 +21,12 @@ export async function GET(request: NextRequest) {
 
   const admin = createAdminClient()
 
-  // P3-6B: Pulse item generation itself (buildPulseItemsForUser) is still
-  // Sleeper-only internally — a separate, unmigrated concern (P3-8) — but
-  // the Portfolio snapshot below is genuinely cross-platform now, so this
-  // user list is no longer scoped to `platform = 'sleeper'`. An ESPN-only
-  // user gets no Pulse items yet (Pulse's own internals still find
-  // nothing for them, same as before this change), but DOES get a real
-  // Portfolio snapshot — that asymmetry is real and worth naming, not
-  // something to paper over by re-adding the old filter.
+  // P3-8 (correction, 2026-07-18): buildPulseItemsForUser now merges real
+  // cross-platform (ESPN) Pulse items via lib/crossPlatformPulse.ts
+  // alongside the existing Sleeper-only generation — an ESPN-only user
+  // does get real Pulse items today, not just a Portfolio snapshot. This
+  // user list is not scoped to `platform = 'sleeper'` because both Pulse
+  // and Portfolio are cross-platform now.
   const { data, error } = await admin.from('connected_leagues').select('user_id')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -39,15 +37,14 @@ export async function GET(request: NextRequest) {
   let itemsBuilt = 0
   let persistenceMissing = false
   let portfolioSnapshotted = 0
-  // P3-6B: supabase/migration_portfolio_schema_version.sql is proposed but
-  // NOT applied to production. Writing schema_version/player_id_space
-  // before that migration runs would either error (column missing) or, if
-  // silently omitted, write a canonical player_id under a row that
-  // DEFAULTS to schema_version 1 / player_id_space 'sleeper_raw' —
-  // mislabeling real canonical data as legacy. Neither is acceptable, so
-  // this flag detects the missing-column case once and skips ALL
-  // Portfolio snapshot writes for the rest of this run rather than
-  // guessing — surfaced honestly in the response, not swallowed silently.
+  // P3-6B: supabase/migration_portfolio_schema_version.sql was applied to
+  // production 2026-07-17 (P3-10) — schema_version/player_id_space exist
+  // today. This flag and its '42703'/'PGRST204' checks below are kept as a
+  // defense-in-depth safety net (e.g. a future environment where the
+  // migration genuinely hasn't run yet), not because the columns are
+  // currently missing — if they were, writing schema_version/
+  // player_id_space would error, and this flag skips ALL Portfolio
+  // snapshot writes for the rest of that run rather than guessing.
   let schemaVersionColumnsMissing = false
   const weekStart = currentWeekStart()
 
@@ -108,12 +105,11 @@ export async function GET(request: NextRequest) {
       // Only resolved (canonical-ID) exposure is written to the
       // historical snapshot table — unresolved players stay visible live
       // via the coverage/exposure API response, but this table's
-      // player_id_space enum only distinguishes sleeper_raw/canonical
-      // (see supabase/migration_portfolio_schema_version.sql, unapplied),
-      // and writing an unresolved `platform:sourceId` string here would
-      // need a third space this migration doesn't define. Not silently
-      // dropped from the PRODUCT — only from this specific historical
-      // trend table.
+      // player_id_space enum (applied to production 2026-07-17, P3-10)
+      // only distinguishes sleeper_raw/canonical, and writing an
+      // unresolved `platform:sourceId` string here would need a third
+      // space that column doesn't define. Not silently dropped from the
+      // PRODUCT — only from this specific historical trend table.
       if (portfolio.exposure.resolved.length > 0) {
         const { error: exposureError } = await admin.from('portfolio_exposure_snapshots').upsert(
           portfolio.exposure.resolved.map((e) => ({

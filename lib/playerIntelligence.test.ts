@@ -5,7 +5,7 @@ const CAPS_READ_ONLY = { leagueRead: true, rosterRead: true, matchupRead: true, 
 function mockAdmin(opts: {
   mappingLookups?: Record<string, { id: string } | null>
   snapshot?: { snapshot_json: unknown; snapped_at: string } | null
-  availableResult?: { status: string; data: unknown } | Error
+  snapshotError?: { message: string } | null
 }) {
   return {
     from: vi.fn((table: string) => {
@@ -25,7 +25,7 @@ function mockAdmin(opts: {
               eq: vi.fn(() => ({
                 order: vi.fn(() => ({
                   limit: vi.fn(() => ({
-                    maybeSingle: vi.fn(() => Promise.resolve({ data: opts.snapshot ?? null })),
+                    maybeSingle: vi.fn(() => Promise.resolve({ data: opts.snapshot ?? null, error: opts.snapshotError ?? null })),
                   })),
                 })),
               })),
@@ -75,6 +75,7 @@ describe('computePlayerStateForLeague — one league, independent state', () => 
 
   const league = { id: 'cl-1', platform: 'sleeper' as const, league_id: 'league-1', league_name: 'My League', team_id: 'team-1' }
   const identity = { canonicalPlayerId: 'canon-1', sourcePlatform: null, sourcePlayerId: null }
+  const REAL_USER_ID = 'real-user-abc-123'
 
   function snapshotWithPlayer(overrides: Record<string, unknown> = {}) {
     return {
@@ -90,7 +91,7 @@ describe('computePlayerStateForLeague — one league, independent state', () => 
     vi.doMock('@/lib/rosterSnapshotSync', () => ({ computeSnapshotFreshness: vi.fn(() => 'fresh') }))
     const { computePlayerStateForLeague } = await import('./playerIntelligence')
     const admin = mockAdmin({ snapshot: { snapshot_json: snapshotWithPlayer(), snapped_at: new Date().toISOString() } }) as never
-    const result = await computePlayerStateForLeague(admin, league, identity)
+    const result = await computePlayerStateForLeague(admin, league, identity, REAL_USER_ID)
     expect(result).toMatchObject({ status: 'mine', isStarter: true, freshness: 'fresh', actionCapability: 'none' })
   })
 
@@ -99,7 +100,7 @@ describe('computePlayerStateForLeague — one league, independent state', () => 
     vi.doMock('@/lib/rosterSnapshotSync', () => ({ computeSnapshotFreshness: vi.fn(() => 'stale') }))
     const { computePlayerStateForLeague } = await import('./playerIntelligence')
     const admin = mockAdmin({ snapshot: { snapshot_json: snapshotWithPlayer(), snapped_at: '2026-07-01T00:00:00Z' } }) as never
-    const result = await computePlayerStateForLeague(admin, league, identity)
+    const result = await computePlayerStateForLeague(admin, league, identity, REAL_USER_ID)
     expect(result.freshness).toBe('stale')
     expect(result.status).toBe('mine')
   })
@@ -117,7 +118,7 @@ describe('computePlayerStateForLeague — one league, independent state', () => 
     vi.doMock('@/lib/rosterSnapshotSync', () => ({ computeSnapshotFreshness: vi.fn(() => 'fresh') }))
     const { computePlayerStateForLeague } = await import('./playerIntelligence')
     const admin = mockAdmin({ snapshot: { snapshot_json: { players: [] }, snapped_at: new Date().toISOString() } }) as never
-    const result = await computePlayerStateForLeague(admin, league, identity)
+    const result = await computePlayerStateForLeague(admin, league, identity, REAL_USER_ID)
     expect(result.status).toBe('free_agent')
   })
 
@@ -134,11 +135,28 @@ describe('computePlayerStateForLeague — one league, independent state', () => 
     vi.doMock('@/lib/rosterSnapshotSync', () => ({ computeSnapshotFreshness: vi.fn(() => 'fresh') }))
     const { computePlayerStateForLeague } = await import('./playerIntelligence')
     const admin = mockAdmin({ snapshot: { snapshot_json: { players: [] }, snapped_at: new Date().toISOString() } }) as never
-    const result = await computePlayerStateForLeague(admin, league, identity)
+    const result = await computePlayerStateForLeague(admin, league, identity, REAL_USER_ID)
     expect(result.status).toBe('waivers')
   })
 
-  it('PROOF: "rostered_elsewhere" only after the provider free-agent pool confirms the player is NOT there — a real inference, not a guess', async () => {
+  it('PROOF (P3-11 correction): a player absent from the BOUNDED available-players pool is "unknown", never "rostered_elsewhere" — absence from a top-N list proves nothing', async () => {
+    vi.doMock('@/lib/platforms', () => ({
+      getIntelligenceAdapter: vi.fn(() => ({
+        platform: 'sleeper',
+        capabilities: CAPS_READ_ONLY,
+        // A real, successful read that simply doesn't happen to include
+        // this specific player — e.g. a bounded top-25-by-ADP pool.
+        readAvailablePlayers: vi.fn(() => Promise.resolve({ status: 'ok', data: [{ canonicalPlayerId: 'someone-else', sourcePlatform: 'sleeper', sourcePlayerId: 's99', availability: 'free_agent' }] })),
+      })),
+    }))
+    vi.doMock('@/lib/rosterSnapshotSync', () => ({ computeSnapshotFreshness: vi.fn(() => 'fresh') }))
+    const { computePlayerStateForLeague } = await import('./playerIntelligence')
+    const admin = mockAdmin({ snapshot: { snapshot_json: { players: [] }, snapped_at: new Date().toISOString() } }) as never
+    const result = await computePlayerStateForLeague(admin, league, identity, REAL_USER_ID)
+    expect(result.status).toBe('unknown')
+  })
+
+  it('PROOF (P3-11 correction): an EMPTY available-players result also stays "unknown" — never "rostered_elsewhere"', async () => {
     vi.doMock('@/lib/platforms', () => ({
       getIntelligenceAdapter: vi.fn(() => ({
         platform: 'sleeper',
@@ -149,8 +167,9 @@ describe('computePlayerStateForLeague — one league, independent state', () => 
     vi.doMock('@/lib/rosterSnapshotSync', () => ({ computeSnapshotFreshness: vi.fn(() => 'fresh') }))
     const { computePlayerStateForLeague } = await import('./playerIntelligence')
     const admin = mockAdmin({ snapshot: { snapshot_json: { players: [] }, snapped_at: new Date().toISOString() } }) as never
-    const result = await computePlayerStateForLeague(admin, league, identity)
-    expect(result.status).toBe('rostered_elsewhere')
+    const result = await computePlayerStateForLeague(admin, league, identity, REAL_USER_ID)
+    expect(result.status).toBe('unknown')
+    expect(result.status).not.toBe('rostered_elsewhere')
   })
 
   it('reports "unknown" (never a guess) when the free-agent check itself fails or is unsupported', async () => {
@@ -158,8 +177,39 @@ describe('computePlayerStateForLeague — one league, independent state', () => 
     vi.doMock('@/lib/rosterSnapshotSync', () => ({ computeSnapshotFreshness: vi.fn(() => 'fresh') }))
     const { computePlayerStateForLeague } = await import('./playerIntelligence')
     const admin = mockAdmin({ snapshot: { snapshot_json: { players: [] }, snapped_at: new Date().toISOString() } }) as never
-    const result = await computePlayerStateForLeague(admin, league, identity)
+    const result = await computePlayerStateForLeague(admin, league, identity, REAL_USER_ID)
     expect(result.status).toBe('unknown')
+  })
+
+  it('PROOF (P3-11 correction): a roster_snapshots query error is surfaced as unknown/unavailable, never treated as "no snapshot yet"', async () => {
+    vi.doMock('@/lib/platforms', () => ({ getIntelligenceAdapter: vi.fn(() => ({ platform: 'sleeper', capabilities: CAPS_READ_ONLY })) }))
+    vi.doMock('@/lib/rosterSnapshotSync', () => ({ computeSnapshotFreshness: vi.fn(() => 'unavailable') }))
+    const { computePlayerStateForLeague } = await import('./playerIntelligence')
+    const admin = mockAdmin({ snapshot: null, snapshotError: { message: 'connection reset' } }) as never
+    const result = await computePlayerStateForLeague(admin, league, identity, REAL_USER_ID)
+    expect(result.status).toBe('unknown')
+    expect(result.freshness).toBe('unavailable')
+  })
+
+  it('PROOF (P3-11 correction): the real authenticated user ID is threaded into the ESPN adapter context, never an empty string', async () => {
+    let receivedUserId: string | undefined
+    vi.doMock('@/lib/platforms', () => ({
+      getIntelligenceAdapter: vi.fn(() => ({
+        platform: 'espn',
+        capabilities: CAPS_READ_ONLY,
+        readAvailablePlayers: vi.fn((context: { userId: string }) => {
+          receivedUserId = context.userId
+          return Promise.resolve({ status: 'ok', data: [] })
+        }),
+      })),
+    }))
+    vi.doMock('@/lib/rosterSnapshotSync', () => ({ computeSnapshotFreshness: vi.fn(() => 'fresh') }))
+    const { computePlayerStateForLeague } = await import('./playerIntelligence')
+    const admin = mockAdmin({ snapshot: { snapshot_json: { players: [] }, snapped_at: new Date().toISOString() } }) as never
+    const espnLeague = { ...league, platform: 'espn' as const }
+    await computePlayerStateForLeague(admin, espnLeague, identity, REAL_USER_ID)
+    expect(receivedUserId).toBe(REAL_USER_ID)
+    expect(receivedUserId).not.toBe('')
   })
 
   it('PROOF: unresolved players remain source-specific — matched by platform+sourcePlayerId, and flagged as unresolved in this league', async () => {
@@ -169,7 +219,7 @@ describe('computePlayerStateForLeague — one league, independent state', () => 
     const unresolvedSnapshot = { players: [{ canonicalPlayerId: null, sourcePlatform: 'sleeper', sourcePlayerId: 's1', lineupStatus: 'bench' }] }
     const admin = mockAdmin({ snapshot: { snapshot_json: unresolvedSnapshot, snapped_at: new Date().toISOString() } }) as never
     const unresolvedIdentity = { canonicalPlayerId: null, sourcePlatform: 'sleeper' as const, sourcePlayerId: 's1' }
-    const result = await computePlayerStateForLeague(admin, league, unresolvedIdentity)
+    const result = await computePlayerStateForLeague(admin, league, unresolvedIdentity, REAL_USER_ID)
     expect(result).toMatchObject({ status: 'mine', unresolvedSourcePlayerId: 's1' })
   })
 
@@ -179,7 +229,7 @@ describe('computePlayerStateForLeague — one league, independent state', () => 
     const { computePlayerStateForLeague } = await import('./playerIntelligence')
     const yahooLeague = { ...league, platform: 'yahoo' as const }
     const admin = mockAdmin({}) as never
-    const result = await computePlayerStateForLeague(admin, yahooLeague, identity)
+    const result = await computePlayerStateForLeague(admin, yahooLeague, identity, REAL_USER_ID)
     expect(result.freshness).toBe('approval_pending')
     expect(result.status).toBe('unknown')
   })
@@ -211,6 +261,7 @@ describe('computePlayerIntelligence — every connected league reports independe
                     { id: 'cl-sleeper', platform: 'sleeper', league_id: 'l1', league_name: 'Sleeper League', team_id: 'team-1' },
                     { id: 'cl-espn', platform: 'espn', league_id: 'l2', league_name: 'ESPN League', team_id: 'team-1' },
                   ],
+                  error: null,
                 })
               ),
             })),
@@ -223,7 +274,7 @@ describe('computePlayerIntelligence — every connected league reports independe
                 eq: vi.fn(() => ({
                   order: vi.fn(() => ({
                     limit: vi.fn(() => ({
-                      maybeSingle: vi.fn(() => Promise.resolve({ data: { snapshot_json: { players: [{ canonicalPlayerId: 'canon-1', sourcePlatform: 'sleeper', sourcePlayerId: 's1', lineupStatus: 'starting' }] }, snapped_at: new Date().toISOString() } })),
+                      maybeSingle: vi.fn(() => Promise.resolve({ data: { snapshot_json: { players: [{ canonicalPlayerId: 'canon-1', sourcePlatform: 'sleeper', sourcePlayerId: 's1', lineupStatus: 'starting' }] }, snapped_at: new Date().toISOString() }, error: null })),
                     })),
                   })),
                 })),
@@ -243,5 +294,17 @@ describe('computePlayerIntelligence — every connected league reports independe
     expect(espnState?.status).toBe('unknown')
     const sleeperState = result.leagues.find((l) => l.connectedLeagueId === 'cl-sleeper')
     expect(sleeperState?.status).toBe('mine')
+  })
+
+  it('PROOF (P3-11 correction): a connected_leagues query error throws rather than silently reporting zero leagues', async () => {
+    vi.doMock('@/lib/platforms', () => ({ getIntelligenceAdapter: vi.fn() }))
+    vi.doMock('@/lib/rosterSnapshotSync', () => ({ computeSnapshotFreshness: vi.fn() }))
+    const { computePlayerIntelligence } = await import('./playerIntelligence')
+    const admin = {
+      from: vi.fn(() => ({ select: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ data: null, error: { message: 'db down' } })) })) })),
+    } as never
+
+    const identity = { canonicalPlayerId: 'canon-1', sourcePlatform: null, sourcePlayerId: null }
+    await expect(computePlayerIntelligence(admin, 'user-1', identity)).rejects.toThrow(/db down/)
   })
 })

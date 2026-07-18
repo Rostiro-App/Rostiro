@@ -36,6 +36,14 @@ export interface PlayerMappingRow {
   espnId: string | null
   yahooId: string | null
   sleeperId: string | null
+  // P3-11 correction: optional because fetchActivePlayerMappings below does
+  // not select this column yet — it doesn't exist in production until
+  // supabase/migration_player_mapping_provenance.sql (PROPOSED, not applied)
+  // is separately approved and applied, and the live query is updated to
+  // select it as its own explicitly-approved follow-up. Always undefined
+  // until then, so the confidence guard in resolvePlayerIdentityPure below
+  // is a no-op and today's behavior is unchanged.
+  mappingBasis?: 'provider_id_reuse' | 'name_team_unambiguous' | 'single_platform' | null
 }
 
 export interface PlayerIdentityInput {
@@ -81,12 +89,33 @@ export function resolvePlayerIdentityPure(
   // 1. Exact stored platform mapping.
   const exact = candidates.find((c) => c[col] === sourcePlayerId)
   if (exact) {
+    const colName = col === 'yahooId' ? 'yahoo_id' : col === 'sleeperId' ? 'sleeper_id' : 'espn_id'
+    // P3-11 correction: a row's cross-platform link can come from a real
+    // provider ID re-match (matchBasis 'provider_id_reuse') OR from a
+    // name+team heuristic applied once at seed time (matchBasis
+    // 'name_team_unambiguous' — see lib/playerMappingSeed.ts's MatchBasis).
+    // Only the former earns 'exact' confidence; a heuristically-linked row
+    // must never silently present as fully verified just because its
+    // provider ID is now stored on file. Conservative at row granularity
+    // (mappingBasis describes the whole row, not which specific column was
+    // heuristically linked) — this can under-claim confidence for a column
+    // that was genuinely the row's original single-platform ID, but never
+    // over-claims, which is the failure mode this guard exists to prevent.
+    if (exact.mappingBasis === 'name_team_unambiguous') {
+      return {
+        canonicalPlayerId: exact.id,
+        sourcePlatform: platform,
+        sourcePlayerId,
+        confidence: 'verified_alias',
+        reason: `Matched via stored player_mappings.${colName}, but this row's cross-platform link was established by a name+team heuristic at seed time, not independent provider confirmation`,
+      }
+    }
     return {
       canonicalPlayerId: exact.id,
       sourcePlatform: platform,
       sourcePlayerId,
       confidence: 'exact',
-      reason: `Matched via stored player_mappings.${col === 'yahooId' ? 'yahoo_id' : col === 'sleeperId' ? 'sleeper_id' : 'espn_id'}`,
+      reason: `Matched via stored player_mappings.${colName}`,
     }
   }
 

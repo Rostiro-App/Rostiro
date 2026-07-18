@@ -21,14 +21,17 @@ function baseSnapshot(overrides: Record<string, unknown> = {}) {
 
 function mockAdmin(opts: {
   leagues: Array<{ id: string; platform: string; league_id: string; league_name: string; team_id: string | null }>
+  leaguesError?: { message: string } | null
   snapshotsByLeagueId: Record<string, { snapshot_json: unknown; snapped_at: string } | null>
+  snapshotErrorByLeagueId?: Record<string, { message: string }>
   playersCacheRows?: Array<Record<string, unknown>>
+  playersCacheError?: { message: string } | null
   throwOnLeagueId?: string
 }) {
   return {
     from: vi.fn((table: string) => {
       if (table === 'connected_leagues') {
-        return { select: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ data: opts.leagues })) })) }
+        return { select: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ data: opts.leagues, error: opts.leaguesError ?? null })) })) }
       }
       if (table === 'roster_snapshots') {
         return {
@@ -39,7 +42,9 @@ function mockAdmin(opts: {
                   limit: vi.fn(() => ({
                     maybeSingle: vi.fn(() => {
                       if (opts.throwOnLeagueId && leagueId === opts.throwOnLeagueId) throw new Error('DB connection lost')
-                      return Promise.resolve({ data: opts.snapshotsByLeagueId[leagueId] ?? null })
+                      const err = opts.snapshotErrorByLeagueId?.[leagueId]
+                      if (err) return Promise.resolve({ data: null, error: err })
+                      return Promise.resolve({ data: opts.snapshotsByLeagueId[leagueId] ?? null, error: null })
                     }),
                   })),
                 })),
@@ -49,7 +54,7 @@ function mockAdmin(opts: {
         }
       }
       if (table === 'players_cache') {
-        return { select: vi.fn(() => ({ eq: vi.fn(() => ({ in: vi.fn(() => Promise.resolve({ data: opts.playersCacheRows ?? [] })) })) })) }
+        return { select: vi.fn(() => ({ eq: vi.fn(() => ({ in: vi.fn(() => Promise.resolve({ data: opts.playersCacheRows ?? [], error: opts.playersCacheError ?? null })) })) })) }
       }
       return {}
     }),
@@ -154,5 +159,78 @@ describe('computeUserCrossPlatformPortfolio — PROOF: platform/league failure i
     expect(result.exposure.resolved[0].canonicalPlayerId).toBe('c1')
     expect(result.health).toHaveLength(1)
     expect(result.health[0].connectedLeagueId).toBe('cl-healthy')
+  })
+})
+
+describe('computeUserCrossPlatformPortfolio — PROOF (P3-11 correction): Supabase query errors are never conflated with empty/unavailable data', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it('a roster_snapshots query error produces a "failed" coverage entry, never "unavailable"', async () => {
+    vi.doMock('@/lib/supabase', () => ({
+      createAdminClient: vi.fn(() =>
+        mockAdmin({
+          leagues: [{ id: 'cl-1', platform: 'sleeper', league_id: 'league-1', league_name: 'My League', team_id: 'team-1' }],
+          snapshotsByLeagueId: {},
+          snapshotErrorByLeagueId: { 'cl-1': { message: 'connection reset by peer' } },
+        })
+      ),
+    }))
+    vi.doMock('@/lib/platforms', () => ({
+      getIntelligenceAdapter: vi.fn(() => ({ platform: 'sleeper', capabilities: CAPS_ALL_READ, readOwnedRoster: vi.fn() })),
+    }))
+    vi.doMock('@/lib/rosterSnapshotSync', () => ({ computeSnapshotFreshness: vi.fn() }))
+
+    const { computeUserCrossPlatformPortfolio } = await import('./crossPlatformPortfolioSync')
+    const result = await computeUserCrossPlatformPortfolio('user-1')
+
+    expect(result.coverage).toHaveLength(1)
+    expect(result.coverage[0].status).toBe('failed')
+    expect(result.coverage[0].reason).toMatch(/connection reset by peer/)
+    expect(result.coverage[0].status).not.toBe('unavailable')
+  })
+
+  it('a players_cache ADP-lookup query error produces a "failed" coverage entry, never a silently-empty lookup', async () => {
+    vi.doMock('@/lib/supabase', () => ({
+      createAdminClient: vi.fn(() =>
+        mockAdmin({
+          leagues: [{ id: 'cl-1', platform: 'sleeper', league_id: 'league-1', league_name: 'My League', team_id: 'team-1' }],
+          snapshotsByLeagueId: { 'cl-1': { snapshot_json: baseSnapshot({ connectedLeagueId: 'cl-1' }), snapped_at: new Date().toISOString() } },
+          playersCacheError: { message: 'players_cache table unavailable' },
+        })
+      ),
+    }))
+    vi.doMock('@/lib/platforms', () => ({
+      getIntelligenceAdapter: vi.fn(() => ({ platform: 'sleeper', capabilities: CAPS_ALL_READ, readOwnedRoster: vi.fn(), readAvailablePlayers: undefined })),
+    }))
+    vi.doMock('@/lib/rosterSnapshotSync', () => ({
+      computeSnapshotFreshness: vi.fn(() => 'fresh'),
+    }))
+
+    const { computeUserCrossPlatformPortfolio } = await import('./crossPlatformPortfolioSync')
+    const result = await computeUserCrossPlatformPortfolio('user-1')
+
+    expect(result.coverage).toHaveLength(1)
+    expect(result.coverage[0].status).toBe('failed')
+    expect(result.coverage[0].reason).toMatch(/players_cache table unavailable/)
+    expect(result.health).toHaveLength(0)
+  })
+
+  it('a top-level connected_leagues query error throws rather than silently reporting zero leagues', async () => {
+    vi.doMock('@/lib/supabase', () => ({
+      createAdminClient: vi.fn(() =>
+        mockAdmin({
+          leagues: [],
+          leaguesError: { message: 'db unreachable' },
+          snapshotsByLeagueId: {},
+        })
+      ),
+    }))
+    vi.doMock('@/lib/platforms', () => ({ getIntelligenceAdapter: vi.fn() }))
+    vi.doMock('@/lib/rosterSnapshotSync', () => ({ computeSnapshotFreshness: vi.fn() }))
+
+    const { computeUserCrossPlatformPortfolio } = await import('./crossPlatformPortfolioSync')
+    await expect(computeUserCrossPlatformPortfolio('user-1')).rejects.toThrow(/db unreachable/)
   })
 })

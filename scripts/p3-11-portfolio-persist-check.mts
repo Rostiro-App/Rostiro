@@ -8,7 +8,17 @@ import { createAdminClient } from '../lib/supabase'
 import { currentWeekStart } from '../lib/portfolio'
 import { computeUserCrossPlatformPortfolio } from '../lib/crossPlatformPortfolioSync'
 
-const USER_ID = 'e91917fe-3e92-478c-bca7-2c22e5413d89'
+// P3-11 correction: a hardcoded production user UUID here was a real
+// finding from the independent audit — replaced with a required env var so
+// this script can never accidentally run against the wrong (or a
+// no-longer-consented) real user, and so no real user UUID lives in
+// version control.
+function requiredEnv(name: string): string {
+  const value = process.env[name]
+  if (!value) throw new Error(`${name} environment variable is required — refusing to run against a hardcoded/guessed user id.`)
+  return value
+}
+const USER_ID = requiredEnv('SMOKE_TEST_USER_ID')
 
 async function main() {
   const admin = createAdminClient()

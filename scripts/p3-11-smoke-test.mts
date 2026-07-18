@@ -21,10 +21,39 @@ import { buildPulseItemsForUser } from '../lib/pulse'
 import { resolvePlayerIdentityForRoute, computePlayerIntelligence } from '../lib/playerIntelligence'
 import type { Platform } from '../types'
 
-const USER_ID = 'e91917fe-3e92-478c-bca7-2c22e5413d89'
+// P3-11 correction: a hardcoded production user UUID here was a real
+// finding from the independent audit — replaced with a required env var so
+// this script can never accidentally run against the wrong (or a
+// no-longer-consented) real user, and so no real user UUID lives in
+// version control.
+function requiredEnv(name: string): string {
+  const value = process.env[name]
+  if (!value) throw new Error(`${name} environment variable is required — refusing to run against a hardcoded/guessed user id.`)
+  return value
+}
+const USER_ID = requiredEnv('SMOKE_TEST_USER_ID')
 
 function section(title: string) {
   console.log(`\n${'='.repeat(70)}\n${title}\n${'='.repeat(70)}`)
+}
+
+// P3-11 correction: this script's console output was found to print real
+// internal user/league UUIDs (connected_leagues.id, player_mappings.id,
+// the user id itself) directly. Redacts any UUID-shaped string wherever it
+// appears in a logged value, recursively, keeping just enough (first/last
+// 4 chars) to visually correlate two log lines about the same row without
+// ever printing the full identifier.
+const UUID_RE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi
+
+function redactUuids(value: unknown): unknown {
+  if (value === undefined) return value
+  const json = JSON.stringify(value)
+  const redacted = json.replace(UUID_RE, (m) => `${m.slice(0, 4)}…${m.slice(-4)}`)
+  return JSON.parse(redacted)
+}
+
+function logSafe(label: string, value: unknown) {
+  console.log(label, redactUuids(value))
 }
 
 async function main() {
@@ -35,7 +64,7 @@ async function main() {
     .from('connected_leagues')
     .select('id, platform, league_id, league_name, team_id')
     .eq('user_id', USER_ID)
-  console.log(leagues)
+  logSafe('  leagues:', leagues)
 
   section('2. Roster snapshot sync — Sleeper + ESPN (read-only against both providers)')
   for (const league of (leagues ?? []) as Array<{ id: string; platform: Platform; league_id: string; league_name: string; team_id: string | null }>) {
@@ -61,20 +90,20 @@ async function main() {
     .not('sleeper_id', 'is', null)
     .limit(1)
     .maybeSingle()
-  console.log('  Sample cross-platform mapping:', crossPlatformSample)
+  logSafe('  Sample cross-platform mapping:', crossPlatformSample)
 
   section('4. Cross-platform Portfolio (exposure + health + coverage)')
   const portfolio = await computeUserCrossPlatformPortfolio(USER_ID)
-  console.log('  coverage:', portfolio.coverage)
-  console.log('  health:', portfolio.health.map((h) => ({ league: h.leagueName, platform: h.platform, score: h.result.health.score, adpSource: h.result.adpSource, factorCoverage: h.result.factorCoverage })))
+  logSafe('  coverage:', portfolio.coverage)
+  logSafe('  health:', portfolio.health.map((h) => ({ league: h.leagueName, platform: h.platform, score: h.result.health.score, adpSource: h.result.adpSource, factorCoverage: h.result.factorCoverage })))
   console.log('  exposure resolved count:', portfolio.exposure.resolved.length, 'unresolved count:', portfolio.exposure.unresolved.length)
 
   section('5. Player Intelligence — compatibility Sleeper ID + canonical route')
   if (crossPlatformSample?.sleeper_id) {
     const identity = await resolvePlayerIdentityForRoute(admin, crossPlatformSample.sleeper_id)
-    console.log('  resolved identity from raw Sleeper ID:', identity)
+    logSafe('  resolved identity from raw Sleeper ID:', identity)
     const intel = await computePlayerIntelligence(admin, USER_ID, identity)
-    console.log('  per-league states:', intel.leagues)
+    logSafe('  per-league states:', intel.leagues)
   } else {
     console.log('  SKIPPED — no cross-platform sample mapping found')
   }
@@ -82,8 +111,8 @@ async function main() {
   section('6. Pulse — coverage + platform attribution')
   const pulse = await buildPulseItemsForUser(admin, USER_ID)
   console.log('  leagueCount:', pulse.leagueCount)
-  console.log('  coverage:', pulse.coverage)
-  console.log('  items (platform/type/fingerprint):', pulse.items.map((i) => ({ type: i.type, fingerprint: i.fingerprint, platform: i.affectedLeagues[0]?.platform })))
+  logSafe('  coverage:', pulse.coverage)
+  logSafe('  items (platform/type/fingerprint):', pulse.items.map((i) => ({ type: i.type, fingerprint: i.fingerprint, platform: i.affectedLeagues[0]?.platform })))
 
   section('7. ESPN draft status (honesty check — is this league genuinely undrafted?)')
   const espnLeague = (leagues ?? []).find((l) => l.platform === 'espn')
@@ -91,7 +120,7 @@ async function main() {
     const espnAdapter = getIntelligenceAdapter('espn')
     const context = { connectedLeagueId: espnLeague.id, userId: USER_ID, platform: 'espn' as const, externalLeagueId: espnLeague.league_id, externalTeamId: espnLeague.team_id! }
     const draft = await espnAdapter?.readDraftMetadata?.(context)
-    console.log('  ESPN draft status:', draft?.data, 'warnings:', draft?.warnings)
+    logSafe('  ESPN draft status:', { data: draft?.data, warnings: draft?.warnings })
   }
 
   console.log('\nSmoke test complete.')

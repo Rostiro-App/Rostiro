@@ -114,15 +114,61 @@ describe('resolvePlayerIdentityPure', () => {
     expect(result.confidence).toBe('unresolved')
   })
 
-  it('never promotes to verified_alias — no second verified crosswalk source exists yet', () => {
+  it('never promotes to verified_alias — no second verified crosswalk source exists yet (none of these candidates carry a heuristic mappingBasis)', () => {
     // Every case in this file resolves via 'exact', 'name_team', or
-    // 'unresolved' — 'verified_alias' should never appear until a real
-    // second source (e.g. a verified nflverse gsis_id crosswalk) is built.
+    // 'unresolved' — 'verified_alias' should never appear for a candidate
+    // whose mappingBasis is absent/'provider_id_reuse'. (P3-11 correction:
+    // 'verified_alias' CAN now appear when mappingBasis is
+    // 'name_team_unambiguous' — see the dedicated test below — but none of
+    // this file's shared `candidates` fixture rows carry that basis.)
     const allResults = [
       resolvePlayerIdentityPure(candidates, { platform: 'yahoo', sourcePlayerId: 'yahoo-1', name: 'A.J. Brown', nflTeam: 'PHI' }),
       resolvePlayerIdentityPure(candidates, { platform: 'espn', sourcePlayerId: 'x', name: 'AJ Brown', nflTeam: 'PHI' }),
       resolvePlayerIdentityPure(candidates, { platform: 'yahoo', sourcePlayerId: 'y', name: 'Nobody', nflTeam: 'KC' }),
     ]
     expect(allResults.every((r) => r.confidence !== 'verified_alias')).toBe(true)
+  })
+
+  it('PROOF (P3-11 correction): a heuristically-linked provider ID (mappingBasis: name_team_unambiguous) never reports "exact" — downgraded to verified_alias', () => {
+    const heuristicCandidates: PlayerMappingRow[] = [
+      { id: 'p-h1', name: 'Puka Nacua', nflTeam: 'LAR', position: 'WR', espnId: 'espn-h1', yahooId: null, sleeperId: 'sleeper-h1', mappingBasis: 'name_team_unambiguous' },
+    ]
+    const result = resolvePlayerIdentityPure(heuristicCandidates, {
+      platform: 'espn', sourcePlayerId: 'espn-h1', name: 'Puka Nacua', nflTeam: 'LAR',
+    })
+    expect(result.canonicalPlayerId).toBe('p-h1')
+    expect(result.confidence).toBe('verified_alias')
+    expect(result.confidence).not.toBe('exact')
+    expect(result.reason).toContain('heuristic')
+  })
+
+  it('PROOF (P3-11 correction): a provider-ID-reuse-linked row (mappingBasis: provider_id_reuse) still reports "exact"', () => {
+    const reuseCandidates: PlayerMappingRow[] = [
+      { id: 'p-h2', name: 'Puka Nacua', nflTeam: 'LAR', position: 'WR', espnId: 'espn-h2', yahooId: null, sleeperId: 'sleeper-h2', mappingBasis: 'provider_id_reuse' },
+    ]
+    const result = resolvePlayerIdentityPure(reuseCandidates, {
+      platform: 'sleeper', sourcePlayerId: 'sleeper-h2', name: 'Puka Nacua', nflTeam: 'LAR',
+    })
+    expect(result).toMatchObject({ canonicalPlayerId: 'p-h2', confidence: 'exact' })
+  })
+
+  it('PROOF (P3-11 correction): a single_platform row still reports "exact" for its one known platform ID (no cross-platform inference to guard against)', () => {
+    const singlePlatformCandidates: PlayerMappingRow[] = [
+      { id: 'p-h3', name: 'Puka Nacua', nflTeam: 'LAR', position: 'WR', espnId: null, yahooId: null, sleeperId: 'sleeper-h3', mappingBasis: 'single_platform' },
+    ]
+    const result = resolvePlayerIdentityPure(singlePlatformCandidates, {
+      platform: 'sleeper', sourcePlayerId: 'sleeper-h3', name: 'Puka Nacua', nflTeam: 'LAR',
+    })
+    expect(result).toMatchObject({ canonicalPlayerId: 'p-h3', confidence: 'exact' })
+  })
+
+  it('PROOF (P3-11 correction): a row with no mappingBasis recorded (pre-migration existing data) preserves today\'s "exact" behavior unchanged', () => {
+    const undatedCandidates: PlayerMappingRow[] = [
+      { id: 'p-h4', name: 'Puka Nacua', nflTeam: 'LAR', position: 'WR', espnId: 'espn-h4', yahooId: null, sleeperId: 'sleeper-h4' },
+    ]
+    const result = resolvePlayerIdentityPure(undatedCandidates, {
+      platform: 'espn', sourcePlayerId: 'espn-h4', name: 'Puka Nacua', nflTeam: 'LAR',
+    })
+    expect(result).toMatchObject({ canonicalPlayerId: 'p-h4', confidence: 'exact' })
   })
 })
