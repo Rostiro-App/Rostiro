@@ -5,7 +5,112 @@ completion report is not the only source of truth for what was actually
 verified — it separates *claim* from *evidence type*, and gives you a
 self-contained way to re-check everything independently.
 
-## 1. Commit + working tree
+**UPDATE 2026-07-18 (P3-11 correction pass):** your independent audit of
+the version below found real defects — see Section 0. Everything in
+Sections 1-5 below is the ORIGINAL package as first written and is kept
+for the record; it describes commit `854a1b3630d21b3e62464a3e254e7b839f7ccafb`,
+which is now superseded. Section 0 is the current state.
+
+## 0. P3-11 correction pass (2026-07-18) — what changed and how it was checked
+
+- **New commit:** `ad69692e5bf23adfe3a7b0a64a7e3a5bd5ef1453` (supersedes
+  `854a1b3630d2...`). Working tree clean with respect to every tracked
+  file. The same two untracked, unrelated items from before are still
+  present and still unrelated (`.agents/`, `skills-lock.json`).
+- **New archive:**
+  `/private/tmp/claude-502/-Users-Lawrence-Documents-Rostiro/8747c564-1e80-4908-a471-8ad6d523d585/scratchpad/export/rostiro_ad69692e5bf2.zip`
+  — built via `git archive` from the commit above (not the working
+  directory). 642 files, ~1.4MB compressed. Verified: no `node_modules/`,
+  no `.next/`, no real `.env`, no match for "secret"/"node_modules"/
+  "\.next" anywhere in the file listing.
+- **Fixes in this commit**, each with its own regression test added in
+  the same commit (**automated test / mocked I/O**, not re-verified live
+  against production in this pass — see the per-item evidence tier):
+  1. Removed the `rostered_elsewhere` inference (`lib/playerIntelligence.ts`)
+     — absence from a bounded top-N provider pool no longer implies
+     another team owns the player; falls through to `unknown`.
+     **Evidence: automated test** (`lib/playerIntelligence.test.ts`).
+  2. Threaded the real authenticated `userId` into every ESPN adapter
+     context in `lib/playerIntelligence.ts` and `lib/crossPlatformPulse.ts`
+     (was hardcoded `''`). **Evidence: automated test** asserting the
+     literal value reaches the adapter context.
+  3. Added Supabase `error` checks to `connected_leagues`/`roster_snapshots`/
+     `players_cache` queries in `lib/playerIntelligence.ts`,
+     `lib/crossPlatformPulse.ts`, and `lib/crossPlatformPortfolioSync.ts`
+     — a real DB failure now produces a `failed` coverage entry or a
+     thrown error, never a silent `unavailable`/empty result. **Evidence:
+     automated test** (mocked Supabase error responses) — **not** a real
+     induced production DB failure.
+  4. While adding test coverage for #3, found and fixed a real bug in
+     `lib/crossPlatformPortfolioSync.ts`: a per-league failure during the
+     ADP/health computation step produced BOTH a success coverage entry
+     (pushed earlier) AND a `failed` entry for the same league. Fixed by
+     moving the success-coverage push to after every step succeeds.
+     **Evidence: automated test** that failed before the fix and passes
+     after.
+  5. `syncPulseItems` (`lib/pulse.ts`) now checks every insert/update/
+     delete error and returns `false` (never `true`) after any failed
+     mutation; existing open rows now have `affected_leagues_json` and
+     `platform` refreshed on update (previously frozen from first
+     insert). **Evidence: automated test**, 4 new cases (failed insert,
+     failed update, failed delete, fresh→stale metadata refresh).
+  6. Stale ESPN snapshots now produce a coverage entry with **zero**
+     `roster_grade`/`waiver_alert` items (`lib/crossPlatformPulse.ts`) —
+     previously only `unavailable`/`unsupported` were excluded, not
+     `stale`. **Evidence: automated test.**
+  7. Proposed (NOT applied) `supabase/migration_player_mapping_provenance.sql`
+     adding `mapping_basis`/`teamless_activity_unverified` columns to
+     `player_mappings`. Updated the seed write path
+     (`scripts/seedPlayerMappings.mts`) to persist both. Wired
+     `lib/playerIdentity.ts`'s exact-match resolution to downgrade a
+     heuristically-linked provider ID (`mapping_basis: 'name_team_unambiguous'`)
+     from `exact` to `verified_alias`, so a stored provider ID can never
+     silently read as fully verified just because it's now on file. This
+     is dormant in production until the migration is separately approved,
+     applied, and `fetchActivePlayerMappings` is updated to select the
+     new column. **Evidence: automated test** for the pure resolver logic;
+     **not yet wired to a live query**.
+  8. Separated write capability from navigation destination in
+     `app/(dashboard)/pulse/page.tsx` — a real external deep link (e.g.
+     ESPN's waiver page) now always shows "Review on ESPN →" when
+     clickable; "Advice only" only appears when there is no `actionUrl`
+     at all. **Evidence: `tsc --noEmit` only — no automated test exists
+     for this page, and it was not manually verified in a browser this
+     pass.**
+  9. Replaced the hardcoded production user UUID in both
+     `scripts/p3-11-smoke-test.mts` and
+     `scripts/p3-11-portfolio-persist-check.mts` with a required
+     `SMOKE_TEST_USER_ID` environment variable (throws if unset), and
+     redacted UUID-shaped strings in the smoke-test script's console
+     output. **Evidence: code review + `tsc --noEmit`** — not re-run
+     against production in this pass.
+  10. Corrected stale comments claiming the P3-10 migrations were
+      unapplied (`app/api/cron/pulse/route.ts`) and reconciled
+      `supabase/schema.sql`'s `player_mappings` definition with the two
+      migrations actually applied to production (nullable `nfl_team`,
+      3 partial unique indexes) — a fresh environment built from
+      `schema.sql` alone now matches production. Also corrected
+      `app/(dashboard)/leagues/page.tsx`'s "Sleeper-only" copy, which was
+      wrong since P3-6B/P3-8 made health/Pulse cross-platform.
+  11. Consolidated `supabase/verify_packet_03_production.sql` into one
+      Section 0 PASS/FAIL result table. **Evidence: real database
+      verification** — re-ran read-only against production
+      (`zdvjgtyzfmbxhzhjuwbm`) during this pass; all 9 checks returned
+      PASS against real data (nfl_team nullable=YES, all 3 partial unique
+      indexes present, both schema-versioning columns present, 0
+      duplicate provider IDs, 0 duplicate name+team+season rows, 0
+      placeholder team strings, the Josh Johnson case resolves to exactly
+      1 row, the 1 real ESPN league has a real `team_id`, 0 leftover test
+      rows).
+- **Explicitly NOT done in this pass** (would require production changes
+  needing separate approval, or a real browser session not available
+  here): applying the provenance migration; re-running the full P3-11
+  smoke test live against production with the new env-var requirement;
+  a real browser check of the Pulse action-label fix; a real induced DB
+  failure (vs. a mocked one) to confirm the error-handling paths against
+  live infrastructure.
+
+## 1. Commit + working tree (ORIGINAL — superseded, kept for the record)
 
 - **Commit:** `854a1b3630d21b3e62464a3e254e7b839f7ccafb`
 - **Working tree:** clean with respect to every tracked file — 0 modified,
@@ -15,7 +120,7 @@ self-contained way to re-check everything independently.
   entirely; they are untracked by git and do not appear in the archive
   below (`git archive` only ever includes tracked content).
 
-## 2. Repository export
+## 2. Repository export (ORIGINAL — superseded, kept for the record)
 
 A fresh ZIP built directly from the commit above via `git archive`
 (never from the working directory, so nothing untracked/uncommitted can
@@ -31,20 +136,21 @@ match for "secret" anywhere in the file listing. This is the local
 scratchpad path in my execution environment, not a location on your
 machine — copy or move it wherever you need it.
 
-## 3. Read-only production verification SQL
+## 3. Read-only production verification SQL (updated — see Section 0)
 
-`supabase/verify_packet_03_production.sql` — 12 sections, every statement
-a `SELECT` against `information_schema`/`pg_catalog`/application tables.
-No `INSERT`/`UPDATE`/`DELETE`/`ALTER`/`CREATE`/`DROP`/`TRUNCATE` anywhere
-in the file (grepped and confirmed — the only keyword matches are in
-comment text describing this guarantee). Safe to run in the Supabase SQL
-editor at any time, by anyone with read access, with zero side effects.
+`supabase/verify_packet_03_production.sql` now leads with a single
+Section 0 consolidated PASS/FAIL table (added in the correction pass),
+followed by the original 12 detail sections below it, every statement a
+`SELECT` against `information_schema`/`pg_catalog`/application tables. No
+`INSERT`/`UPDATE`/`DELETE`/`ALTER`/`CREATE`/`DROP`/`TRUNCATE` anywhere in
+the file. Safe to run in the Supabase SQL editor at any time, by anyone
+with read access, with zero side effects.
 
-Re-ran several sections directly against production while preparing this
-package (not just written-and-assumed): `nfl_team` nullability check,
-leftover-test-row check, and the `connected_leagues` platform summary all
-returned the expected values (see P3-11's own report for the fuller set
-already captured there).
+Re-ran Section 0 directly against production during the correction pass
+(not just written-and-assumed) — all 9 checks returned PASS. The original
+package's own partial re-run (`nfl_team` nullability, leftover-test-row
+check, `connected_leagues` platform summary) is preserved below for the
+record.
 
 ## 4. P3-11 evidence classification — what was actually proven, by what
 
