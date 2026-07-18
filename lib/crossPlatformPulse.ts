@@ -23,7 +23,18 @@ import { createAdminClient } from '@/lib/supabase'
 import { getIntelligenceAdapter, type ConnectedLeagueContext, type SnapshotFreshness, type NormalizedRosterSnapshot } from '@/lib/platforms'
 import { computeSnapshotFreshness } from '@/lib/rosterSnapshotSync'
 import { computeCrossPlatformLeagueHealth, type PlayerAdpRow, type AdpSource } from '@/lib/crossPlatformPortfolio'
+import { espnWaiverUrl } from '@/lib/espn'
 import type { AffectedLeague, Platform } from '@/types'
+
+// P3-8B: a real, honest deep link — "Advice only" would be a lie for a
+// platform whose waiver page genuinely exists and is one click away, even
+// though Rostiro itself has no write capability there. Only ESPN has a
+// real link today; other platforms fall back to null (no misleading
+// button), matching lib/platforms/*.ts's own honest-capabilities discipline.
+function waiverActionUrl(platform: Platform, leagueId: string): string | null {
+  if (platform === 'espn') return espnWaiverUrl(leagueId)
+  return null
+}
 
 type AdminClient = ReturnType<typeof createAdminClient>
 
@@ -36,6 +47,19 @@ export interface CrossPlatformPulseItem {
   affectedLeagues: AffectedLeague[]
   deadline: string | null
   actionUrl: string | null
+}
+
+// P3-8B: so the UI can show "1 ESPN league is stale" or "unavailable —
+// hasn't synced yet" instead of a stale/unavailable league silently
+// looking identical to "nothing needs attention" (zero items either way).
+export type PulseLeagueCoverageStatus = 'included_fresh' | 'included_stale' | 'unavailable' | 'unsupported' | 'approval_pending' | 'failed'
+
+export interface PulseLeagueCoverageEntry {
+  connectedLeagueId: string
+  leagueName: string
+  platform: Platform
+  status: PulseLeagueCoverageStatus
+  reason: string | null
 }
 
 interface ConnectedLeagueRow {
@@ -122,20 +146,35 @@ function actionCapabilityFor(caps: { lineupWrite: boolean; waiverWrite: boolean 
   return 'none'
 }
 
+export interface LeagueItemsResult {
+  items: CrossPlatformPulseItem[]
+  coverage: PulseLeagueCoverageEntry
+}
+
+function coverageEntry(league: ConnectedLeagueRow, status: PulseLeagueCoverageStatus, reason: string | null): PulseLeagueCoverageEntry {
+  return { connectedLeagueId: league.id, leagueName: league.league_name, platform: league.platform, status, reason }
+}
+
 /**
- * One league's cross-platform Pulse items. Never throws past its own
- * boundary in practice (the caller wraps it too, but every internal step
- * here already degrades to "no items for this league" rather than an
- * exception) — a stale or unavailable league contributes nothing, it
- * never blanks another league's real items.
+ * One league's cross-platform Pulse items PLUS its coverage entry. Never
+ * throws past its own boundary in practice (the caller wraps it too, but
+ * every internal step here already degrades to "no items for this
+ * league" rather than an exception) — a stale or unavailable league
+ * contributes zero items but STILL gets a real coverage entry, so the UI
+ * can distinguish "nothing needs attention" from "this league hasn't
+ * synced yet."
  */
 export async function buildCrossPlatformPulseItemsForLeague(
   admin: AdminClient,
   league: ConnectedLeagueRow
-): Promise<CrossPlatformPulseItem[]> {
-  if (!league.team_id) return []
+): Promise<LeagueItemsResult> {
+  if (!league.team_id) return { items: [], coverage: coverageEntry(league, 'unavailable', 'No team assigned yet') }
   const adapter = getIntelligenceAdapter(league.platform)
-  if (!adapter) return [] // no adapter (Yahoo) — never fabricate intelligence for it
+  if (!adapter) {
+    // No adapter (Yahoo) — never fabricate intelligence for it.
+    const status: PulseLeagueCoverageStatus = league.platform === 'yahoo' ? 'approval_pending' : 'unsupported'
+    return { items: [], coverage: coverageEntry(league, status, `No intelligence adapter for platform '${league.platform}'`) }
+  }
 
   const latest = await fetchLatestSnapshot(admin, league.id, league.team_id)
   const freshness = computeSnapshotFreshness({
@@ -144,7 +183,9 @@ export async function buildCrossPlatformPulseItemsForLeague(
     capabilitiesSupportRosterRead: adapter.capabilities.rosterRead,
     approvalPending: false,
   })
-  if (!latest || (freshness !== 'fresh' && freshness !== 'stale')) return []
+  if (!latest || (freshness !== 'fresh' && freshness !== 'stale')) {
+    return { items: [], coverage: coverageEntry(league, 'unavailable', 'No successful roster snapshot has been captured yet') }
+  }
 
   const actionCapability = actionCapabilityFor(adapter.capabilities)
   const items: CrossPlatformPulseItem[] = []
@@ -213,7 +254,7 @@ export async function buildCrossPlatformPulseItemsForLeague(
           reasoning: `${best.candidate.displayName} is unrostered in ${league.league_name} (ADP ${Math.round(best.adp)}), confirmed via ${league.platform}'s real waiver/free-agent data — not inferred from your own roster.`,
           affectedLeagues: [leagueDetail],
           deadline: null,
-          actionUrl: null,
+          actionUrl: waiverActionUrl(league.platform, league.league_id),
         })
       }
     }
@@ -221,10 +262,16 @@ export async function buildCrossPlatformPulseItemsForLeague(
   // A non-'ok' status (failed/unsupported/unverified/a thrown error) means
   // no waiver_alert for this league — never guessed from absence.
 
-  return items
+  return { items, coverage: coverageEntry(league, freshness === 'fresh' ? 'included_fresh' : 'included_stale', null) }
 }
 
-export async function buildCrossPlatformPulseItemsForUser(userId: string): Promise<{ items: CrossPlatformPulseItem[]; leagueCount: number }> {
+export interface CrossPlatformPulseUserResult {
+  items: CrossPlatformPulseItem[]
+  leagueCount: number
+  coverage: PulseLeagueCoverageEntry[]
+}
+
+export async function buildCrossPlatformPulseItemsForUser(userId: string): Promise<CrossPlatformPulseUserResult> {
   const admin = createAdminClient()
   const { data: leagues } = await admin
     .from('connected_leagues')
@@ -234,9 +281,14 @@ export async function buildCrossPlatformPulseItemsForUser(userId: string): Promi
   const rows = (leagues ?? []) as ConnectedLeagueRow[]
 
   const results = await Promise.allSettled(rows.map((league) => buildCrossPlatformPulseItemsForLeague(admin, league)))
-  const items = results.flatMap((r) => (r.status === 'fulfilled' ? r.value : []))
+  const items = results.flatMap((r) => (r.status === 'fulfilled' ? r.value.items : []))
+  const coverage = results.map((r, i) =>
+    r.status === 'fulfilled'
+      ? r.value.coverage
+      : coverageEntry(rows[i], 'failed', r.reason instanceof Error ? r.reason.message : 'Unknown error computing this league')
+  )
 
-  return { items, leagueCount: rows.length }
+  return { items, leagueCount: rows.length, coverage }
 }
 
 export type { AdpSource }

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { rowToPulseItem, type PulseItemRow } from './pulse'
+import { rowToPulseItem, syncPulseItems, type PulseItemRow } from './pulse'
+import type { CrossPlatformPulseItem } from './crossPlatformPulse'
 
 const baseRow: PulseItemRow = {
   id: '1', user_id: 'u', type: 'touchdown_swing', priority: 'info',
@@ -71,6 +72,7 @@ describe('buildPulseItemsForUser — P3-8: cross-platform merge (real function, 
             },
           ],
           leagueCount: 1,
+          coverage: [{ connectedLeagueId: 'cl-espn', leagueName: 'ESPN League', platform: 'espn', status: 'included_fresh', reason: null }],
         })
       ),
     }))
@@ -111,5 +113,124 @@ describe('buildPulseItemsForUser — P3-8: cross-platform merge (real function, 
     // A real Sleeper item (roster_grade, since the draft just completed
     // and myPlayers is non-empty) survives despite ESPN's total failure.
     expect(result.items.some((i) => i.type === 'roster_grade' && i.affectedLeagues[0]?.leagueId === 'cl-sleeper')).toBe(true)
+  })
+})
+
+describe('P3-8B — PROOF: an ESPN item survives cron generation, persistence, cached retrieval, and serialization', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it('generates a real ESPN roster_grade item, persists it via the REAL syncPulseItems with platform: espn, then reads it back via the REAL rowToPulseItem retaining all per-league metadata', async () => {
+    // An earlier test in this file mocks @/lib/crossPlatformPulse's
+    // exports at the module boundary — explicitly unmock it here so THIS
+    // test exercises the REAL buildCrossPlatformPulseItemsForLeague, not
+    // a leftover mock missing that export.
+    vi.doUnmock('@/lib/crossPlatformPulse')
+
+    // Step 1: GENERATION — the real buildCrossPlatformPulseItemsForLeague,
+    // I/O mocked, same function the cron calls (via
+    // buildCrossPlatformPulseItemsForUser -> buildPulseItemsForUser).
+    vi.doMock('@/lib/platforms', () => ({
+      getIntelligenceAdapter: vi.fn(() => ({ platform: 'espn', capabilities: { leagueRead: true, rosterRead: true, matchupRead: true, draftRead: true, freeAgentRead: true, lineupWrite: false, waiverWrite: false, tradeWrite: false } })),
+    }))
+    vi.doMock('@/lib/rosterSnapshotSync', () => ({ computeSnapshotFreshness: vi.fn(() => 'fresh') }))
+
+    const { buildCrossPlatformPulseItemsForLeague } = await import('./crossPlatformPulse')
+    const league = { id: 'cl-espn', platform: 'espn' as const, league_id: 'espn-league-1', league_name: 'ESPN League', team_id: 'team-1' }
+    const snapshotAdmin = {
+      from: vi.fn((table: string) => {
+        if (table === 'roster_snapshots') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  order: vi.fn(() => ({
+                    limit: vi.fn(() => ({
+                      maybeSingle: vi.fn(() =>
+                        Promise.resolve({
+                          data: {
+                            snapshot_json: {
+                              schemaVersion: 1, connectedLeagueId: 'cl-espn', platform: 'espn', externalLeagueId: 'espn-league-1', externalTeamId: 'team-1',
+                              capturedAt: new Date().toISOString(), providerUpdatedAt: null, warnings: [],
+                              players: [{ canonicalPlayerId: 'canon-real-1', sourcePlatform: 'espn', sourcePlayerId: 'e1', displayName: 'Josh Allen', nflTeam: 'BUF', position: 'QB', lineupStatus: 'starting', slot: null, identityConfidence: 'exact', identityReason: 'x' }],
+                            },
+                            snapped_at: new Date().toISOString(),
+                          },
+                        })
+                      ),
+                    })),
+                  })),
+                })),
+              })),
+            })),
+          }
+        }
+        if (table === 'players_cache') {
+          return { select: vi.fn(() => ({ eq: vi.fn(() => ({ in: vi.fn(() => Promise.resolve({ data: [{ player_id: 'e1', adp_consensus: 8, adp_espn: 8, injury_status: null }] })) })) })) }
+        }
+        return {}
+      }),
+    }
+
+    const { items: generatedItems } = await buildCrossPlatformPulseItemsForLeague(snapshotAdmin as never, league)
+    const grade = generatedItems.find((i): i is CrossPlatformPulseItem => i.type === 'roster_grade')
+    expect(grade).toBeDefined()
+    expect(grade!.affectedLeagues[0]).toMatchObject({ platform: 'espn', freshness: 'fresh', actionCapability: 'none' })
+
+    // Step 2: PERSISTENCE — the REAL syncPulseItems, proving the insert
+    // call stores platform: 'espn' (not the pre-P3-8 hardcoded 'sleeper'
+    // bug) and the full affectedLeagues metadata in affected_leagues_json.
+    let insertedRow: Record<string, unknown> | null = null
+    const persistAdmin = {
+      from: vi.fn((table: string) => {
+        if (table === 'pulse_items') {
+          return {
+            select: vi.fn(() => ({ eq: vi.fn(() => ({ not: vi.fn(() => Promise.resolve({ data: [], error: null })) })) })),
+            insert: vi.fn((rows: Array<Record<string, unknown>>) => {
+              insertedRow = rows[0]
+              return Promise.resolve({ error: null })
+            }),
+            update: vi.fn(() => ({ in: vi.fn(() => Promise.resolve({ error: null })) })),
+          }
+        }
+        return {}
+      }),
+    }
+    const persisted = await syncPulseItems(persistAdmin as never, 'user-1', [grade!])
+    expect(persisted).toBe(true)
+    expect(insertedRow).not.toBeNull()
+    expect(insertedRow!.platform).toBe('espn') // never mislabeled 'sleeper'
+
+    // Step 3: CACHED RETRIEVAL + SERIALIZATION — the REAL rowToPulseItem,
+    // fed the exact row shape a real DB read would return (built from
+    // what was actually inserted above, simulating the round trip).
+    const retrievedRow: PulseItemRow = {
+      id: 'row-1',
+      user_id: 'user-1',
+      type: insertedRow!.type as PulseItemRow['type'],
+      priority: insertedRow!.priority as PulseItemRow['priority'],
+      headline: insertedRow!.headline as string,
+      reasoning: insertedRow!.reasoning as string,
+      affected_leagues_json: insertedRow!.affected_leagues_json as PulseItemRow['affected_leagues_json'],
+      deadline: insertedRow!.deadline as string | null,
+      action_url: insertedRow!.action_url as string | null,
+      platform: insertedRow!.platform as PulseItemRow['platform'],
+      status: 'open',
+      created_at: new Date().toISOString(),
+    }
+    const cachedItem = rowToPulseItem(retrievedRow)
+
+    // Full round trip verified: platform, league, freshness,
+    // actionCapability, status, and canonical identity metadata all
+    // survive generation -> persistence -> cached retrieval intact.
+    expect(cachedItem.platform).toBe('espn')
+    expect(cachedItem.affectedLeagues[0]).toMatchObject({
+      leagueId: 'cl-espn',
+      leagueName: 'ESPN League',
+      platform: 'espn',
+      freshness: 'fresh',
+      actionCapability: 'none',
+    })
   })
 })

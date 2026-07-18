@@ -18,7 +18,8 @@ import { detectOpportunitySurges, type SurgeEvent } from '@/lib/opportunitySurge
 import { generatePlayerNewsContext, generateOpportunitySurgeContext } from '@/lib/claude'
 import { pushToUser } from '@/lib/engagementTriggers'
 import { isFreePlan } from '@/lib/usageLimits'
-import { buildCrossPlatformPulseItemsForUser } from '@/lib/crossPlatformPulse'
+import { buildCrossPlatformPulseItemsForUser, type PulseLeagueCoverageEntry } from '@/lib/crossPlatformPulse'
+export type { PulseLeagueCoverageEntry }
 import { resolveEffectiveInjury } from './scratchAlerts'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AffectedLeague, InterruptMetricRow, PulseItem, PulseItemStatus, PulseItemType, PulsePriority } from '@/types'
@@ -102,7 +103,7 @@ export interface PulseItemRow {
 export async function buildPulseItemsForUser(
   supabase: SupabaseClient,
   userId: string
-): Promise<{ items: BuiltPulseItem[]; leagueCount: number }> {
+): Promise<{ items: BuiltPulseItem[]; leagueCount: number; coverage: PulseLeagueCoverageEntry[] }> {
   const { data: leagues, error } = await supabase
     .from('connected_leagues')
     .select('id, league_id, league_name, team_id')
@@ -117,10 +118,10 @@ export async function buildPulseItemsForUser(
   // regardless of whether this user has any Sleeper leagues at all, so an
   // ESPN-only user still gets real Pulse intelligence instead of the
   // early-return empty feed this function used to produce for them.
-  const crossPlatform = await buildCrossPlatformPulseItemsForUser(userId).catch(() => ({ items: [], leagueCount: 0 }))
+  const crossPlatform = await buildCrossPlatformPulseItemsForUser(userId).catch(() => ({ items: [], leagueCount: 0, coverage: [] }))
 
   if (rows.length === 0) {
-    return { items: crossPlatform.items, leagueCount: crossPlatform.leagueCount }
+    return { items: crossPlatform.items, leagueCount: crossPlatform.leagueCount, coverage: crossPlatform.coverage }
   }
 
   // PRD Section 9: "full Waiver Day detail" is Pro's state depth — the
@@ -203,10 +204,24 @@ export async function buildPulseItemsForUser(
   // internal per-league failure isolation (lib/crossPlatformPulse.ts).
   const items = [...results.flatMap((r) => (r.status === 'fulfilled' ? r.value : [])), ...crossPlatform.items]
 
+  // P3-8B: a simple coverage entry per Sleeper league (this legacy path
+  // doesn't track freshness/snapshot state the way the cross-platform
+  // path does — 'included_fresh' here just means "the fetch succeeded,"
+  // not a real freshness computation) so the UI's coverage summary can
+  // report on every connected league, not only the cross-platform ones.
+  const sleeperCoverage: PulseLeagueCoverageEntry[] = results.map((r, i) => ({
+    connectedLeagueId: rows[i].id,
+    leagueName: rows[i].league_name,
+    platform: 'sleeper',
+    status: r.status === 'fulfilled' ? 'included_fresh' : 'failed',
+    reason: r.status === 'rejected' ? (r.reason instanceof Error ? r.reason.message : 'Unknown error') : null,
+  }))
+  const coverage = [...sleeperCoverage, ...crossPlatform.coverage]
+
   const PRIORITY_RANK: Record<PulsePriority, number> = { critical: 0, important: 1, info: 2 }
   items.sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority])
 
-  return { items, leagueCount: rows.length + crossPlatform.leagueCount }
+  return { items, leagueCount: rows.length + crossPlatform.leagueCount, coverage }
 }
 
 async function buildLeagueItems(

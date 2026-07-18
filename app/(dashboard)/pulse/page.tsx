@@ -66,6 +66,18 @@ const TYPE_CONFIG: Record<PulseItemType, { color: string; label: string }> = {
 
 type PulseAction = 'done' | 'dismiss' | 'snooze'
 
+// P3-8B: mirrors lib/crossPlatformPulse.ts's PulseLeagueCoverageEntry — a
+// stale/unavailable/unsupported/approval_pending league must be visible
+// here even though it correctly produced zero items, so it never looks
+// identical to "nothing needs attention."
+interface PulseCoverageEntry {
+  connectedLeagueId: string
+  leagueName: string
+  platform: string
+  status: 'included_fresh' | 'included_stale' | 'unavailable' | 'unsupported' | 'approval_pending' | 'failed'
+  reason: string | null
+}
+
 interface PulseResponse {
   items: PulseItem[]
   leagueCount: number
@@ -73,6 +85,7 @@ interface PulseResponse {
   estMinutes: number
   firstName: string | null
   persistent: boolean
+  coverage: PulseCoverageEntry[]
 }
 
 // T-108
@@ -132,6 +145,7 @@ export default function PulsePage() {
   // state can tell "truly no leagues" apart from "has leagues, none of
   // them Sleeper," which otherwise look identical and aren't.
   const [totalLeagueCount, setTotalLeagueCount] = useState(0)
+  const [coverage, setCoverage] = useState<PulseCoverageEntry[]>([])
   const [filmRoomResults, setFilmRoomResults] = useState<FilmRoomLeagueResult[]>([])
   const [liveMatchups, setLiveMatchups] = useState<LiveMatchupSummary[]>([])
   const [playoffTier, setPlayoffTier] = useState<PlayoffTier>('none')
@@ -201,7 +215,11 @@ export default function PulsePage() {
   useEffect(() => {
     let cancelled = false
 
-    fetch('/api/pulse/sleeper')
+    // P3-8B: /api/pulse is the platform-neutral route — /api/pulse/sleeper
+    // still exists as a temporary compatibility alias for any caller not
+    // yet migrated, but this page (the real UI consumer) now calls the
+    // neutral name directly.
+    fetch('/api/pulse')
       .then((res) => {
         if (!res.ok) throw new Error('Failed to load Pulse')
         return res.json()
@@ -214,6 +232,7 @@ export default function PulsePage() {
         setEstMinutes(data.estMinutes)
         setFirstName(data.firstName)
         setPersistent(data.persistent)
+        setCoverage(data.coverage ?? [])
       })
       .catch((err: Error) => {
         if (!cancelled) setError(err.message)
@@ -447,6 +466,8 @@ export default function PulsePage() {
                   </>
                 )}
         </p>
+
+        <CoverageSummary coverage={coverage} />
 
         {persistent && totalToday > 0 && (
           <div className="mono-data mt-3.5 flex items-center gap-3 text-[10px] tracking-[0.1em]" style={{ color: 'var(--t3)' }}>
@@ -732,6 +753,16 @@ function PulseCard({
             {leagueLabel(item).toUpperCase()}
             {item.platform ? ` · ${item.platform.toUpperCase()}` : ''}
           </p>
+          {itemFreshnessNote(item) && (
+            <p className="mono-data text-[9.5px] mt-0.5" style={{ color: 'var(--warn)' }}>
+              {itemFreshnessNote(item)}
+            </p>
+          )}
+          {unresolvedNote(item) && (
+            <p className="mono-data text-[9.5px] mt-0.5" style={{ color: 'var(--t3)' }}>
+              {unresolvedNote(item)}
+            </p>
+          )}
         </div>
         <span
           className="mono-data text-[8.5px] tracking-[0.16em] px-1.5 py-0.5 rounded flex-shrink-0"
@@ -749,7 +780,7 @@ function PulseCard({
 
       <div className="flex items-center justify-between gap-2 mt-2.5 flex-wrap">
         <div className="flex items-center gap-1.5">
-          {item.actionUrl && (
+          {item.actionUrl ? (
             <a
               href={item.actionUrl}
               target="_blank"
@@ -758,9 +789,21 @@ function PulseCard({
               className="mono-data text-[10.5px] px-2.5 py-1 rounded-[7px] transition-all hover:shadow-[0_0_12px_rgba(75,163,245,.25)]"
               style={{ color: 'var(--signal)', border: '1px solid rgba(75,163,245,.35)' }}
             >
-              Open ↗
+              {// An external deep link (e.g. ESPN's real waiver page) gets
+              // the platform-specific label; an internal Rostiro route
+              // (e.g. /leagues for roster_grade) keeps its plain "Open ↗".
+              item.actionUrl.startsWith('http')
+                ? actionCapabilityLabel(item.affectedLeagues[0]?.actionCapability, item.affectedLeagues[0]?.platform ?? item.platform)
+                : 'Open ↗'}
             </a>
-          )}
+          ) : item.affectedLeagues[0]?.actionCapability !== undefined ? (
+            // P3-8B: honest — no adapter has real write capability today,
+            // so this is plain text, never a button that implies an action
+            // Rostiro can't actually take.
+            <span className="mono-data text-[10.5px]" style={{ color: 'var(--t3)' }}>
+              {actionCapabilityLabel(item.affectedLeagues[0]?.actionCapability, item.affectedLeagues[0]?.platform ?? item.platform)}
+            </span>
+          ) : null}
           {mode === 'savant' && (
             <span className="mono-data text-[10px] ml-1" style={{ color: 'var(--t3)' }}>
               {item.deadline
@@ -778,6 +821,86 @@ function PulseCard({
 function leagueLabel(item: PulseItem): string {
   if (item.affectedLeagues.length === 1) return item.affectedLeagues[0].leagueName
   return `${item.affectedLeagues.length} leagues`
+}
+
+// P3-8B: stale/unavailable warning shown directly on the card for the
+// leagues actually affected by THIS item — separate from the page-level
+// CoverageSummary, which covers every connected league regardless of
+// whether it produced any items.
+function itemFreshnessNote(item: PulseItem): string | null {
+  const notes = item.affectedLeagues
+    .map((l) => freshnessLabel(l.freshness))
+    .filter((n): n is string => n !== null)
+  if (notes.length === 0) return null
+  return [...new Set(notes)].join(' · ')
+}
+
+// P3-8B: a source-specific note for a player this item is about who isn't
+// yet linked across platforms — never the raw canonical/provider ID, just
+// an honest "not yet cross-linked" signal so an unresolved identity stays
+// visible rather than silently merged or hidden.
+function unresolvedNote(item: PulseItem): string | null {
+  const hasUnresolvedPlayer = item.affectedLeagues.some((l) => l.providerPlayerId && !l.canonicalPlayerId)
+  return hasUnresolvedPlayer ? 'Not yet cross-linked across your other leagues' : null
+}
+
+// P3-8B: honest, human copy for a per-league freshness/action state — never
+// a raw enum value, never a canonical player ID, never an action button
+// that implies a capability that doesn't exist. lib/platforms/*.ts's
+// adapters have zero write capability today (no write API exists for any
+// platform), so every real action label collapses to "Advice only" — this
+// function exists so that stays true even if a platform gains a real write
+// path later, without a UI change.
+function freshnessLabel(freshness?: string | null): string | null {
+  switch (freshness) {
+    case 'fresh': return null // the common case — no extra label needed
+    case 'stale': return 'Stale — may not reflect recent moves'
+    case 'unavailable': return 'Not synced yet'
+    case 'unsupported': return 'Not supported for this platform'
+    case 'approval_pending': return 'Pending platform approval'
+    default: return null
+  }
+}
+
+function actionCapabilityLabel(actionCapability?: string | null, platform?: string | null): string {
+  if (actionCapability === 'lineup') return `Set lineup on ${platformLabel(platform)} →`
+  if (actionCapability === 'waiver') return `Review on ${platformLabel(platform)} →`
+  return 'Advice only'
+}
+
+function platformLabel(platform?: string | null): string {
+  if (!platform) return 'your platform'
+  if (platform === 'espn') return 'ESPN'
+  if (platform === 'sleeper') return 'Sleeper'
+  if (platform === 'yahoo') return 'Yahoo'
+  return platform
+}
+
+const COVERAGE_STATUS_LABEL: Record<PulseCoverageEntry['status'], string> = {
+  included_fresh: 'up to date',
+  included_stale: 'stale',
+  unavailable: 'not synced yet',
+  unsupported: 'not supported yet',
+  approval_pending: 'pending platform approval',
+  failed: 'temporarily unavailable',
+}
+
+// The coverage summary a founder asked for explicitly: an unavailable or
+// stale league must be visible here even though it correctly produced zero
+// Pulse items — otherwise it looks identical to "nothing needs attention."
+function CoverageSummary({ coverage }: { coverage: PulseCoverageEntry[] }) {
+  const needsAttention = coverage.filter((c) => c.status !== 'included_fresh')
+  if (needsAttention.length === 0) return null
+
+  return (
+    <div className="mono-data mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10.5px]" style={{ color: 'var(--t3)' }}>
+      {needsAttention.map((c) => (
+        <span key={c.connectedLeagueId} title={c.reason ?? undefined}>
+          {c.leagueName} ({platformLabel(c.platform)}) — {COVERAGE_STATUS_LABEL[c.status]}
+        </span>
+      ))}
+    </div>
+  )
 }
 
 // Done / Snooze / Dismiss — hidden entirely in live-only mode (onAction null)
@@ -901,6 +1024,30 @@ function DetailDrawer({
               {new Date(item.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).toUpperCase()}
             </span>
           </div>
+          {/* P3-8B: freshness/action-capability/status — never a raw
+              canonicalPlayerId, just the honest per-league state. */}
+          {item.affectedLeagues[0]?.freshness && (
+            <div className="flex justify-between">
+              <span style={{ color: 'var(--t3)' }}>DATA</span>
+              <span style={{ color: itemFreshnessNote(item) ? 'var(--warn)' : 'var(--t1)' }}>
+                {freshnessLabel(item.affectedLeagues[0].freshness)?.toUpperCase() ?? 'UP TO DATE'}
+              </span>
+            </div>
+          )}
+          {item.affectedLeagues[0]?.actionCapability !== undefined && (
+            <div className="flex justify-between">
+              <span style={{ color: 'var(--t3)' }}>ACTION</span>
+              <span style={{ color: 'var(--t1)' }}>
+                {actionCapabilityLabel(item.affectedLeagues[0]?.actionCapability, item.affectedLeagues[0]?.platform ?? item.platform).toUpperCase()}
+              </span>
+            </div>
+          )}
+          {unresolvedNote(item) && (
+            <div className="flex justify-between">
+              <span style={{ color: 'var(--t3)' }}>IDENTITY</span>
+              <span style={{ color: 'var(--t1)' }}>NOT YET CROSS-LINKED</span>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-1.5 mt-5 flex-wrap">
@@ -912,7 +1059,9 @@ function DetailDrawer({
               className="mono-data text-[10.5px] px-3 py-1.5 rounded-[7px] transition-all hover:shadow-[0_0_12px_rgba(75,163,245,.25)]"
               style={{ color: 'var(--signal)', border: '1px solid rgba(75,163,245,.35)' }}
             >
-              Open ↗
+              {item.actionUrl.startsWith('http')
+                ? actionCapabilityLabel(item.affectedLeagues[0]?.actionCapability, item.affectedLeagues[0]?.platform ?? item.platform)
+                : 'Open ↗'}
             </a>
           )}
           {onAction && (

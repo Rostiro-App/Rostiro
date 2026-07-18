@@ -56,7 +56,7 @@ describe('buildCrossPlatformPulseItemsForLeague', () => {
     const { buildCrossPlatformPulseItemsForLeague } = await import('./crossPlatformPulse')
     const admin = mockAdmin({ snapshot: { snapshot_json: snapshotWithPlayers(), snapped_at: new Date().toISOString() }, playersCacheRows: [{ player_id: 'e1', adp_consensus: 10, adp_espn: 12, injury_status: null }] }) as never
 
-    const items = await buildCrossPlatformPulseItemsForLeague(admin, league)
+    const { items } = await buildCrossPlatformPulseItemsForLeague(admin, league)
     const grade = items.find((i) => i.type === 'roster_grade')
     expect(grade).toBeDefined()
     expect(grade?.affectedLeagues[0]).toMatchObject({ platform: 'espn', freshness: 'fresh', actionCapability: 'none' })
@@ -68,27 +68,39 @@ describe('buildCrossPlatformPulseItemsForLeague', () => {
     const { buildCrossPlatformPulseItemsForLeague } = await import('./crossPlatformPulse')
     const admin = mockAdmin({ snapshot: { snapshot_json: snapshotWithPlayers(), snapped_at: '2026-07-01T00:00:00Z' }, playersCacheRows: [{ player_id: 'e1', adp_consensus: 10, adp_espn: 12, injury_status: null }] }) as never
 
-    const items = await buildCrossPlatformPulseItemsForLeague(admin, league)
+    const { items } = await buildCrossPlatformPulseItemsForLeague(admin, league)
     expect(items[0].affectedLeagues[0].freshness).toBe('stale')
   })
 
-  it('PROOF: unavailable/unsupported snapshots contribute zero items, never blanking anything else', async () => {
+  it('PROOF (P3-8B): unavailable snapshots contribute zero items but STILL get a real coverage entry, never blanking anything else', async () => {
     vi.doMock('@/lib/platforms', () => ({ getIntelligenceAdapter: vi.fn(() => ({ platform: 'espn', capabilities: CAPS_READ_ONLY })) }))
     vi.doMock('@/lib/rosterSnapshotSync', () => ({ computeSnapshotFreshness: vi.fn(() => 'unavailable') }))
     const { buildCrossPlatformPulseItemsForLeague } = await import('./crossPlatformPulse')
     const admin = mockAdmin({ snapshot: null }) as never
-    const items = await buildCrossPlatformPulseItemsForLeague(admin, league)
+    const { items, coverage } = await buildCrossPlatformPulseItemsForLeague(admin, league)
     expect(items).toHaveLength(0)
+    expect(coverage).toMatchObject({ connectedLeagueId: 'cl-1', status: 'unavailable' })
+    expect(coverage.reason).not.toBeNull()
   })
 
-  it('a Yahoo league (no adapter) produces zero items — never represented as live intelligence', async () => {
+  it('PROOF (P3-8B): a stale league is included but its coverage status is included_stale, distinguishable from fresh', async () => {
+    vi.doMock('@/lib/platforms', () => ({ getIntelligenceAdapter: vi.fn(() => ({ platform: 'espn', capabilities: CAPS_READ_ONLY })) }))
+    vi.doMock('@/lib/rosterSnapshotSync', () => ({ computeSnapshotFreshness: vi.fn(() => 'stale') }))
+    const { buildCrossPlatformPulseItemsForLeague } = await import('./crossPlatformPulse')
+    const admin = mockAdmin({ snapshot: { snapshot_json: snapshotWithPlayers(), snapped_at: '2026-07-01T00:00:00Z' }, playersCacheRows: [{ player_id: 'e1', adp_consensus: 10, adp_espn: 12, injury_status: null }] }) as never
+    const { coverage } = await buildCrossPlatformPulseItemsForLeague(admin, league)
+    expect(coverage.status).toBe('included_stale')
+  })
+
+  it('a Yahoo league (no adapter) produces zero items and an approval_pending coverage entry — never represented as live intelligence', async () => {
     vi.doMock('@/lib/platforms', () => ({ getIntelligenceAdapter: vi.fn(() => null) }))
     vi.doMock('@/lib/rosterSnapshotSync', () => ({ computeSnapshotFreshness: vi.fn() }))
     const { buildCrossPlatformPulseItemsForLeague } = await import('./crossPlatformPulse')
     const yahooLeague = { ...league, platform: 'yahoo' as const }
     const admin = mockAdmin({}) as never
-    const items = await buildCrossPlatformPulseItemsForLeague(admin, yahooLeague)
+    const { items, coverage } = await buildCrossPlatformPulseItemsForLeague(admin, yahooLeague)
     expect(items).toHaveLength(0)
+    expect(coverage.status).toBe('approval_pending')
   })
 
   it('PROOF: never infers a waiver_alert from roster absence — only from a successful readAvailablePlayers result', async () => {
@@ -102,7 +114,7 @@ describe('buildCrossPlatformPulseItemsForLeague', () => {
     vi.doMock('@/lib/rosterSnapshotSync', () => ({ computeSnapshotFreshness: vi.fn(() => 'fresh') }))
     const { buildCrossPlatformPulseItemsForLeague } = await import('./crossPlatformPulse')
     const admin = mockAdmin({ snapshot: { snapshot_json: snapshotWithPlayers(), snapped_at: new Date().toISOString() }, playersCacheRows: [] }) as never
-    const items = await buildCrossPlatformPulseItemsForLeague(admin, league)
+    const { items } = await buildCrossPlatformPulseItemsForLeague(admin, league)
     expect(items.some((i) => i.type === 'waiver_alert')).toBe(false)
   })
 
@@ -122,7 +134,7 @@ describe('buildCrossPlatformPulseItemsForLeague', () => {
       snapshot: { snapshot_json: snapshotWithPlayers(), snapped_at: new Date().toISOString() },
       playersCacheRows: [{ player_id: 'e1', adp_consensus: 10, adp_espn: 12, injury_status: null }, { player_id: 'e9', adp_consensus: 5, adp_espn: 6, injury_status: null }],
     }) as never
-    const items = await buildCrossPlatformPulseItemsForLeague(admin, league)
+    const { items } = await buildCrossPlatformPulseItemsForLeague(admin, league)
     const waiver = items.find((i) => i.type === 'waiver_alert')
     expect(waiver?.affectedLeagues[0]).toMatchObject({ canonicalPlayerId: 'c9', providerPlayerId: 'e9', status: 'free_agent', platform: 'espn' })
   })
