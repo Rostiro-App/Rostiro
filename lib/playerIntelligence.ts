@@ -61,18 +61,27 @@ export async function resolvePlayerIdentityForRoute(
   rawParam: string,
   legacyPlatformHint: Platform = 'sleeper'
 ): Promise<PlayerIdentityInput> {
-  const { data: byId } = await admin.from('player_mappings').select('id').eq('id', rawParam).maybeSingle()
+  // P3-11 correction: every lookup below now checks its own Supabase
+  // error and throws rather than silently falling through to the next
+  // lookup (or ultimately to "no mapping found") — a real DB failure on
+  // any one of these four queries must never be indistinguishable from a
+  // genuinely unresolved player.
+  const { data: byId, error: byIdError } = await admin.from('player_mappings').select('id').eq('id', rawParam).maybeSingle()
+  if (byIdError) throw new Error(`player_mappings lookup by id failed: ${byIdError.message}`)
   if (byId) return { canonicalPlayerId: byId.id, sourcePlatform: null, sourcePlayerId: null }
 
   // Legacy compatibility: every caller before P3-7 passes a raw
   // platform-specific ID (Sleeper today, the only platform the UI
   // currently wires player cards from) — look it up across all three
   // provider-ID columns rather than assuming the hint is right.
-  const { data: bySleeper } = await admin.from('player_mappings').select('id').eq('sleeper_id', rawParam).maybeSingle()
+  const { data: bySleeper, error: bySleeperError } = await admin.from('player_mappings').select('id').eq('sleeper_id', rawParam).maybeSingle()
+  if (bySleeperError) throw new Error(`player_mappings lookup by sleeper_id failed: ${bySleeperError.message}`)
   if (bySleeper) return { canonicalPlayerId: bySleeper.id, sourcePlatform: null, sourcePlayerId: null }
-  const { data: byEspn } = await admin.from('player_mappings').select('id').eq('espn_id', rawParam).maybeSingle()
+  const { data: byEspn, error: byEspnError } = await admin.from('player_mappings').select('id').eq('espn_id', rawParam).maybeSingle()
+  if (byEspnError) throw new Error(`player_mappings lookup by espn_id failed: ${byEspnError.message}`)
   if (byEspn) return { canonicalPlayerId: byEspn.id, sourcePlatform: null, sourcePlayerId: null }
-  const { data: byYahoo } = await admin.from('player_mappings').select('id').eq('yahoo_id', rawParam).maybeSingle()
+  const { data: byYahoo, error: byYahooError } = await admin.from('player_mappings').select('id').eq('yahoo_id', rawParam).maybeSingle()
+  if (byYahooError) throw new Error(`player_mappings lookup by yahoo_id failed: ${byYahooError.message}`)
   if (byYahoo) return { canonicalPlayerId: byYahoo.id, sourcePlatform: null, sourcePlayerId: null }
 
   // Genuinely no mapping exists yet — stay platform-specific rather than

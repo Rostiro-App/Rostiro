@@ -94,12 +94,74 @@ with checks as (
       and (select count(*) from public.portfolio_exposure_snapshots where week_start = '1999-01-01') = 0,
     (select count(*) from public.portfolio_health_snapshots where week_start = '1999-01-01')::text || ' health / ' ||
     (select count(*) from public.portfolio_exposure_snapshots where week_start = '1999-01-01')::text || ' exposure'
+
+  union all
+  -- P3-11 correction: safe to run at ANY time (this checks
+  -- information_schema, never references the columns as data) —
+  -- correctly reports FAIL today, since
+  -- supabase/migration_player_mapping_provenance.sql is proposed but NOT
+  -- applied. Section 0B below has the finer-grained provenance checks,
+  -- which DO reference the columns directly and will error with "column
+  -- does not exist" until that migration is applied — run Section 0B only
+  -- after this specific check flips to PASS.
+  select
+    'player_mappings provenance columns present (mapping_basis, teamless_activity_unverified)',
+    (select count(*) = 2 from information_schema.columns
+     where table_schema = 'public' and table_name = 'player_mappings'
+       and column_name in ('mapping_basis', 'teamless_activity_unverified')),
+    coalesce((select string_agg(column_name, ', ' order by column_name) from information_schema.columns
+     where table_schema = 'public' and table_name = 'player_mappings'
+       and column_name in ('mapping_basis', 'teamless_activity_unverified')), 'none found')
 )
 select
   case when pass then 'PASS' else 'FAIL' end as result,
   check_name,
   detail
 from checks
+order by pass asc, check_name;
+
+-- ─── 0B. Provenance backfill checks — RUN ONLY AFTER Section 0's ───────────
+-- "player_mappings provenance columns present" check above shows PASS
+-- (i.e. after migration_player_mapping_provenance.sql has been applied).
+-- Before that, every check below will error with "column mapping_basis
+-- does not exist" — that is expected, not a bug in this file; it is not
+-- applied to production as of this writing (P3-11 correction pass,
+-- 2026-07-18) and must not be run until separately approved.
+with provenance_checks as (
+  select
+    'zero rows with null mapping_basis' as check_name,
+    (select count(*) = 0 from public.player_mappings where mapping_basis is null) as pass,
+    (select count(*) from public.player_mappings where mapping_basis is null)::text || ' null row(s)' as detail
+
+  union all
+  select
+    'mapping_basis distribution contains only the 3 valid values',
+    not exists (
+      select 1 from public.player_mappings
+      where mapping_basis is not null
+        and mapping_basis not in ('provider_id_reuse', 'name_team_unambiguous', 'single_platform')
+    ),
+    coalesce((select string_agg(distinct mapping_basis, ', ') from public.player_mappings
+     where mapping_basis is not null
+       and mapping_basis not in ('provider_id_reuse', 'name_team_unambiguous', 'single_platform')), 'none — all valid')
+
+  union all
+  select
+    'every teamless row (nfl_team is null) is flagged teamless_activity_unverified = true',
+    not exists (select 1 from public.player_mappings where nfl_team is null and teamless_activity_unverified = false),
+    (select count(*) from public.player_mappings where nfl_team is null and teamless_activity_unverified = false)::text || ' teamless row(s) NOT flagged'
+
+  union all
+  select
+    'no team-known row (nfl_team is not null) is incorrectly flagged teamless_activity_unverified = true',
+    not exists (select 1 from public.player_mappings where nfl_team is not null and teamless_activity_unverified = true),
+    (select count(*) from public.player_mappings where nfl_team is not null and teamless_activity_unverified = true)::text || ' team-known row(s) incorrectly flagged'
+)
+select
+  case when pass then 'PASS' else 'FAIL' end as result,
+  check_name,
+  detail
+from provenance_checks
 order by pass asc, check_name;
 
 -- ─── 1. Migration presence: player_mappings constraints ────────────────────

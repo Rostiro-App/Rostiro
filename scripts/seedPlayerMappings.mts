@@ -81,7 +81,7 @@ async function loadExistingMappings(admin: ReturnType<typeof createAdminClient>,
   for (;;) {
     const { data, error } = await admin
       .from('player_mappings')
-      .select('id, name, nfl_team, position, espn_id, yahoo_id, sleeper_id, season')
+      .select('id, name, nfl_team, position, espn_id, yahoo_id, sleeper_id, season, mapping_basis')
       .eq('season', season)
       .range(from, from + PAGE_SIZE - 1)
     if (error) throw new Error(`Failed to load player_mappings: ${error.message}`)
@@ -95,6 +95,7 @@ async function loadExistingMappings(admin: ReturnType<typeof createAdminClient>,
       yahooId: r.yahoo_id,
       sleeperId: r.sleeper_id,
       season: r.season,
+      mappingBasis: r.mapping_basis,
     })))
     if (data.length < PAGE_SIZE) break
     from += PAGE_SIZE
@@ -110,7 +111,11 @@ async function loadExistingMappings(admin: ReturnType<typeof createAdminClient>,
 // every insert/update with a real Supabase error (surfaced below, not
 // swallowed), which is the correct, honest failure mode until the
 // migration is separately approved and applied.
-async function applyActions(admin: ReturnType<typeof createAdminClient>, actions: SeedAction[]) {
+async function applyActions(
+  admin: ReturnType<typeof createAdminClient>,
+  actions: SeedAction[],
+  existingById: Map<string, ExistingMapping>
+) {
   let inserted = 0
   let updated = 0
   let linked = 0
@@ -133,9 +138,21 @@ async function applyActions(admin: ReturnType<typeof createAdminClient>, actions
       }
       inserted++
     } else if (action.type === 'update_team') {
+      // P3-11 correction: this action's own matchBasis ('provider_id_reuse')
+      // reflects that THIS platform's provider ID was re-matched — real,
+      // strong evidence for that one column. But the row as a whole may
+      // already carry a WEAKER basis ('name_team_unambiguous' or
+      // 'single_platform') from how it was originally created, and a team
+      // change says nothing new about that. Never overwrite an existing
+      // recorded basis with 'provider_id_reuse' here — only set it when
+      // the row has no basis recorded at all yet (pre-backfill/legacy
+      // row), preserving the weakest historical provenance otherwise.
+      const existingBasis = existingById.get(action.mappingId)?.mappingBasis
+      const updatePayload: Record<string, unknown> = { nfl_team: action.newNflTeam }
+      if (!existingBasis) updatePayload.mapping_basis = action.matchBasis
       const { error } = await admin
         .from('player_mappings')
-        .update({ nfl_team: action.newNflTeam, mapping_basis: action.matchBasis })
+        .update(updatePayload)
         .eq('id', action.mappingId)
       if (error) {
         console.error(`  UPDATE FAILED for mapping ${action.mappingId}: ${error.message}`)
@@ -217,7 +234,8 @@ async function main() {
     return
   }
 
-  const result = await applyActions(admin, actions)
+  const existingById = new Map(existingMappings.map((m) => [m.id, m]))
+  const result = await applyActions(admin, actions, existingById)
   console.log(`\nApplied: ${result.inserted} inserted, ${result.updated} team updates, ${result.linked} platform-ID links.`)
 }
 

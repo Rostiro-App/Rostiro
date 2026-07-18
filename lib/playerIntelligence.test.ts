@@ -4,6 +4,7 @@ const CAPS_READ_ONLY = { leagueRead: true, rosterRead: true, matchupRead: true, 
 
 function mockAdmin(opts: {
   mappingLookups?: Record<string, { id: string } | null>
+  mappingLookupError?: Record<string, { message: string }>
   snapshot?: { snapshot_json: unknown; snapped_at: string } | null
   snapshotError?: { message: string } | null
 }) {
@@ -13,7 +14,11 @@ function mockAdmin(opts: {
         return {
           select: vi.fn(() => ({
             eq: vi.fn((col: string, val: string) => ({
-              maybeSingle: vi.fn(() => Promise.resolve({ data: opts.mappingLookups?.[`${col}:${val}`] ?? null })),
+              maybeSingle: vi.fn(() => {
+                const err = opts.mappingLookupError?.[`${col}:${val}`]
+                if (err) return Promise.resolve({ data: null, error: err })
+                return Promise.resolve({ data: opts.mappingLookups?.[`${col}:${val}`] ?? null, error: null })
+              }),
             })),
           })),
         }
@@ -65,6 +70,21 @@ describe('resolvePlayerIdentityForRoute — compatibility lookup at the route bo
     const admin = mockAdmin({ mappingLookups: {} }) as never
     const result = await resolvePlayerIdentityForRoute(admin, 'unmapped-123')
     expect(result).toEqual({ canonicalPlayerId: null, sourcePlatform: 'sleeper', sourcePlayerId: 'unmapped-123' })
+  })
+
+  it('PROOF (P3-11 correction): a Supabase error on the first (id) lookup throws, never falls through as if unmapped', async () => {
+    const { resolvePlayerIdentityForRoute } = await import('./playerIntelligence')
+    const admin = mockAdmin({ mappingLookupError: { 'id:canon-1': { message: 'connection reset' } } }) as never
+    await expect(resolvePlayerIdentityForRoute(admin, 'canon-1')).rejects.toThrow(/connection reset/)
+  })
+
+  it('PROOF (P3-11 correction): a Supabase error on a later (espn_id) lookup throws, never falls through to the legacy sourcePlayerId guess', async () => {
+    const { resolvePlayerIdentityForRoute } = await import('./playerIntelligence')
+    const admin = mockAdmin({
+      mappingLookups: { 'id:4426515': null, 'sleeper_id:4426515': null },
+      mappingLookupError: { 'espn_id:4426515': { message: 'query timeout' } },
+    }) as never
+    await expect(resolvePlayerIdentityForRoute(admin, '4426515')).rejects.toThrow(/query timeout/)
   })
 })
 

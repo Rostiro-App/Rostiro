@@ -113,6 +113,20 @@ describe('buildPulseItemsForUser — P3-8: cross-platform merge (real function, 
     // A real Sleeper item (roster_grade, since the draft just completed
     // and myPlayers is non-empty) survives despite ESPN's total failure.
     expect(result.items.some((i) => i.type === 'roster_grade' && i.affectedLeagues[0]?.leagueId === 'cl-sleeper')).toBe(true)
+
+    // PROOF (P3-11 correction): the total cross-platform failure is NOT
+    // silently collapsed into an empty coverage array (which would look
+    // identical to "this user has zero non-Sleeper leagues") — it now
+    // surfaces as an explicit 'failed' coverage entry carrying the real
+    // error message.
+    const crossPlatformFailure = result.coverage.find((c) => c.connectedLeagueId === 'cross-platform-system-error')
+    expect(crossPlatformFailure).toBeDefined()
+    expect(crossPlatformFailure?.status).toBe('failed')
+    expect(crossPlatformFailure?.reason).toContain('ESPN totally down')
+
+    // The Sleeper league's own coverage is completely unaffected.
+    const sleeperCoverage = result.coverage.find((c) => c.connectedLeagueId === 'cl-sleeper')
+    expect(sleeperCoverage?.status).toBe('included_fresh')
   })
 })
 

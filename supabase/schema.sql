@@ -209,6 +209,24 @@ create table public.player_mappings (
   gsis_id     text,  -- NFL official player ID from nflverse
   is_active   boolean not null default true,
   season      integer not null default 2026,
+  -- P3-11 correction pass, 2026-07-18: reflects the target end-state schema
+  -- from supabase/migration_player_mapping_provenance.sql — PROPOSED, NOT
+  -- YET APPLIED to production (do not apply without separate approval). A
+  -- fresh environment built from this file gets these columns from day one
+  -- (safe as NOT NULL here since there's no pre-existing data to backfill);
+  -- production itself won't have them until that migration is approved and
+  -- run, at which point its own backfill brings existing rows in line with
+  -- this same shape. mapping_basis records how a row's cross-platform link
+  -- was established (lib/playerMappingSeed.ts's MatchBasis) — never
+  -- upgraded from a heuristic basis to a stronger one after the fact (see
+  -- lib/playerIdentity.ts's confidence guard and
+  -- scripts/seedPlayerMappings.mts's update_team handling).
+  -- teamless_activity_unverified flags a row with no current NFL team but a
+  -- real ownership%/ADP signal at seed time — never proof of active free
+  -- agency on its own (see lib/playerMappingSeed.ts's header comment).
+  mapping_basis text not null
+    check (mapping_basis in ('provider_id_reuse', 'name_team_unambiguous', 'single_platform')),
+  teamless_activity_unverified boolean not null default false,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
   unique (name, nfl_team, season)

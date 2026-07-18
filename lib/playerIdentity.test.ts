@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { resolvePlayerIdentityPure, normalizePlayerName, type PlayerMappingRow } from './playerIdentity'
+import { describe, it, expect, vi } from 'vitest'
+import { resolvePlayerIdentityPure, normalizePlayerName, fetchActivePlayerMappings, type PlayerMappingRow } from './playerIdentity'
 
 const candidates: PlayerMappingRow[] = [
   { id: 'p-1', name: 'A.J. Brown', nflTeam: 'PHI', position: 'WR', espnId: 'espn-1', yahooId: 'yahoo-1', sleeperId: 'sleeper-1' },
@@ -114,13 +114,12 @@ describe('resolvePlayerIdentityPure', () => {
     expect(result.confidence).toBe('unresolved')
   })
 
-  it('never promotes to verified_alias — no second verified crosswalk source exists yet (none of these candidates carry a heuristic mappingBasis)', () => {
+  it('never promotes to verified_alias — no second verified crosswalk source exists yet', () => {
     // Every case in this file resolves via 'exact', 'name_team', or
-    // 'unresolved' — 'verified_alias' should never appear for a candidate
-    // whose mappingBasis is absent/'provider_id_reuse'. (P3-11 correction:
-    // 'verified_alias' CAN now appear when mappingBasis is
-    // 'name_team_unambiguous' — see the dedicated test below — but none of
-    // this file's shared `candidates` fixture rows carry that basis.)
+    // 'unresolved' — 'verified_alias' should never appear, full stop. Even
+    // a heuristically-linked provider ID (mappingBasis:
+    // 'name_team_unambiguous') downgrades to 'name_team', never
+    // 'verified_alias' — see the dedicated test below.
     const allResults = [
       resolvePlayerIdentityPure(candidates, { platform: 'yahoo', sourcePlayerId: 'yahoo-1', name: 'A.J. Brown', nflTeam: 'PHI' }),
       resolvePlayerIdentityPure(candidates, { platform: 'espn', sourcePlayerId: 'x', name: 'AJ Brown', nflTeam: 'PHI' }),
@@ -129,7 +128,7 @@ describe('resolvePlayerIdentityPure', () => {
     expect(allResults.every((r) => r.confidence !== 'verified_alias')).toBe(true)
   })
 
-  it('PROOF (P3-11 correction): a heuristically-linked provider ID (mappingBasis: name_team_unambiguous) never reports "exact" — downgraded to verified_alias', () => {
+  it('PROOF (P3-11 correction): a heuristically-linked provider ID (mappingBasis: name_team_unambiguous) never reports "exact" — downgraded to name_team, never verified_alias', () => {
     const heuristicCandidates: PlayerMappingRow[] = [
       { id: 'p-h1', name: 'Puka Nacua', nflTeam: 'LAR', position: 'WR', espnId: 'espn-h1', yahooId: null, sleeperId: 'sleeper-h1', mappingBasis: 'name_team_unambiguous' },
     ]
@@ -137,8 +136,9 @@ describe('resolvePlayerIdentityPure', () => {
       platform: 'espn', sourcePlayerId: 'espn-h1', name: 'Puka Nacua', nflTeam: 'LAR',
     })
     expect(result.canonicalPlayerId).toBe('p-h1')
-    expect(result.confidence).toBe('verified_alias')
+    expect(result.confidence).toBe('name_team')
     expect(result.confidence).not.toBe('exact')
+    expect(result.confidence).not.toBe('verified_alias')
     expect(result.reason).toContain('heuristic')
   })
 
@@ -170,5 +170,36 @@ describe('resolvePlayerIdentityPure', () => {
       platform: 'espn', sourcePlayerId: 'espn-h4', name: 'Puka Nacua', nflTeam: 'LAR',
     })
     expect(result).toMatchObject({ canonicalPlayerId: 'p-h4', confidence: 'exact' })
+  })
+})
+
+describe('fetchActivePlayerMappings — PROOF (P3-11 correction): a Supabase query error is thrown, never conflated with "zero active mappings"', () => {
+  it('throws with the real error message rather than returning an empty array', async () => {
+    const admin = {
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => Promise.resolve({ data: null, error: { message: 'connection reset by peer' } })),
+        })),
+      })),
+    }
+    await expect(fetchActivePlayerMappings(admin as never)).rejects.toThrow(/connection reset by peer/)
+  })
+
+  it('selects mapping_basis and maps it onto mappingBasis', async () => {
+    const admin = {
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() =>
+            Promise.resolve({
+              data: [{ id: 'p-1', name: 'Puka Nacua', nfl_team: 'LAR', position: 'WR', espn_id: 'e1', yahoo_id: null, sleeper_id: 's1', mapping_basis: 'name_team_unambiguous' }],
+              error: null,
+            })
+          ),
+        })),
+      })),
+    }
+    const rows = await fetchActivePlayerMappings(admin as never)
+    expect(rows).toHaveLength(1)
+    expect(rows[0].mappingBasis).toBe('name_team_unambiguous')
   })
 })

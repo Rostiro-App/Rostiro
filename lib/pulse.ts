@@ -118,7 +118,30 @@ export async function buildPulseItemsForUser(
   // regardless of whether this user has any Sleeper leagues at all, so an
   // ESPN-only user still gets real Pulse intelligence instead of the
   // early-return empty feed this function used to produce for them.
-  const crossPlatform = await buildCrossPlatformPulseItemsForUser(userId).catch(() => ({ items: [], leagueCount: 0, coverage: [] }))
+  //
+  // P3-11 correction: a TOTAL failure of buildCrossPlatformPulseItemsForUser
+  // (e.g. its own connected_leagues query throwing) previously collapsed to
+  // `coverage: []` here — indistinguishable from "this user has zero
+  // non-Sleeper leagues," which silently hid a real infrastructure failure
+  // from the coverage summary. Sleeper items/coverage below are computed
+  // entirely independently and are NEVER affected by this failure; only the
+  // cross-platform side degrades, and it now does so as one explicit
+  // 'failed' coverage entry rather than an empty array.
+  const crossPlatform = await buildCrossPlatformPulseItemsForUser(userId).catch(
+    (err): { items: BuiltPulseItem[]; leagueCount: number; coverage: PulseLeagueCoverageEntry[] } => ({
+      items: [],
+      leagueCount: 0,
+      coverage: [
+        {
+          connectedLeagueId: 'cross-platform-system-error',
+          leagueName: 'Cross-platform leagues (ESPN/Yahoo)',
+          platform: 'espn',
+          status: 'failed',
+          reason: `Cross-platform Pulse computation failed entirely: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        },
+      ],
+    })
+  )
 
   if (rows.length === 0) {
     return { items: crossPlatform.items, leagueCount: crossPlatform.leagueCount, coverage: crossPlatform.coverage }

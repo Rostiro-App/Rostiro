@@ -52,6 +52,14 @@ export interface ExistingMapping {
   yahooId: string | null
   sleeperId: string | null
   season: number
+  // P3-11 correction: the row's currently-recorded provenance, loaded so
+  // the write path (scripts/seedPlayerMappings.mts) can preserve the
+  // weakest historical basis rather than ever overwriting a heuristic
+  // link with a stronger-sounding one — see that file's applyActions for
+  // the actual guard. Optional/undefined until
+  // supabase/migration_player_mapping_provenance.sql (PROPOSED, not
+  // applied) lands and the seed runner's loadExistingMappings selects it.
+  mappingBasis?: MatchBasis | null
 }
 
 export type MatchBasis = 'provider_id_reuse' | 'name_team_unambiguous' | 'single_platform'

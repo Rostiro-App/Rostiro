@@ -36,13 +36,12 @@ export interface PlayerMappingRow {
   espnId: string | null
   yahooId: string | null
   sleeperId: string | null
-  // P3-11 correction: optional because fetchActivePlayerMappings below does
-  // not select this column yet — it doesn't exist in production until
-  // supabase/migration_player_mapping_provenance.sql (PROPOSED, not applied)
-  // is separately approved and applied, and the live query is updated to
-  // select it as its own explicitly-approved follow-up. Always undefined
-  // until then, so the confidence guard in resolvePlayerIdentityPure below
-  // is a no-op and today's behavior is unchanged.
+  // P3-11 correction: optional because the column doesn't exist in
+  // production until supabase/migration_player_mapping_provenance.sql
+  // (PROPOSED, not applied) is separately approved and applied.
+  // fetchActivePlayerMappings below DOES select this column — this field
+  // will be undefined only until that migration lands; once it does, this
+  // becomes real data with no further code change needed here.
   mappingBasis?: 'provider_id_reuse' | 'name_team_unambiguous' | 'single_platform' | null
 }
 
@@ -96,17 +95,22 @@ export function resolvePlayerIdentityPure(
     // 'name_team_unambiguous' — see lib/playerMappingSeed.ts's MatchBasis).
     // Only the former earns 'exact' confidence; a heuristically-linked row
     // must never silently present as fully verified just because its
-    // provider ID is now stored on file. Conservative at row granularity
-    // (mappingBasis describes the whole row, not which specific column was
-    // heuristically linked) — this can under-claim confidence for a column
-    // that was genuinely the row's original single-platform ID, but never
-    // over-claims, which is the failure mode this guard exists to prevent.
+    // provider ID is now stored on file. Reported as 'name_team' rather
+    // than 'verified_alias' — 'verified_alias' would itself be a
+    // mislabeling, since (per step 2 below) no independently verified
+    // second source exists in this codebase yet; 'name_team' is the
+    // existing, honest label for exactly this kind of heuristic match.
+    // Conservative at row granularity (mappingBasis describes the whole
+    // row, not which specific column was heuristically linked) — this can
+    // under-claim confidence for a column that was genuinely the row's
+    // original single-platform ID, but never over-claims, which is the
+    // failure mode this guard exists to prevent.
     if (exact.mappingBasis === 'name_team_unambiguous') {
       return {
         canonicalPlayerId: exact.id,
         sourcePlatform: platform,
         sourcePlayerId,
-        confidence: 'verified_alias',
+        confidence: 'name_team',
         reason: `Matched via stored player_mappings.${colName}, but this row's cross-platform link was established by a name+team heuristic at seed time, not independent provider confirmation`,
       }
     }
@@ -222,10 +226,19 @@ export async function fetchActivePlayerMappings(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   admin: SupabaseClient<any, any, any>
 ): Promise<PlayerMappingRow[]> {
-  const { data } = await admin
+  const { data, error } = await admin
     .from('player_mappings')
-    .select('id, name, nfl_team, position, espn_id, yahoo_id, sleeper_id')
+    .select('id, name, nfl_team, position, espn_id, yahoo_id, sleeper_id, mapping_basis')
     .eq('is_active', true)
+
+  // P3-11 correction: a real DB failure here must NEVER be treated the
+  // same as "zero active mappings" — every caller (roster-sync adapters,
+  // resolvePlayerIdentity below) would otherwise silently resolve every
+  // player as 'unresolved', which looks identical to a genuinely empty
+  // table. Thrown so callers' existing try/catch (lib/platforms/*.ts
+  // already wraps every read in one) surfaces this as a real 'failed'
+  // result instead.
+  if (error) throw new Error(`Failed to load player_mappings: ${error.message}`)
 
   return (data ?? []).map((row) => ({
     id: row.id,
@@ -235,6 +248,7 @@ export async function fetchActivePlayerMappings(
     espnId: row.espn_id,
     yahooId: row.yahoo_id,
     sleeperId: row.sleeper_id,
+    mappingBasis: row.mapping_basis,
   }))
 }
 
