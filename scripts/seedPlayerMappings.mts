@@ -31,6 +31,7 @@
  * lib/platforms/*.ts's readAvailablePlayers, which asks the provider
  * directly), not an inference from a missing team field here.
  */
+import { fileURLToPath } from 'node:url'
 import { createAdminClient } from '../lib/supabase'
 import { buildPlayerMappingSeedPlan, type ExistingMapping, type PlayerCacheRow, type SeedAction } from '../lib/playerMappingSeed'
 import { fetchLiveEspnCandidates } from '../lib/espnIngestRunner'
@@ -111,7 +112,11 @@ async function loadExistingMappings(admin: ReturnType<typeof createAdminClient>,
 // every insert/update with a real Supabase error (surfaced below, not
 // swallowed), which is the correct, honest failure mode until the
 // migration is separately approved and applied.
-async function applyActions(
+// Exported (P3-11D) so lib/seedPlayerMappings.test.ts can prove the
+// weakest-provenance-preservation and teamless-flag-on-team-change
+// behavior directly against a mocked admin client, without running this
+// script's live `main()` entrypoint.
+export async function applyActions(
   admin: ReturnType<typeof createAdminClient>,
   actions: SeedAction[],
   existingById: Map<string, ExistingMapping>
@@ -147,8 +152,18 @@ async function applyActions(
       // recorded basis with 'provider_id_reuse' here — only set it when
       // the row has no basis recorded at all yet (pre-backfill/legacy
       // row), preserving the weakest historical provenance otherwise.
+      // P3-11D correction: teamless_activity_unverified must track the
+      // NEW team value on every team change, not just at insert time — a
+      // player traded onto a real team is no longer teamless (clear the
+      // flag); a player who loses their team (nflTeam becomes null) picks
+      // up the same caution a fresh teamless insert would carry (set the
+      // flag). This is independent of mapping_basis — a team change never
+      // touches provenance either way.
       const existingBasis = existingById.get(action.mappingId)?.mappingBasis
-      const updatePayload: Record<string, unknown> = { nfl_team: action.newNflTeam }
+      const updatePayload: Record<string, unknown> = {
+        nfl_team: action.newNflTeam,
+        teamless_activity_unverified: action.newNflTeam === null,
+      }
       if (!existingBasis) updatePayload.mapping_basis = action.matchBasis
       const { error } = await admin
         .from('player_mappings')
@@ -166,7 +181,7 @@ async function applyActions(
       // platform's ID attached via a name+team heuristic, which is a real,
       // weaker-confidence fact about the WHOLE row going forward (see
       // lib/playerIdentity.ts's resolvePlayerIdentityPure guard, which
-      // downgrades 'exact' to 'verified_alias' for any row whose
+      // downgrades 'exact' to 'name_team' for any row whose
       // mapping_basis is 'name_team_unambiguous'). This never silently
       // upgrades confidence — it can only ever move a row from
       // 'single_platform' to the more cautious 'name_team_unambiguous'.
@@ -239,7 +254,14 @@ async function main() {
   console.log(`\nApplied: ${result.inserted} inserted, ${result.updated} team updates, ${result.linked} platform-ID links.`)
 }
 
-main().catch((err) => {
-  console.error(err)
-  process.exit(1)
-})
+// P3-11D: only run main() when this file is executed directly (`npx tsx
+// scripts/seedPlayerMappings.mts`), never when imported — lib/
+// seedPlayerMappings.test.ts imports applyActions above for unit testing
+// and must not trigger a live createAdminClient()/network call as a side
+// effect of that import.
+if (process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((err) => {
+    console.error(err)
+    process.exit(1)
+  })
+}

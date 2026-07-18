@@ -156,6 +156,47 @@ with provenance_checks as (
     'no team-known row (nfl_team is not null) is incorrectly flagged teamless_activity_unverified = true',
     not exists (select 1 from public.player_mappings where nfl_team is not null and teamless_activity_unverified = true),
     (select count(*) from public.player_mappings where nfl_team is not null and teamless_activity_unverified = true)::text || ' team-known row(s) incorrectly flagged'
+
+  union all
+  -- P3-11D: the 4 checks below prove the actual backfill RELATIONSHIP
+  -- (not just "no nulls remain") — that mapping_basis was derived from
+  -- provider-ID count exactly the way
+  -- migration_player_mapping_provenance.sql's backfill logic claims, on
+  -- the real rows, not merely internally consistent with itself.
+  select
+    'every row with 2+ provider IDs backfilled to name_team_unambiguous',
+    not exists (
+      select 1 from public.player_mappings
+      where (espn_id is not null)::int + (yahoo_id is not null)::int + (sleeper_id is not null)::int >= 2
+        and mapping_basis is distinct from 'name_team_unambiguous'
+    ),
+    (select count(*) from public.player_mappings
+     where (espn_id is not null)::int + (yahoo_id is not null)::int + (sleeper_id is not null)::int >= 2
+       and mapping_basis is distinct from 'name_team_unambiguous')::text || ' mismatched row(s)'
+
+  union all
+  select
+    'every row with exactly 1 provider ID backfilled to single_platform',
+    not exists (
+      select 1 from public.player_mappings
+      where (espn_id is not null)::int + (yahoo_id is not null)::int + (sleeper_id is not null)::int = 1
+        and mapping_basis is distinct from 'single_platform'
+    ),
+    (select count(*) from public.player_mappings
+     where (espn_id is not null)::int + (yahoo_id is not null)::int + (sleeper_id is not null)::int = 1
+       and mapping_basis is distinct from 'single_platform')::text || ' mismatched row(s)'
+
+  union all
+  select
+    'zero rows have zero provider IDs (espn_id, yahoo_id, sleeper_id all null)',
+    (select count(*) = 0 from public.player_mappings where espn_id is null and yahoo_id is null and sleeper_id is null),
+    (select count(*) from public.player_mappings where espn_id is null and yahoo_id is null and sleeper_id is null)::text || ' zero-provider row(s)'
+
+  union all
+  select
+    'provider_id_reuse count is zero immediately after this migration (no write path assigns it retroactively)',
+    (select count(*) = 0 from public.player_mappings where mapping_basis = 'provider_id_reuse'),
+    (select count(*) from public.player_mappings where mapping_basis = 'provider_id_reuse')::text || ' provider_id_reuse row(s)'
 )
 select
   case when pass then 'PASS' else 'FAIL' end as result,

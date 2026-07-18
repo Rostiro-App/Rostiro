@@ -13,6 +13,11 @@ export default defineConfig({
   // added for the Packet 02 correction pass's OAuth-lifecycle regression
   // tests — same recurring gap, yet more folders. app/faq/**/*.test.{ts,tsx}
   // added for the same pass's FAQ write-access-copy regression test.
-  test: { environment: 'jsdom', globals: true, include: ['app/demo/**/*.test.{ts,tsx}', 'components/marketing/scenes/**/*.test.{ts,tsx}', 'components/interrupt/**/*.test.{ts,tsx}', 'components/settings/**/*.test.{ts,tsx}', 'components/onboarding/**/*.test.{ts,tsx}', 'app/[(]auth[)]/**/*.test.{ts,tsx}', 'app/faq/**/*.test.{ts,tsx}', 'lib/**/*.test.ts', 'app/api/**/*.test.ts'], setupFiles: ['./app/demo/test-setup.ts'] },
+  // scripts/**/*.test.ts added (P3-11D) for
+  // scripts/seedPlayerMappings.test.ts — the first scripts/*.mts runner to
+  // get real regression tests (applyActions exported specifically for
+  // this, guarded behind an entrypoint check so importing it for testing
+  // never triggers the script's live main()).
+  test: { environment: 'jsdom', globals: true, include: ['app/demo/**/*.test.{ts,tsx}', 'components/marketing/scenes/**/*.test.{ts,tsx}', 'components/interrupt/**/*.test.{ts,tsx}', 'components/settings/**/*.test.{ts,tsx}', 'components/onboarding/**/*.test.{ts,tsx}', 'app/[(]auth[)]/**/*.test.{ts,tsx}', 'app/faq/**/*.test.{ts,tsx}', 'lib/**/*.test.ts', 'app/api/**/*.test.ts', 'scripts/**/*.test.ts'], setupFiles: ['./app/demo/test-setup.ts'] },
   resolve: { alias: { '@': fileURLToPath(new URL('.', import.meta.url)) } },
 })
