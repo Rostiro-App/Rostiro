@@ -128,6 +128,13 @@ export interface PlayerLeagueState {
   // comparison rather than a canonical link — i.e. this player is
   // unresolved in THIS league specifically, even if resolved elsewhere.
   unresolvedSourcePlayerId: string | null
+  // P3.5-1: the real, external provider league ID (e.g. a Sleeper league
+  // ID, an ESPN leagueId) — already loaded by every caller of this
+  // function (connected_leagues.league_id), simply passed through here so
+  // the UI can build a real deep link via lib/leagueLinks.ts's existing,
+  // client-safe URL builders. Never used to construct anything beyond a
+  // plain "go view your real league" URL — no write action is implied.
+  externalLeagueId: string
 }
 
 function actionCapabilityFor(caps: { lineupWrite: boolean; waiverWrite: boolean }): ActionCapability {
@@ -176,6 +183,7 @@ export async function computePlayerStateForLeague(
       freshness: adapter ? 'unavailable' : (league.platform === 'yahoo' ? 'approval_pending' : 'unsupported'),
       actionCapability: 'none',
       unresolvedSourcePlayerId: null,
+      externalLeagueId: league.league_id,
     }
   }
 
@@ -201,6 +209,7 @@ export async function computePlayerStateForLeague(
       freshness: 'unavailable',
       actionCapability: actionCapabilityFor(adapter.capabilities),
       unresolvedSourcePlayerId: null,
+      externalLeagueId: league.league_id,
     }
   }
 
@@ -228,6 +237,7 @@ export async function computePlayerStateForLeague(
         freshness,
         actionCapability,
         unresolvedSourcePlayerId: mine.canonicalPlayerId ? null : mine.sourcePlayerId,
+        externalLeagueId: league.league_id,
       }
     }
   }
@@ -259,6 +269,7 @@ export async function computePlayerStateForLeague(
             freshness,
             actionCapability,
             unresolvedSourcePlayerId: found.canonicalPlayerId ? null : found.sourcePlayerId,
+            externalLeagueId: league.league_id,
           }
         }
         // The player wasn't in this BOUNDED pool — that proves nothing
@@ -281,6 +292,7 @@ export async function computePlayerStateForLeague(
     freshness,
     actionCapability,
     unresolvedSourcePlayerId: null,
+    externalLeagueId: league.league_id,
   }
 }
 
@@ -329,6 +341,7 @@ export async function computePlayerIntelligence(
           freshness: 'unavailable' as const,
           actionCapability: 'none' as const,
           unresolvedSourcePlayerId: null,
+          externalLeagueId: league.league_id,
         }
       }
     })

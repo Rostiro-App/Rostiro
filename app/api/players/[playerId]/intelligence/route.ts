@@ -11,9 +11,11 @@
 // no caller needed to change. `availability[]` gains platform/freshness/
 // actionCapability fields additively; existing fields (leagueId,
 // leagueName, status, isStarter) are unchanged so the current
-// PlayerIntelligenceCard keeps working exactly as before. The Card itself
-// has NOT been updated to render the new fields — see the P3-7
-// completion report.
+// PlayerIntelligenceCard keeps working exactly as before.
+//
+// Packet 3.5, P3.5-1 (2026-07-18): PlayerIntelligenceCard.tsx has now been
+// updated to render platform, the full status set, freshness, and
+// unresolved-identity state — see that file and its regression tests.
 
 import { createSSRClient, createAdminClient } from '@/lib/supabase'
 import { resolvePlayerIdentityForRoute, computePlayerIntelligence } from '@/lib/playerIntelligence'
@@ -115,6 +117,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       platform: l.platform,
       freshness: l.freshness,
       actionCapability: l.actionCapability,
+      // P3.5-1: previously computed but never returned — the UI had no
+      // way to surface "this league's identity link is still unresolved"
+      // or to build a real per-league deep link.
+      unresolvedSourcePlayerId: l.unresolvedSourcePlayerId,
+      externalLeagueId: l.externalLeagueId,
     })),
     usage: usageRow ?? null,
     context,

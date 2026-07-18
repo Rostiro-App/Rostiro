@@ -18,6 +18,9 @@ export default defineConfig({
   // get real regression tests (applyActions exported specifically for
   // this, guarded behind an entrypoint check so importing it for testing
   // never triggers the script's live main()).
-  test: { environment: 'jsdom', globals: true, include: ['app/demo/**/*.test.{ts,tsx}', 'components/marketing/scenes/**/*.test.{ts,tsx}', 'components/interrupt/**/*.test.{ts,tsx}', 'components/settings/**/*.test.{ts,tsx}', 'components/onboarding/**/*.test.{ts,tsx}', 'app/[(]auth[)]/**/*.test.{ts,tsx}', 'app/faq/**/*.test.{ts,tsx}', 'lib/**/*.test.ts', 'app/api/**/*.test.ts', 'scripts/**/*.test.ts'], setupFiles: ['./app/demo/test-setup.ts'] },
+  // components/players/**/*.test.{ts,tsx} added (Packet 3.5, P3.5-1) for
+  // PlayerIntelligenceCard.test.tsx — same recurring gap, another folder
+  // with no test glob until it needed one.
+  test: { environment: 'jsdom', globals: true, include: ['app/demo/**/*.test.{ts,tsx}', 'components/marketing/scenes/**/*.test.{ts,tsx}', 'components/interrupt/**/*.test.{ts,tsx}', 'components/settings/**/*.test.{ts,tsx}', 'components/onboarding/**/*.test.{ts,tsx}', 'components/players/**/*.test.{ts,tsx}', 'app/[(]auth[)]/**/*.test.{ts,tsx}', 'app/faq/**/*.test.{ts,tsx}', 'lib/**/*.test.ts', 'app/api/**/*.test.ts', 'scripts/**/*.test.ts'], setupFiles: ['./app/demo/test-setup.ts'] },
   resolve: { alias: { '@': fileURLToPath(new URL('.', import.meta.url)) } },
 })

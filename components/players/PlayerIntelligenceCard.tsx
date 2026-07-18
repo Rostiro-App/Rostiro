@@ -10,12 +10,37 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useFocusTrap } from '@/lib/useFocusTrap'
 import { playerPhotoUrl, teamLogoUrl } from '@/lib/playerImages'
+import { sleeperLeagueUrl, espnLeagueUrl, yahooLeagueUrl } from '@/lib/leagueLinks'
+
+type Platform = 'sleeper' | 'espn' | 'yahoo'
+type Status = 'mine' | 'rostered_elsewhere' | 'free_agent' | 'waivers' | 'unknown'
+type Freshness = 'fresh' | 'stale' | 'unavailable' | 'unsupported' | 'approval_pending'
+
+// P3.5-1: previously declared in this file as 'none'/'lineup'/'waiver' but
+// never rendered — kept for type-shape parity with the API response, but
+// this UI never shows it directly; see navigationLabel below for why
+// navigation (a real deep link) and write-capability are deliberately
+// separate concerns, same distinction already established for Pulse
+// (app/(dashboard)/pulse/page.tsx's navigationLabel).
+type ActionCapability = 'none' | 'lineup' | 'waiver'
 
 interface Availability {
   leagueId: string
   leagueName: string
-  status: 'mine' | 'rostered_elsewhere' | 'free_agent'
+  status: Status
   isStarter: boolean
+  platform: Platform
+  freshness: Freshness
+  actionCapability: ActionCapability
+  // Present only when THIS league's roster/waiver match came from a raw
+  // source-ID comparison rather than a canonical cross-platform link —
+  // i.e. this player isn't cross-linked in this specific league yet, even
+  // if resolved elsewhere. Never silently dropped — see unresolvedNote.
+  unresolvedSourcePlayerId: string | null
+  // Real external provider league ID (a Sleeper league ID, an ESPN
+  // leagueId, etc.) — used only to build a real "go view your league"
+  // deep link via lib/leagueLinks.ts. Never a Rostiro-internal UUID.
+  externalLeagueId: string
 }
 
 interface Usage {
@@ -50,16 +75,68 @@ interface Intelligence {
   context: Context | null
 }
 
-const STATUS_LABEL: Record<Availability['status'], string> = {
+const STATUS_LABEL: Record<Status, string> = {
   mine: 'On your roster',
-  rostered_elsewhere: 'Rostered by an opponent',
+  rostered_elsewhere: 'Rostered by another team',
   free_agent: 'Free agent',
+  waivers: 'On waivers',
+  unknown: 'Unknown',
 }
 
-const STATUS_COLOR: Record<Availability['status'], string> = {
+const STATUS_COLOR: Record<Status, string> = {
   mine: 'var(--signal)',
   rostered_elsewhere: 'var(--t3)',
   free_agent: 'var(--live)',
+  waivers: 'var(--warn)',
+  unknown: 'var(--t3)',
+}
+
+const PLATFORM_LABEL: Record<Platform, string> = {
+  sleeper: 'SLEEPER',
+  espn: 'ESPN',
+  yahoo: 'YAHOO',
+}
+
+// P3.5-1: honest, human copy for a per-league freshness state — never a
+// raw enum value. Mirrors app/(dashboard)/pulse/page.tsx's freshnessLabel
+// so the same freshness state reads identically across Pulse and Player
+// Intelligence.
+function freshnessLabel(freshness: Freshness): string | null {
+  switch (freshness) {
+    case 'fresh': return null // the common case — no extra label needed
+    case 'stale': return 'Stale — may not reflect recent moves'
+    case 'unavailable': return 'Data unavailable right now'
+    case 'unsupported': return 'Not supported for this platform'
+    case 'approval_pending': return 'Pending platform approval'
+    default: return null
+  }
+}
+
+// A source-specific note for a player who isn't yet cross-linked in THIS
+// league — never the raw canonical/provider ID, just an honest signal so
+// an unresolved identity stays visible rather than silently merged/hidden.
+function unresolvedNote(a: Availability): string | null {
+  return a.unresolvedSourcePlayerId ? 'Not yet cross-linked in this league' : null
+}
+
+// P3.5-1: navigation destination (does a real link exist to click
+// through to?) is a SEPARATE question from write capability (can Rostiro
+// itself take an action there?) — every adapter's write capability is
+// 'none' today, so a label driven by actionCapability would always read
+// "Advice only," even for a league Rostiro can genuinely deep-link to.
+// This function governs ONLY the clickable link's own text, driven by
+// whether a real externalLeagueId exists, never by actionCapability —
+// same discipline as Pulse's navigationLabel.
+function leagueDeepLink(platform: Platform, externalLeagueId: string): string | null {
+  if (!externalLeagueId) return null
+  if (platform === 'sleeper') return sleeperLeagueUrl(externalLeagueId)
+  if (platform === 'espn') return espnLeagueUrl(externalLeagueId)
+  if (platform === 'yahoo') return yahooLeagueUrl(externalLeagueId)
+  return null
+}
+
+function navigationLabel(platform: Platform): string {
+  return `Review on ${PLATFORM_LABEL[platform]} →`
 }
 
 export default function PlayerIntelligenceCard() {
@@ -213,14 +290,50 @@ export default function PlayerIntelligenceCard() {
                 {data.availability.length === 0 && (
                   <p className="text-[12px]" style={{ color: 'var(--t3)' }}>No connected leagues to check.</p>
                 )}
-                {data.availability.map((a) => (
-                  <div key={a.leagueId} className="flex items-center justify-between text-[12px]">
-                    <span style={{ color: 'var(--t2)' }}>{a.leagueName}</span>
-                    <span className="mono-data text-[10px]" style={{ color: STATUS_COLOR[a.status] }}>
-                      {STATUS_LABEL[a.status]}{a.isStarter ? ' · STARTING' : ''}
-                    </span>
-                  </div>
-                ))}
+                {data.availability.map((a) => {
+                  const freshnessNote = freshnessLabel(a.freshness)
+                  const identityNote = unresolvedNote(a)
+                  const deepLink = leagueDeepLink(a.platform, a.externalLeagueId)
+                  return (
+                    <div key={a.leagueId} className="rounded-[8px] px-2.5 py-2" style={{ border: '1px solid var(--hairline)' }}>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span
+                            className="mono-data text-[9px] px-1.5 py-0.5 rounded-[4px] flex-shrink-0"
+                            style={{ color: 'var(--t3)', border: '1px solid var(--hairline)' }}
+                          >
+                            {PLATFORM_LABEL[a.platform]}
+                          </span>
+                          <span className="text-[12px] truncate" style={{ color: 'var(--t2)' }}>{a.leagueName}</span>
+                        </div>
+                        <span className="mono-data text-[10px] flex-shrink-0" style={{ color: STATUS_COLOR[a.status] }}>
+                          {STATUS_LABEL[a.status]}{a.isStarter ? ' · STARTING' : ''}
+                        </span>
+                      </div>
+                      {(freshnessNote || identityNote) && (
+                        <p className="text-[10.5px] mt-1" style={{ color: 'var(--warn)' }}>
+                          {[freshnessNote, identityNote].filter(Boolean).join(' · ')}
+                        </p>
+                      )}
+                      <div className="flex justify-end mt-1">
+                        {deepLink ? (
+                          <a
+                            href={deepLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="mono-data text-[10px]"
+                            style={{ color: 'var(--signal)' }}
+                          >
+                            {navigationLabel(a.platform)}
+                          </a>
+                        ) : (
+                          <span className="mono-data text-[10px]" style={{ color: 'var(--t3)' }}>Advice only</span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           </>
