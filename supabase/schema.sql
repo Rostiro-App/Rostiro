@@ -319,7 +319,12 @@ create table public.pulse_items (
                           check (status in ('open', 'done', 'dismissed', 'snoozed')),
   snoozed_until         timestamptz,
   completed_at          timestamptz,
-  created_at            timestamptz not null default now()
+  created_at            timestamptz not null default now(),
+  -- Packet 03 (supabase/migration_pulse_data_access_closure.sql, PROPOSED
+  -- not yet applied to production): per-league win-probability metrics on
+  -- interrupt Pulse items, consumed by components/InterruptStack.tsx via
+  -- /api/pulse/interrupts.
+  metrics_json          jsonb
 );
 
 alter table public.pulse_items enable row level security;
@@ -332,6 +337,117 @@ create index idx_pulse_items_user_active on public.pulse_items
 
 create unique index idx_pulse_items_user_fingerprint on public.pulse_items
   (user_id, fingerprint) where fingerprint is not null;
+
+-- ─── News Items / Player Context Cache / Player Scratches / Notes ──────────────
+-- Packet 03 operational-closure reconciliation: these 4 tables already
+-- exist in production (created by supabase/migration_player_intel.sql,
+-- migration_scratch_alerts.sql, migration_notes.sql respectively) but were
+-- missing from this base schema file entirely — a fresh environment built
+-- from schema.sql alone would never get them. Definitions below match
+-- production exactly, plus the grants proposed in
+-- supabase/migration_pulse_data_access_closure.sql (PROPOSED, not yet
+-- applied to production) so a fresh environment starts with the correct
+-- privileges from day one instead of hitting the same "permission denied"
+-- gap production did.
+
+create table public.news_items (
+  id           text primary key,
+  source       text not null default 'espn',
+  headline     text not null,
+  summary      text,
+  author       text,
+  link         text not null,
+  published_at timestamptz not null,
+  player_ids   text[] not null default '{}',
+  created_at   timestamptz not null default now()
+);
+
+create index news_items_published_idx on public.news_items (published_at desc);
+create index news_items_player_ids_idx on public.news_items using gin (player_ids);
+
+alter table public.news_items enable row level security;
+
+create policy "Authenticated users can read news items" on public.news_items
+  for select using (auth.role() = 'authenticated');
+
+grant select on public.news_items to authenticated;
+grant select, insert, update on public.news_items to service_role;
+
+create table public.player_context_cache (
+  id         uuid primary key default gen_random_uuid(),
+  player_id  text not null,
+  platform   text not null default 'sleeper',
+  kind       text not null check (kind in ('news', 'opportunity_surge')),
+  source_id  text not null,
+  reasoning  text not null,
+  created_at timestamptz not null default now(),
+  unique (player_id, platform, kind, source_id)
+);
+
+alter table public.player_context_cache enable row level security;
+
+create policy "Authenticated users can read player context cache" on public.player_context_cache
+  for select using (auth.role() = 'authenticated');
+
+-- Written by whichever request first computes a given (player x event)'s
+-- reasoning — the on-demand Pulse route (user-scoped SSR client) or the
+-- daily cron (service role) — so authenticated users need insert, not just
+-- select. Content is public NFL commentary, never user data.
+create policy "Authenticated users can write player context cache" on public.player_context_cache
+  for insert with check (auth.role() = 'authenticated');
+
+grant select, insert on public.player_context_cache to authenticated;
+grant select, insert on public.player_context_cache to service_role;
+
+create table public.player_scratches (
+  player_id    text not null,
+  platform     text not null default 'sleeper',
+  status       text not null check (status in ('out','doubtful','questionable')),
+  confidence   text not null check (confidence in ('high','medium')),
+  source       text not null default 'espn_news',
+  news_id      text,
+  headline     text,
+  detected_at  timestamptz not null default now(),
+  primary key (player_id, platform)
+);
+
+create index player_scratches_detected_idx on public.player_scratches (detected_at);
+
+alter table public.player_scratches enable row level security;
+
+-- Global player injury signals — no per-user data — so authenticated users
+-- get a role-level read (the Pulse card is built on-demand with the
+-- authenticated SSR client via buildPulseItemsForUser; RLS-on with no
+-- policy would deny that read and leave the in-app card silently empty).
+create policy "Authenticated users can read player scratches" on public.player_scratches
+  for select using (auth.role() = 'authenticated');
+
+grant select on public.player_scratches to authenticated;
+grant select, insert, update on public.player_scratches to service_role;
+
+create table public.notes (
+  id          uuid primary key default uuid_generate_v4(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  league_id   uuid references public.connected_leagues(id) on delete cascade,
+  player_id   text,
+  type        text not null default 'general' check (type in ('general', 'ask_copilot')),
+  body        text not null,
+  response    text,
+  status      text not null default 'n/a' check (status in ('n/a', 'pending', 'answered', 'failed')),
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+alter table public.notes enable row level security;
+
+create policy "Users can manage their own notes" on public.notes
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+grant select, insert, update, delete on public.notes to authenticated;
+grant select on public.notes to service_role;
+
+create index idx_notes_user_created on public.notes (user_id, created_at desc);
+create index idx_notes_league on public.notes (league_id) where league_id is not null;
 
 -- ─── ADP Snapshots ─────────────────────────────────────────────────────────────
 -- One row per player per day, written by the players cron. Powers the
