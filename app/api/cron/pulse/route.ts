@@ -6,7 +6,8 @@
 
 import { createAdminClient } from '@/lib/supabase'
 import { buildPulseItemsForUser, syncPulseItems } from '@/lib/pulse'
-import { computeUserPortfolioSnapshot, currentWeekStart } from '@/lib/portfolio'
+import { currentWeekStart } from '@/lib/portfolio'
+import { computeUserCrossPlatformPortfolio } from '@/lib/crossPlatformPortfolioSync'
 import { NextResponse, type NextRequest } from 'next/server'
 import { recordCronRun } from '@/lib/cronHeartbeat'
 import { isAuthorizedCronRequest } from '@/lib/cronAuth'
@@ -20,10 +21,15 @@ export async function GET(request: NextRequest) {
 
   const admin = createAdminClient()
 
-  const { data, error } = await admin
-    .from('connected_leagues')
-    .select('user_id')
-    .eq('platform', 'sleeper')
+  // P3-6B: Pulse item generation itself (buildPulseItemsForUser) is still
+  // Sleeper-only internally — a separate, unmigrated concern (P3-8) — but
+  // the Portfolio snapshot below is genuinely cross-platform now, so this
+  // user list is no longer scoped to `platform = 'sleeper'`. An ESPN-only
+  // user gets no Pulse items yet (Pulse's own internals still find
+  // nothing for them, same as before this change), but DOES get a real
+  // Portfolio snapshot — that asymmetry is real and worth naming, not
+  // something to paper over by re-adding the old filter.
+  const { data, error } = await admin.from('connected_leagues').select('user_id')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -33,6 +39,16 @@ export async function GET(request: NextRequest) {
   let itemsBuilt = 0
   let persistenceMissing = false
   let portfolioSnapshotted = 0
+  // P3-6B: supabase/migration_portfolio_schema_version.sql is proposed but
+  // NOT applied to production. Writing schema_version/player_id_space
+  // before that migration runs would either error (column missing) or, if
+  // silently omitted, write a canonical player_id under a row that
+  // DEFAULTS to schema_version 1 / player_id_space 'sleeper_raw' —
+  // mislabeling real canonical data as legacy. Neither is acceptable, so
+  // this flag detects the missing-column case once and skips ALL
+  // Portfolio snapshot writes for the rest of this run rather than
+  // guessing — surfaced honestly in the response, not swallowed silently.
+  let schemaVersionColumnsMissing = false
   const weekStart = currentWeekStart()
 
   for (const userId of userIds) {
@@ -48,45 +64,77 @@ export async function GET(request: NextRequest) {
       usersSynced += 1
       itemsBuilt += built.items.length
     } catch {
-      // One user's league failing shouldn't stop the run for everyone else.
-      continue
+      // One user's league failing shouldn't stop the run for everyone
+      // else — and, per P3-6B, must NOT prevent that SAME user's
+      // Portfolio snapshot below from running (they're independent
+      // computations over independent data; a Sleeper Pulse hiccup for
+      // one user says nothing about whether their ESPN Portfolio data is
+      // fine). No `continue` here — falls through to the Portfolio block.
     }
 
-    // T-86: Portfolio data plumbing — piggybacks on this same per-user loop
-    // (already fetching rosters for Pulse generation) rather than a
-    // separate cron. Best-effort like the other snapshot steps in this
-    // codebase: a missing migration or one user's Sleeper call failing
-    // never breaks Pulse generation for anyone.
+    // T-86 / P3-6B: real cross-platform Portfolio snapshot — exposure
+    // deduplicated by canonical player ID, health computed via the same
+    // computeLeagueHealth every other cross-platform path uses. Failure
+    // isolation for individual leagues already happens INSIDE
+    // computeUserCrossPlatformPortfolio (lib/crossPlatformPortfolioSync.ts)
+    // — this try/catch only guards the whole-user call (e.g. a DB hiccup
+    // fetching connected_leagues itself).
+    if (schemaVersionColumnsMissing) continue
+
     try {
-      const snapshot = await computeUserPortfolioSnapshot(admin, userId)
-      if (snapshot.health.length > 0) {
+      const portfolio = await computeUserCrossPlatformPortfolio(userId)
+      if (portfolio.health.length > 0) {
         const { error: healthError } = await admin.from('portfolio_health_snapshots').upsert(
-          snapshot.health.map((h) => ({
+          portfolio.health.map((h) => ({
             week_start: weekStart,
             user_id: userId,
-            league_id: h.leagueId,
-            health_score: h.healthScore,
-            health_status: h.healthStatus,
+            league_id: h.connectedLeagueId,
+            health_score: h.result.health.score,
+            health_status: h.result.health.status,
+            schema_version: 2,
             created_at: new Date().toISOString(),
           })),
           { onConflict: 'week_start,user_id,league_id' }
         )
-        if (!healthError) portfolioSnapshotted += 1
+        if (healthError) {
+          if (healthError.code === '42703' || healthError.code === 'PGRST204') {
+            schemaVersionColumnsMissing = true
+            continue
+          }
+        } else {
+          portfolioSnapshotted += 1
+        }
       }
-      if (snapshot.exposure.length > 0) {
-        await admin.from('portfolio_exposure_snapshots').upsert(
-          snapshot.exposure.map((e) => ({
+      // Only resolved (canonical-ID) exposure is written to the
+      // historical snapshot table — unresolved players stay visible live
+      // via the coverage/exposure API response, but this table's
+      // player_id_space enum only distinguishes sleeper_raw/canonical
+      // (see supabase/migration_portfolio_schema_version.sql, unapplied),
+      // and writing an unresolved `platform:sourceId` string here would
+      // need a third space this migration doesn't define. Not silently
+      // dropped from the PRODUCT — only from this specific historical
+      // trend table.
+      if (portfolio.exposure.resolved.length > 0) {
+        const { error: exposureError } = await admin.from('portfolio_exposure_snapshots').upsert(
+          portfolio.exposure.resolved.map((e) => ({
             week_start: weekStart,
             user_id: userId,
-            player_id: e.playerId,
-            league_count: e.leagueCount,
+            player_id: e.canonicalPlayerId,
+            league_count: e.exposureCount,
+            schema_version: 2,
+            player_id_space: 'canonical',
             created_at: new Date().toISOString(),
           })),
           { onConflict: 'week_start,user_id,player_id' }
         )
+        if (exposureError && (exposureError.code === '42703' || exposureError.code === 'PGRST204')) {
+          schemaVersionColumnsMissing = true
+        }
       }
     } catch {
-      // Missing migration or a transient failure — never break Pulse over it.
+      // A transient failure for one user's Portfolio computation — never
+      // break Pulse over it, and never break the next user's Portfolio
+      // snapshot either.
     }
   }
 
@@ -97,5 +145,11 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  return NextResponse.json({ users: userIds.length, usersSynced, itemsBuilt, portfolioSnapshotted })
+  return NextResponse.json({
+    users: userIds.length,
+    usersSynced,
+    itemsBuilt,
+    portfolioSnapshotted,
+    portfolioSchemaVersionColumnsMissing: schemaVersionColumnsMissing,
+  })
 }

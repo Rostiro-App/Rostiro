@@ -414,6 +414,16 @@ export interface LeagueHealth {
   status: LeagueHealthStatus
   factors: LeagueHealthFactor[]
   topFlag: string | null // most actionable one-liner, e.g. "2 starters OUT"
+  // Packet 03, P3-6B: optional so every existing caller of
+  // computeLeagueHealth (which never sets these itself) stays valid —
+  // callers that route through lib/crossPlatformPortfolio.ts's
+  // computeCrossPlatformLeagueHealth populate both. factorCoverage is how
+  // many of the 5 PRD factors actually had data; adpSource discloses
+  // whether the ranking input was platform-neutral (adp_consensus) or a
+  // disclosed platform-specific fallback — never silently compared as if
+  // interchangeable across differently-sourced leagues.
+  factorCoverage?: { available: number; total: number }
+  adpSource?: 'consensus' | 'sleeper' | 'espn' | 'mixed' | 'unknown'
 }
 
 // T-83: the personal playoff-intensity ladder — 'none' (regular season),

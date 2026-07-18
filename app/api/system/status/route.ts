@@ -14,6 +14,7 @@
 import { createSSRClient } from '@/lib/supabase'
 import { getSleeperDrafts, getSleeperRosters, getSleeperLeague, getSleeperWinnersBracket } from '@/lib/sleeper'
 import { computeLeagueHealth, type HealthPlayer } from '@/lib/healthScore'
+import { computeUserCrossPlatformPortfolio } from '@/lib/crossPlatformPortfolioSync'
 import { computePlayoffTier } from '@/lib/playoffStatus'
 import { getRostiroState } from '@/lib/rostiroState'
 import { computeLiveWindow } from '@/lib/liveWindow'
@@ -65,6 +66,17 @@ const UNKNOWN_HEALTH: LeagueHealth = {
   status: 'unknown',
   factors: [],
   topFlag: null,
+}
+
+// P3-6B: attaches factorCoverage to any LeagueHealth result without
+// touching computeLeagueHealth itself — same "5 PRD factors, count how
+// many actually had data" computation lib/crossPlatformPortfolio.ts uses.
+function withFactorCoverage(health: LeagueHealth, adpSource: LeagueHealth['adpSource']): LeagueHealth {
+  return {
+    ...health,
+    factorCoverage: { available: health.factors.filter((f) => f.score !== null).length, total: health.factors.length },
+    adpSource,
+  }
 }
 
 export async function GET() {
@@ -167,6 +179,19 @@ export async function GET() {
     currentWeek = upcoming?.week ?? scheduleRows[scheduleRows.length - 1]?.week ?? null
   }
 
+  // P3-6B: real cross-platform health for non-Sleeper leagues (ESPN today;
+  // Yahoo still has no adapter — see lib/platforms/index.ts's
+  // getIntelligenceAdapter — so it stays UNKNOWN_HEALTH regardless).
+  // Deliberately does NOT replace the Sleeper path below, which keeps
+  // using its own live, direct-fetch computation unchanged — that path is
+  // proven and doesn't depend on roster_snapshots ever having been
+  // populated, unlike this cross-platform pipeline, which currently
+  // returns 'unavailable' for any league with no snapshot yet (honest,
+  // not a regression, since ESPN health was UNKNOWN_HEALTH unconditionally
+  // before this change).
+  const crossPlatform = await computeUserCrossPlatformPortfolio(user.id).catch(() => ({ health: [], exposure: { resolved: [], unresolved: [] }, coverage: [] }))
+  const crossPlatformHealthByLeague = new Map(crossPlatform.health.map((h) => [h.connectedLeagueId, h.result]))
+
   const results = await Promise.allSettled(
     rows.map(async (league): Promise<SystemStatusLeague> => {
       const leagueMeta = {
@@ -181,10 +206,15 @@ export async function GET() {
         playoffTier: 'none' as const,
       }
 
-      // Health + deadlines are Sleeper-only until Yahoo/ESPN league sync is
-      // live end-to-end; other platforms still appear in the bar as unknown.
+      // Deadlines/playoff brackets/drafts remain Sleeper-only — those are
+      // genuinely different, unbuilt cross-platform features, not part of
+      // this Health migration. Health itself is now real for ESPN too.
       if (league.platform !== 'sleeper') {
-        return { id: league.id, name: league.league_name, platform: league.platform, health: UNKNOWN_HEALTH, ...leagueMeta }
+        const crossResult = crossPlatformHealthByLeague.get(league.id)
+        const health = crossResult
+          ? { ...crossResult.health, factorCoverage: crossResult.factorCoverage, adpSource: crossResult.adpSource }
+          : UNKNOWN_HEALTH
+        return { id: league.id, name: league.league_name, platform: league.platform, health, ...leagueMeta }
       }
 
       const [rosters, drafts] = await Promise.all([
@@ -264,12 +294,18 @@ export async function GET() {
 
       const bestFreeAgent = topPool.find((p) => !allRosteredIds.has(p.player_id)) ?? null
 
-      const health = computeLeagueHealth({
-        myPlayers,
-        starterIds: myRoster.starters ?? [],
-        bestFreeAgentAdp: bestFreeAgent?.adp_sleeper ?? null,
-        bestFreeAgentName: bestFreeAgent?.name ?? null,
-      })
+      // adpSource is always 'sleeper' here — this path reads adp_sleeper
+      // directly (never adp_consensus), same disclosure discipline P3-6B
+      // applies to the cross-platform path below.
+      const health = withFactorCoverage(
+        computeLeagueHealth({
+          myPlayers,
+          starterIds: myRoster.starters ?? [],
+          bestFreeAgentAdp: bestFreeAgent?.adp_sleeper ?? null,
+          bestFreeAgentName: bestFreeAgent?.name ?? null,
+        }),
+        'sleeper'
+      )
 
       // T-83: only fetch the bracket once this league's real playoff week
       // has actually arrived — an empty bracket every week of the regular
