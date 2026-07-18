@@ -1,19 +1,23 @@
-// T-89: Player Intelligence Card (PRD 6.11) — ⌘K player search becomes
-// decision intelligence. Cross-league availability, usage/depth chart, and
-// context (news/opportunity-surge reasoning already computed by Pulse —
-// this route never calls Claude itself, it only reads what's cached) for
-// a single player, on demand.
+// T-89 / Packet 03 P3-7: Player Intelligence Card (PRD 6.11) — ⌘K player
+// search becomes decision intelligence. Cross-league availability,
+// usage/depth chart, and context (news/opportunity-surge reasoning
+// already computed by Pulse — this route never calls Claude itself, it
+// only reads what's cached) for a single player, on demand.
+//
+// P3-7: canonical player ID is now the primary identity. Every existing
+// caller (Draft Kit, Lineups, trades, ⌘K search — all Sleeper-only today)
+// still passes a raw Sleeper player ID in the URL, unchanged — this route
+// resolves that via lib/playerIntelligence.ts's compatibility lookup, so
+// no caller needed to change. `availability[]` gains platform/freshness/
+// actionCapability fields additively; existing fields (leagueId,
+// leagueName, status, isStarter) are unchanged so the current
+// PlayerIntelligenceCard keeps working exactly as before. The Card itself
+// has NOT been updated to render the new fields — see the P3-7
+// completion report.
 
-import { createSSRClient } from '@/lib/supabase'
-import { getSleeperRosters } from '@/lib/sleeper'
+import { createSSRClient, createAdminClient } from '@/lib/supabase'
+import { resolvePlayerIdentityForRoute, computePlayerIntelligence } from '@/lib/playerIntelligence'
 import { NextResponse, type NextRequest } from 'next/server'
-
-interface LeagueRow {
-  id: string
-  league_id: string
-  league_name: string
-  team_id: string | null
-}
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ playerId: string }> }) {
   const { playerId } = await params
@@ -21,48 +25,42 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const admin = createAdminClient()
+  const identity = await resolvePlayerIdentityForRoute(admin, playerId)
+
+  // players_cache lookup for display fields: canonical players may have
+  // any combination of espn_id/sleeper_id/yahoo_id — prefer whichever
+  // platform this specific request's identity actually names; legacy
+  // (unresolved) callers keep querying by their own raw platform+ID,
+  // exactly as before.
+  let cachePlatform = identity.sourcePlatform ?? 'sleeper'
+  let cachePlayerId = identity.sourcePlayerId ?? playerId
+  if (identity.canonicalPlayerId) {
+    const { data: mapping } = await admin
+      .from('player_mappings')
+      .select('sleeper_id, espn_id, yahoo_id')
+      .eq('id', identity.canonicalPlayerId)
+      .maybeSingle()
+    if (mapping?.sleeper_id) { cachePlatform = 'sleeper'; cachePlayerId = mapping.sleeper_id }
+    else if (mapping?.espn_id) { cachePlatform = 'espn'; cachePlayerId = mapping.espn_id }
+    else if (mapping?.yahoo_id) { cachePlatform = 'yahoo'; cachePlayerId = mapping.yahoo_id }
+  }
+
   const { data: playerRow, error: playerError } = await supabase
     .from('players_cache')
     .select('player_id, name, position, nfl_team, injury_status, adp_sleeper, depth_chart_order, depth_chart_position')
-    .eq('platform', 'sleeper')
-    .eq('player_id', playerId)
+    .eq('platform', cachePlatform)
+    .eq('player_id', cachePlayerId)
     .maybeSingle()
   if (playerError) return NextResponse.json({ error: playerError.message }, { status: 500 })
   if (!playerRow) return NextResponse.json({ error: 'Player not found' }, { status: 404 })
 
-  const { data: leagues, error: leaguesError } = await supabase
-    .from('connected_leagues')
-    .select('id, league_id, league_name, team_id')
-    .eq('user_id', user.id)
-    .eq('platform', 'sleeper')
-  if (leaguesError) return NextResponse.json({ error: leaguesError.message }, { status: 500 })
-
-  const leagueRows = (leagues ?? []) as LeagueRow[]
-  const availability = await Promise.all(
-    leagueRows.map(async (league) => {
-      try {
-        const rosters = await getSleeperRosters(league.league_id)
-        const owner = rosters.find((r) => Array.isArray(r.players) && r.players.includes(playerId))
-        if (!owner) return { leagueId: league.id, leagueName: league.league_name, status: 'free_agent' as const, isStarter: false }
-
-        const isMine = String(owner.roster_id) === league.team_id
-        const isStarter = Array.isArray(owner.starters) && owner.starters.includes(playerId)
-        return {
-          leagueId: league.id,
-          leagueName: league.league_name,
-          status: isMine ? ('mine' as const) : ('rostered_elsewhere' as const),
-          isStarter: isMine && isStarter,
-        }
-      } catch {
-        return null
-      }
-    })
-  )
+  const intelligence = await computePlayerIntelligence(admin, user.id, identity)
 
   const { data: usageRow } = await supabase
     .from('player_usage_snapshots')
     .select('season, week, offense_snaps, offense_pct, defense_snaps, defense_pct')
-    .eq('player_id', playerId)
+    .eq('player_id', cachePlayerId)
     .order('season', { ascending: false })
     .order('week', { ascending: false })
     .limit(1)
@@ -74,8 +72,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const { data: contextRow } = await supabase
     .from('player_context_cache')
     .select('kind, source_id, reasoning, created_at')
-    .eq('player_id', playerId)
-    .eq('platform', 'sleeper')
+    .eq('player_id', cachePlayerId)
+    .eq('platform', cachePlatform)
     .not('reasoning', 'eq', '')
     .order('created_at', { ascending: false })
     .limit(1)
@@ -100,6 +98,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   return NextResponse.json({
     player: {
       playerId: playerRow.player_id,
+      canonicalPlayerId: identity.canonicalPlayerId,
       name: playerRow.name,
       position: playerRow.position,
       nflTeam: playerRow.nfl_team,
@@ -108,7 +107,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       depthChartOrder: playerRow.depth_chart_order,
       depthChartPosition: playerRow.depth_chart_position,
     },
-    availability: availability.filter((a): a is NonNullable<typeof a> => a !== null),
+    availability: intelligence.leagues.map((l) => ({
+      leagueId: l.connectedLeagueId,
+      leagueName: l.leagueName,
+      status: l.status,
+      isStarter: l.isStarter,
+      platform: l.platform,
+      freshness: l.freshness,
+      actionCapability: l.actionCapability,
+    })),
     usage: usageRow ?? null,
     context,
   })
