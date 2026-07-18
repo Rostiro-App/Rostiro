@@ -307,8 +307,7 @@ under 10 minutes. Everything here is read-only from the app's
 perspective (viewing pages, not changing lineups/waivers/settings).
 
 - [ ] **Log in** to the real Rostiro app as yourself.
-- [ ] Open **Leagues** page — confirm the ESPN league ("10th Annual
-      Broome St League") and both Sleeper leagues all appear, each with
+- [ ] Open **Leagues** page — confirm the ESPN league ("Example ESPN League") and both Sleeper leagues all appear, each with
       its own health indicator (ESPN's should show as unrated/no score
       yet, since that league hasn't drafted — not an error).
 - [ ] Open the **System Bar** (nav) — confirm it shows a health dot for

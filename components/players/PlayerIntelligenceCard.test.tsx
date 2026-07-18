@@ -35,7 +35,7 @@ describe('PlayerIntelligenceCard — P3.5-1 cross-platform closure', () => {
       player: BASE_PLAYER,
       availability: [
         { leagueId: 'cl-sleeper', leagueName: 'Testing League', status: 'mine', isStarter: true, platform: 'sleeper', freshness: 'fresh', actionCapability: 'none', unresolvedSourcePlayerId: null, externalLeagueId: 'sleeper-league-1' },
-        { leagueId: 'cl-espn', leagueName: '10th Annual Broome St League', status: 'free_agent', isStarter: false, platform: 'espn', freshness: 'fresh', actionCapability: 'none', unresolvedSourcePlayerId: null, externalLeagueId: '799979' },
+        { leagueId: 'cl-espn', leagueName: 'Example ESPN League', status: 'free_agent', isStarter: false, platform: 'espn', freshness: 'fresh', actionCapability: 'none', unresolvedSourcePlayerId: null, externalLeagueId: '123456789' },
       ],
       usage: null,
       context: null,
@@ -45,7 +45,7 @@ describe('PlayerIntelligenceCard — P3.5-1 cross-platform closure', () => {
     expect(screen.getByText('SLEEPER')).toBeTruthy()
     expect(screen.getByText('Testing League')).toBeTruthy()
     expect(screen.getByText('ESPN')).toBeTruthy()
-    expect(screen.getByText('10th Annual Broome St League')).toBeTruthy()
+    expect(screen.getByText('Example ESPN League')).toBeTruthy()
     expect(screen.getByText('On your roster · STARTING')).toBeTruthy()
     expect(screen.getByText('Free agent')).toBeTruthy()
   })
@@ -86,7 +86,7 @@ describe('PlayerIntelligenceCard — P3.5-1 cross-platform closure', () => {
     mockFetchOnce({
       player: BASE_PLAYER,
       availability: [
-        { leagueId: 'cl-espn', leagueName: 'Real ESPN League', status: 'free_agent', isStarter: false, platform: 'espn', freshness: 'fresh', actionCapability: 'none', unresolvedSourcePlayerId: null, externalLeagueId: '799979' },
+        { leagueId: 'cl-espn', leagueName: 'Real ESPN League', status: 'free_agent', isStarter: false, platform: 'espn', freshness: 'fresh', actionCapability: 'none', unresolvedSourcePlayerId: null, externalLeagueId: '123456789' },
       ],
       usage: null,
       context: null,
@@ -95,7 +95,7 @@ describe('PlayerIntelligenceCard — P3.5-1 cross-platform closure', () => {
 
     const link = screen.getByRole('link', { name: 'Review on ESPN →' }) as HTMLAnchorElement
     expect(link).toBeTruthy()
-    expect(link.href).toBe('https://fantasy.espn.com/football/league?leagueId=799979')
+    expect(link.href).toBe('https://fantasy.espn.com/football/league?leagueId=123456789')
     expect(screen.queryByText('Advice only')).toBeNull()
   })
 

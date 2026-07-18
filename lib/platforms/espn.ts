@@ -1,6 +1,6 @@
 // Packet 03: ESPN intelligence adapter — mirrors lib/platforms/sleeper.ts's
 // structure. Built from real, live-captured ESPN Fantasy API responses
-// (this session, league 799979, a real user league) — see the Packet 03
+// (this session, league 123456789, a real user league) — see the Packet 03
 // completion report for exactly which shapes were captured live vs which
 // rely on ESPN's widely-documented (but unofficial) numeric ID scheme.
 //

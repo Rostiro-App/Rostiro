@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Real ESPN Fantasy API shapes, captured live this session against a real
-// user league (799979, "10th Annual Broome St League", 2026 season, not
+// user league (123456789, "Example ESPN League", 2026 season, not
 // yet drafted) via an authenticated browser session — same discipline as
 // lib/platforms/sleeper.test.ts's real Sleeper captures. Names/GUIDs from
 // the live mRoster/mTeam capture were replaced with fake placeholders
@@ -20,7 +20,7 @@ const mockContext = {
   connectedLeagueId: 'cl-espn-1',
   userId: 'user-1',
   platform: 'espn' as const,
-  externalLeagueId: '799979',
+  externalLeagueId: '123456789',
   externalTeamId: '7',
 }
 

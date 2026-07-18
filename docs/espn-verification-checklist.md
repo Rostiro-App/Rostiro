@@ -1,10 +1,10 @@
 # ESPN Intelligence Adapter — Deferred Verification Checklist
 
-**Status:** partially verified. `lib/platforms/espn.ts` was built from real, live-captured ESPN Fantasy API responses (session of 2026-07-17, league 799979 "10th Annual Broome St League", a real user league) — but that league had not yet drafted at capture time, which blocks several items below from being verified against real data. This is the root cause behind every unchecked item; do not work around it with synthetic fixtures or by relaxing the implementation to make a check appear to pass.
+**Status:** partially verified. `lib/platforms/espn.ts` was built from real, live-captured ESPN Fantasy API responses (session of 2026-07-17, league 123456789 "Example ESPN League", a real user league) — but that league had not yet drafted at capture time, which blocks several items below from being verified against real data. This is the root cause behind every unchecked item; do not work around it with synthetic fixtures or by relaxing the implementation to make a check appear to pass.
 
 **Do not edit the Packet 03 ESPN adapter to make any of these appear complete.** If a real run reveals the implementation is wrong, fix the implementation and re-run the check — don't adjust the check to match whatever the code currently does.
 
-**When league 799979 (or another connected ESPN league) actually drafts**, work through this list top to bottom.
+**When league 123456789 (or another connected ESPN league) actually drafts**, work through this list top to bottom.
 
 ---
 

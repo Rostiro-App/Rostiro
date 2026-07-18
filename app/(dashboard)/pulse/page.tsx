@@ -8,7 +8,7 @@
 // Live behavior unchanged from T-69: persistent items, optimistic PATCH
 // with rollback, persistent: false hides actions until the migration runs.
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useMode, type Mode } from '@/components/nav/AppShell'
 import { STATE_CONFIG } from '@/lib/brandTokens'
@@ -140,11 +140,6 @@ export default function PulsePage() {
   const [rostiroState, setRostiroState] = useState<RostiroState>('standard')
   const [liveScores, setLiveScores] = useState<LiveGameScore[]>([])
   const [scoresGated, setScoresGated] = useState(false)
-  // T-109: leagueCount above is Sleeper-only (buildPulseItemsForUser's own
-  // filter) — this is every connected league, any platform, so the empty
-  // state can tell "truly no leagues" apart from "has leagues, none of
-  // them Sleeper," which otherwise look identical and aren't.
-  const [totalLeagueCount, setTotalLeagueCount] = useState(0)
   const [coverage, setCoverage] = useState<PulseCoverageEntry[]>([])
   const [filmRoomResults, setFilmRoomResults] = useState<FilmRoomLeagueResult[]>([])
   const [liveMatchups, setLiveMatchups] = useState<LiveMatchupSummary[]>([])
@@ -160,12 +155,11 @@ export default function PulsePage() {
     let cancelled = false
     fetch('/api/system/status')
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { rostiroState?: RostiroState; liveScores?: LiveGameScore[]; scoresGated?: boolean; leagues?: unknown[]; playoffTier?: PlayoffTier } | null) => {
+      .then((data: { rostiroState?: RostiroState; liveScores?: LiveGameScore[]; scoresGated?: boolean; playoffTier?: PlayoffTier } | null) => {
         if (cancelled || !data) return
         if (data.rostiroState) setRostiroState(data.rostiroState)
         setLiveScores(data.liveScores ?? [])
         setScoresGated(data.scoresGated ?? false)
-        setTotalLeagueCount(data.leagues?.length ?? 0)
         setPlayoffTier(data.playoffTier ?? 'none')
       })
       .catch(() => {})
@@ -212,20 +206,27 @@ export default function PulsePage() {
     }
   }, [rostiroState])
 
-  useEffect(() => {
-    let cancelled = false
-
-    // P3-8B: /api/pulse is the platform-neutral route — /api/pulse/sleeper
-    // still exists as a temporary compatibility alias for any caller not
-    // yet migrated, but this page (the real UI consumer) now calls the
-    // neutral name directly.
+  // P3.5-2: the pulse load is now callable more than once — on mount, and
+  // again from the retry affordance a total-coverage-failure / fetch-error
+  // state offers. `isMounted` guards the mount call's state writes (a fast
+  // unmount mustn't set state on a dead component); the user-initiated retry
+  // passes the default always-true guard since it only ever runs while
+  // mounted. P3-8B: /api/pulse is the platform-neutral route — /api/pulse/
+  // sleeper still exists as a temporary compatibility alias for any caller
+  // not yet migrated, but this page (the real UI consumer) calls the neutral
+  // name directly.
+  // Note: the caller owns the `loading` transition (mount relies on the
+  // initial loading=true; retry flips it back on before calling). Setting it
+  // here would be a synchronous setState inside the mount effect body, which
+  // React's rules-of-hooks lint (correctly) flags as a cascading render.
+  const loadPulse = useCallback((isMounted: () => boolean = () => true) => {
     fetch('/api/pulse')
       .then((res) => {
         if (!res.ok) throw new Error('Failed to load Pulse')
         return res.json()
       })
       .then((data: PulseResponse) => {
-        if (cancelled) return
+        if (!isMounted()) return
         setItems(data.items)
         setLeagueCount(data.leagueCount)
         setDoneToday(data.doneToday)
@@ -235,16 +236,29 @@ export default function PulsePage() {
         setCoverage(data.coverage ?? [])
       })
       .catch((err: Error) => {
-        if (!cancelled) setError(err.message)
+        if (isMounted()) setError(err.message)
       })
       .finally(() => {
-        if (!cancelled) setLoading(false)
+        if (isMounted()) setLoading(false)
       })
+  }, [])
 
+  useEffect(() => {
+    let cancelled = false
+    loadPulse(() => !cancelled)
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [loadPulse])
+
+  // P3.5-2: a safe, read-only retry — re-runs the same GET /api/pulse. Never
+  // writes anything; a total coverage failure is often a snapshot that just
+  // hasn't landed yet, so re-asking is the honest recovery.
+  const handleRetry = useCallback(() => {
+    setError(null)
+    setLoading(true)
+    loadPulse()
+  }, [loadPulse])
 
   // Escape dismisses the drawer.
   useEffect(() => {
@@ -357,6 +371,44 @@ export default function PulsePage() {
   const visibleItems = mode === 'focused' ? displayItems.slice(0, FOCUSED_CAP) : displayItems
   const hiddenByFocusedCap = displayItems.length - visibleItems.length
 
+  // P3.5-2 (state-classification correction): ONLY included_fresh counts as
+  // *current* coverage. included_stale is useful last-known information, but
+  // the backend deliberately suppresses actionable recommendations from stale
+  // leagues — so stale-only coverage must never produce an unqualified
+  // "nothing needs attention." A league that's unavailable / unsupported /
+  // approval_pending / failed produced a coverage entry (evidence evaluation
+  // was attempted) but no usable data.
+  const freshCount = coverage.filter((c) => c.status === 'included_fresh').length
+  const problemCount = coverage.filter((c) => PROBLEM_STATUSES.includes(c.status)).length
+  const nonFreshCount = coverage.length - freshCount // stale + problem
+  const hasCoverage = coverage.length > 0
+
+  // Zero-item classification (meaningful only when items.length === 0).
+  // Coverage evidence is checked BEFORE leagueCount: a failed/unavailable
+  // coverage entry alongside leagueCount === 0 is a degraded state, never a
+  // "no leagues connected" state.
+  //  - no_leagues:          truly nothing connected (no leagues, no coverage)
+  //  - degraded:            coverage exists but ZERO fresh leagues (all
+  //                         stale/unavailable/failed/unsupported/pending)
+  //  - qualified_all_clear: ≥1 fresh league AND some non-fresh coverage
+  //  - normal_all_clear:    every checked league is fresh (or no coverage
+  //                         evidence at all, the legacy fallback)
+  const zeroItemState: 'no_leagues' | 'degraded' | 'qualified_all_clear' | 'normal_all_clear' =
+    leagueCount === 0 && !hasCoverage
+      ? 'no_leagues'
+      : hasCoverage && freshCount === 0
+        ? 'degraded'
+        : freshCount > 0 && nonFreshCount > 0
+          ? 'qualified_all_clear'
+          : 'normal_all_clear'
+  // "All clear" copy counts the leagues we could actually check (fresh),
+  // falling back to leagueCount only when there's no coverage evidence so the
+  // healthy all-fresh case reads identically to before.
+  const allClearCount = hasCoverage ? freshCount : leagueCount
+  // A stale-only degraded state (no hard failures) gets sync-review framing,
+  // not "we couldn't reach your leagues."
+  const degradedStaleOnly = zeroItemState === 'degraded' && problemCount === 0
+
   return (
     <div className="max-w-2xl mx-auto px-4 pt-6 pb-8 md:px-6 md:pt-8">
 
@@ -432,10 +484,18 @@ export default function PulsePage() {
           {greeting()}{firstName ? `, ${firstName}` : ''}.
         </h1>
         <p className="text-[13px] mt-0.5" style={{ color: 'var(--t2)' }}>
-          {leagueCount === 0
-            ? 'No leagues connected yet'
+          {loading
+            ? 'Checking your leagues…'
             : items.length === 0
-              ? `All clear across ${leagueCount} ${leagueCount === 1 ? 'league' : 'leagues'}`
+              ? zeroItemState === 'no_leagues'
+                ? 'No leagues connected yet'
+                : zeroItemState === 'degraded'
+                  ? degradedStaleOnly
+                    ? 'Showing last-known data — recommendations paused'
+                    : 'Couldn’t check your leagues right now'
+                  : zeroItemState === 'qualified_all_clear'
+                    ? `Nothing needs attention in the ${allClearCount} ${allClearCount === 1 ? 'league' : 'leagues'} we could check`
+                    : `All clear across ${allClearCount} ${allClearCount === 1 ? 'league' : 'leagues'}`
               : isMissionBriefing
                 ? (
                   <>
@@ -467,7 +527,7 @@ export default function PulsePage() {
                 )}
         </p>
 
-        <CoverageSummary coverage={coverage} />
+        {!loading && <CoverageSummary coverage={coverage} />}
 
         {persistent && totalToday > 0 && (
           <div className="mono-data mt-3.5 flex items-center gap-3 text-[10px] tracking-[0.1em]" style={{ color: 'var(--t3)' }}>
@@ -654,12 +714,20 @@ export default function PulsePage() {
         </div>
       )}
 
-      {/* Body */}
+      {/* Body — P3.5-2 (state-classification correction): the zero-item state
+          is decided by `zeroItemState`, which checks coverage evidence BEFORE
+          leagueCount. Stale-only or all-problem coverage is degraded (never
+          "nothing needs attention"); a failed coverage entry with zero
+          leagues is still degraded (never NoLeaguesState); a fresh league
+          beside a non-fresh one is a QUALIFIED all-clear. */}
       {loading && <LoadingState />}
-      {!loading && error && <ErrorState message={error} />}
-      {!loading && !error && leagueCount === 0 && <NoLeaguesState totalLeagueCount={totalLeagueCount} />}
-      {!loading && !error && leagueCount > 0 && items.length === 0 && (
-        <AllClearState doneToday={doneToday} />
+      {!loading && error && <ErrorState message={error} onRetry={handleRetry} />}
+      {!loading && !error && items.length === 0 && zeroItemState === 'no_leagues' && <NoLeaguesState />}
+      {!loading && !error && items.length === 0 && zeroItemState === 'degraded' && (
+        <UnavailableState coverage={coverage} onRetry={handleRetry} />
+      )}
+      {!loading && !error && items.length === 0 && (zeroItemState === 'qualified_all_clear' || zeroItemState === 'normal_all_clear') && (
+        <AllClearState doneToday={doneToday} qualified={zeroItemState === 'qualified_all_clear'} />
       )}
       {!loading && items.length > 0 && (
         <div className={mode === 'balanced' ? 'space-y-3' : 'space-y-2'}>
@@ -746,10 +814,10 @@ function PulseCard({
 
       <div className="flex items-start justify-between gap-2.5">
         <div className="min-w-0">
-          <p className={`font-semibold leading-tight ${mode === 'focused' ? 'text-[13px] truncate' : 'text-[13.5px]'}`} style={{ color: 'var(--t1)' }}>
+          <p className={`font-semibold leading-tight ${mode === 'focused' ? 'text-[13px] truncate' : 'text-[13.5px] break-words'}`} style={{ color: 'var(--t1)' }}>
             {item.headline}
           </p>
-          <p className="mono-data text-[10px] mt-1" style={{ color: 'var(--t3)' }}>
+          <p className="mono-data text-[10px] mt-1 break-words" style={{ color: 'var(--t3)' }}>
             {leagueLabel(item).toUpperCase()}
             {item.platform ? ` · ${item.platform.toUpperCase()}` : ''}
           </p>
@@ -899,20 +967,51 @@ const COVERAGE_STATUS_LABEL: Record<PulseCoverageEntry['status'], string> = {
   failed: 'temporarily unavailable',
 }
 
-// The coverage summary a founder asked for explicitly: an unavailable or
-// stale league must be visible here even though it correctly produced zero
-// Pulse items — otherwise it looks identical to "nothing needs attention."
+// Statuses where the league produced a coverage entry but no usable
+// intelligence — the honest "we couldn't check this one" bucket, as opposed
+// to included_fresh (checked, current) / included_stale (checked, old).
+const PROBLEM_STATUSES: PulseCoverageEntry['status'][] = ['unavailable', 'unsupported', 'approval_pending', 'failed']
+
+// P3.5-2 (state-classification correction): the compact coverage summary a
+// founder asked for. A stale or unavailable league must be visible here even
+// though it correctly produced zero Pulse items — otherwise it looks
+// identical to "nothing needs attention." Coverage is INCOMPLETE whenever any
+// entry is not included_fresh — this is a property of coverage completeness,
+// NOT of whether the item list happens to be non-empty, so the incomplete
+// warning is shown regardless of item count (a zero-item result with one
+// fresh and one stale league is still partial and says so). The warning
+// wording covers both "isn't current" (stale) and "isn't available"
+// (unavailable/failed/unsupported/approval_pending). Per-league reason stays
+// on hover (title), never dumped as raw diagnostics onto the page.
 function CoverageSummary({ coverage }: { coverage: PulseCoverageEntry[] }) {
-  const needsAttention = coverage.filter((c) => c.status !== 'included_fresh')
-  if (needsAttention.length === 0) return null
+  if (coverage.length === 0) return null
+
+  const total = coverage.length
+  const fresh = coverage.filter((c) => c.status === 'included_fresh').length
+  const stale = coverage.filter((c) => c.status === 'included_stale').length
+  const problems = coverage.filter((c) => PROBLEM_STATUSES.includes(c.status))
+  // Everything not perfectly fresh is worth a chip — stale included, since
+  // "showing last-known data" is itself a caveat worth stating.
+  const flagged = coverage.filter((c) => c.status !== 'included_fresh')
+  if (flagged.length === 0) return null
+
+  const counts = [`${fresh} of ${total} ${total === 1 ? 'league' : 'leagues'} up to date`]
+  if (stale > 0) counts.push(`${stale} stale`)
+  if (problems.length > 0) counts.push(`${problems.length} unavailable`)
 
   return (
-    <div className="mono-data mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10.5px]" style={{ color: 'var(--t3)' }}>
-      {needsAttention.map((c) => (
-        <span key={c.connectedLeagueId} title={c.reason ?? undefined}>
-          {c.leagueName} ({platformLabel(c.platform)}) — {COVERAGE_STATUS_LABEL[c.status]}
-        </span>
-      ))}
+    <div className="mt-2 space-y-1">
+      <p className="mono-data text-[10.5px] tracking-[0.02em]" style={{ color: 'var(--t3)' }}>
+        {counts.join(' · ')}
+        <span style={{ color: 'var(--warn)' }}> · coverage incomplete — some league data isn’t current or available</span>
+      </p>
+      <div className="mono-data flex flex-wrap items-center gap-x-3 gap-y-1 text-[10.5px]" style={{ color: 'var(--t3)' }}>
+        {flagged.map((c) => (
+          <span key={c.connectedLeagueId} title={c.reason ?? undefined} className="break-words min-w-0">
+            {c.leagueName} ({platformLabel(c.platform)}) — {COVERAGE_STATUS_LABEL[c.status]}
+          </span>
+        ))}
+      </div>
     </div>
   )
 }
@@ -1113,41 +1212,130 @@ function LoadingState() {
   )
 }
 
-function ErrorState({ message }: { message: string }) {
+function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <div className="glass rounded-xl p-6 text-center mb-3">
       <p className="text-sm" style={{ color: 'var(--crit)' }}>{message}</p>
+      {/* P3.5-2: a safe, read-only retry — GET /api/pulse never mutates. */}
+      <button
+        type="button"
+        onClick={onRetry}
+        className="inline-block text-sm font-semibold px-4 py-2 rounded-lg mt-4 transition-all hover:shadow-[0_0_18px_rgba(75,163,245,0.35)]"
+        style={{ backgroundColor: 'var(--signal-dim)', color: 'var(--signal)', border: '1px solid rgba(75,163,245,.4)' }}
+      >
+        Try again
+      </button>
     </div>
   )
 }
 
-// T-109: leagueCount === 0 here means "zero Sleeper leagues," which isn't
-// the same thing as "zero leagues" — an ESPN/Yahoo-only account would
-// otherwise see this and think nothing is connected at all.
-function NoLeaguesState({ totalLeagueCount }: { totalLeagueCount: number }) {
-  const hasOtherLeagues = totalLeagueCount > 0
+// P3.5-2 (state-classification correction): the degraded state — coverage
+// exists but ZERO leagues are fresh, and there are no items. Never reads as
+// "nothing needs attention." Copy AND the next action adapt to the honest
+// cause:
+//  - failed:          a genuine failure → "Try again" (retry re-runs
+//                     generation and may recover).
+//  - unavailable:     no successful snapshot yet → a repeated GET won't force
+//                     a sync, so offer "Review leagues," NOT a retry.
+//  - included_stale:  recommendations are paused until current data lands →
+//                     "Review leagues," never a retry (it can't refresh it).
+//  - approval_pending / unsupported: structural → no button at all.
+// Precedence when mixed: any failure is retryable; else if anything is
+// stale/unavailable, review-leagues; else (only pending/unsupported) nothing.
+function UnavailableState({ coverage, onRetry }: { coverage: PulseCoverageEntry[]; onRetry: () => void }) {
+  const statuses = new Set(coverage.map((c) => c.status))
+  const every = (s: PulseCoverageEntry['status']) => coverage.length > 0 && [...statuses].every((x) => x === s)
+  const anyFailed = coverage.some((c) => c.status === 'failed')
+  const anyUnavailable = coverage.some((c) => c.status === 'unavailable')
+  const anyStale = coverage.some((c) => c.status === 'included_stale')
+
+  let headline: string
+  let detail: string
+  if (every('approval_pending')) {
+    headline = 'Waiting on platform approval'
+    detail = 'Your connected league is still pending platform approval. Intelligence appears here automatically once access is granted — nothing is broken.'
+  } else if (every('unsupported')) {
+    headline = 'These leagues aren’t supported yet'
+    detail = 'Pulse doesn’t generate recommendations for these leagues yet. They stay connected — nothing is broken.'
+  } else if (every('included_stale')) {
+    headline = 'Recommendations paused — your data isn’t current'
+    detail = 'Your last-known league data is still available, but recommendations stay paused until a fresh sync lands. Review your leagues to check their connection.'
+  } else if (every('unavailable')) {
+    headline = 'Couldn’t check your leagues right now'
+    detail = 'Your leagues haven’t completed a data sync yet. Recommendations appear once a sync succeeds — review your leagues to check their connection.'
+  } else if (every('failed')) {
+    headline = 'Couldn’t check your leagues right now'
+    detail = 'We couldn’t reach your league data just now. This is usually temporary — the details above show which leagues.'
+  } else {
+    headline = 'Couldn’t check your leagues right now'
+    detail = 'None of your connected leagues could be evaluated with current data. Some data isn’t current or available — see the details above.'
+  }
+
+  const buttonClass =
+    'inline-block text-sm font-semibold px-4 py-2 rounded-lg mt-4 transition-all hover:shadow-[0_0_18px_rgba(75,163,245,0.35)]'
+  const buttonStyle = { backgroundColor: 'var(--signal-dim)', color: 'var(--signal)', border: '1px solid rgba(75,163,245,.4)' }
+
+  return (
+    <div className="glass rounded-xl p-6 text-center">
+      <p className="text-sm font-medium" style={{ color: 'var(--t1)' }}>{headline}</p>
+      <p className="text-sm mt-1" style={{ color: 'var(--t2)' }}>{detail}</p>
+      {anyFailed ? (
+        // A hard failure is worth retrying — re-runs the same read-only GET.
+        <button type="button" onClick={onRetry} className={buttonClass} style={buttonStyle}>
+          Try again
+        </button>
+      ) : anyUnavailable || anyStale ? (
+        // No retry would force a sync — honest sync guidance instead.
+        <a href="/leagues" className={buttonClass} style={buttonStyle}>
+          Review leagues →
+        </a>
+      ) : null}
+    </div>
+  )
+}
+
+// P3.5-2 (state-classification correction): platform-neutral empty state.
+// Only shown for a TRUE zero-leagues account (no leagues, no coverage) — a
+// connected account whose leagues returned no usable coverage routes to the
+// degraded state instead, never here. Never mentions a specific platform, so
+// an ESPN/Yahoo user is never told to connect Sleeper.
+function NoLeaguesState() {
   return (
     <div className="glass rounded-xl p-6 text-center">
       <p className="text-sm font-medium" style={{ color: 'var(--t1)' }}>
-        {hasOtherLeagues ? 'Pulse needs a Sleeper league.' : 'Connect a league to activate Pulse.'}
+        Connect a league to activate Pulse.
       </p>
       <p className="text-sm mt-1" style={{ color: 'var(--t2)' }}>
-        {hasOtherLeagues
-          ? `You have ${totalLeagueCount} ${totalLeagueCount === 1 ? 'league' : 'leagues'} connected, but Pulse currently runs on Sleeper leagues only. Connect a Sleeper league to activate it here.`
-          : 'Once a Sleeper league is connected, Rostiro checks it every time you open this page.'}
+        Once a league is connected, Rostiro checks it every time you open this page.
       </p>
       <a
         href="/leagues/add"
         className="inline-block text-sm font-semibold px-4 py-2 rounded-lg mt-4 transition-all hover:shadow-[0_0_18px_rgba(75,163,245,0.35)]"
         style={{ backgroundColor: 'var(--signal-dim)', color: 'var(--signal)', border: '1px solid rgba(75,163,245,.4)' }}
       >
-        {hasOtherLeagues ? 'Add a Sleeper league →' : 'Connect a league →'}
+        Connect a league →
       </a>
     </div>
   )
 }
 
-function AllClearState({ doneToday }: { doneToday: number }) {
+// P3.5-2 (state-classification correction): `qualified` = at least one fresh
+// league but some coverage isn't current/available. The copy must never imply
+// every connected league was checked — it explicitly scopes the all-clear to
+// the leagues we could evaluate and points at the coverage summary above.
+function AllClearState({ doneToday, qualified }: { doneToday: number; qualified: boolean }) {
+  if (qualified) {
+    return (
+      <div className="glass rounded-xl p-6 text-center">
+        <p className="text-sm font-medium" style={{ color: 'var(--t1)' }}>
+          Nothing needs attention in the leagues we could check.
+        </p>
+        <p className="text-sm mt-1" style={{ color: 'var(--t2)' }}>
+          Some leagues aren’t current or available yet — see coverage above. New intelligence lands here as soon as something changes.
+        </p>
+      </div>
+    )
+  }
   return (
     <div className="glass rounded-xl p-6 text-center">
       <p className="text-sm font-medium" style={{ color: 'var(--t1)' }}>

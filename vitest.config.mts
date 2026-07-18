@@ -21,6 +21,9 @@ export default defineConfig({
   // components/players/**/*.test.{ts,tsx} added (Packet 3.5, P3.5-1) for
   // PlayerIntelligenceCard.test.tsx — same recurring gap, another folder
   // with no test glob until it needed one.
-  test: { environment: 'jsdom', globals: true, include: ['app/demo/**/*.test.{ts,tsx}', 'components/marketing/scenes/**/*.test.{ts,tsx}', 'components/interrupt/**/*.test.{ts,tsx}', 'components/settings/**/*.test.{ts,tsx}', 'components/onboarding/**/*.test.{ts,tsx}', 'components/players/**/*.test.{ts,tsx}', 'app/[(]auth[)]/**/*.test.{ts,tsx}', 'app/faq/**/*.test.{ts,tsx}', 'lib/**/*.test.ts', 'app/api/**/*.test.ts', 'scripts/**/*.test.ts'], setupFiles: ['./app/demo/test-setup.ts'] },
+  // app/[(]dashboard[)]/**/*.test.{ts,tsx} added (Packet 3.5, P3.5-2) for
+  // app/(dashboard)/pulse/page.test.tsx — the Pulse visual-state closure's
+  // regression tests; the dashboard route group had no test glob until now.
+  test: { environment: 'jsdom', globals: true, include: ['app/demo/**/*.test.{ts,tsx}', 'components/marketing/scenes/**/*.test.{ts,tsx}', 'components/interrupt/**/*.test.{ts,tsx}', 'components/settings/**/*.test.{ts,tsx}', 'components/onboarding/**/*.test.{ts,tsx}', 'components/players/**/*.test.{ts,tsx}', 'app/[(]auth[)]/**/*.test.{ts,tsx}', 'app/[(]dashboard[)]/**/*.test.{ts,tsx}', 'app/faq/**/*.test.{ts,tsx}', 'lib/**/*.test.ts', 'app/api/**/*.test.ts', 'scripts/**/*.test.ts'], setupFiles: ['./app/demo/test-setup.ts'] },
   resolve: { alias: { '@': fileURLToPath(new URL('.', import.meta.url)) } },
 })
