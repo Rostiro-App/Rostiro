@@ -18,6 +18,7 @@ import { detectOpportunitySurges, type SurgeEvent } from '@/lib/opportunitySurge
 import { generatePlayerNewsContext, generateOpportunitySurgeContext } from '@/lib/claude'
 import { pushToUser } from '@/lib/engagementTriggers'
 import { isFreePlan } from '@/lib/usageLimits'
+import { buildCrossPlatformPulseItemsForUser } from '@/lib/crossPlatformPulse'
 import { resolveEffectiveInjury } from './scratchAlerts'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AffectedLeague, InterruptMetricRow, PulseItem, PulseItemStatus, PulseItemType, PulsePriority } from '@/types'
@@ -110,7 +111,17 @@ export async function buildPulseItemsForUser(
 
   if (error) throw new Error(error.message)
   const rows = (leagues ?? []) as LeagueRow[]
-  if (rows.length === 0) return { items: [], leagueCount: 0 }
+
+  // P3-8: ESPN (and, once it ships an adapter, Yahoo) leagues are
+  // evaluated independently via lib/crossPlatformPulse.ts — computed
+  // regardless of whether this user has any Sleeper leagues at all, so an
+  // ESPN-only user still gets real Pulse intelligence instead of the
+  // early-return empty feed this function used to produce for them.
+  const crossPlatform = await buildCrossPlatformPulseItemsForUser(userId).catch(() => ({ items: [], leagueCount: 0 }))
+
+  if (rows.length === 0) {
+    return { items: crossPlatform.items, leagueCount: crossPlatform.leagueCount }
+  }
 
   // PRD Section 9: "full Waiver Day detail" is Pro's state depth — the
   // base waiver_alert (name/ADP/unrostered) below stays free for everyone;
@@ -187,13 +198,15 @@ export async function buildPulseItemsForUser(
   )
 
   // One league failing (Sleeper down, league deleted) shouldn't blank the
-  // whole feed for the user's other leagues.
-  const items = results.flatMap((r) => (r.status === 'fulfilled' ? r.value : []))
+  // whole feed for the user's other leagues. Cross-platform (ESPN) items
+  // computed above are concatenated in — that computation has its own
+  // internal per-league failure isolation (lib/crossPlatformPulse.ts).
+  const items = [...results.flatMap((r) => (r.status === 'fulfilled' ? r.value : [])), ...crossPlatform.items]
 
   const PRIORITY_RANK: Record<PulsePriority, number> = { critical: 0, important: 1, info: 2 }
   items.sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority])
 
-  return { items, leagueCount: rows.length }
+  return { items, leagueCount: rows.length + crossPlatform.leagueCount }
 }
 
 async function buildLeagueItems(
@@ -667,7 +680,13 @@ export async function syncPulseItems(
         affected_leagues_json: b.affectedLeagues,
         deadline: b.deadline,
         action_url: b.actionUrl,
-        platform: 'sleeper',
+        // P3-8: derived from the item's own affected league rather than
+        // hardcoded — a cross-platform item (lib/crossPlatformPulse.ts)
+        // must be stored under its real platform, never silently
+        // relabeled 'sleeper'. Falls back to 'sleeper' only for an item
+        // with no affected leagues at all, which shouldn't happen in
+        // practice but must not throw if it does.
+        platform: b.affectedLeagues[0]?.platform ?? 'sleeper',
         fingerprint: b.fingerprint,
         status: 'open',
       }))
@@ -750,7 +769,7 @@ export function builtToPulseItem(built: BuiltPulseItem, userId: string): PulseIt
     affectedLeagues: built.affectedLeagues,
     deadline: built.deadline,
     actionUrl: built.actionUrl,
-    platform: 'sleeper',
+    platform: built.affectedLeagues[0]?.platform ?? 'sleeper',
     isDismissed: false,
     status: 'open',
     createdAt: new Date().toISOString(),

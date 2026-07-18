@@ -254,6 +254,20 @@ export interface AffectedLeague {
   leagueId: string
   leagueName: string
   platform: Platform
+  // Packet 03, P3-8: optional so every existing (Sleeper-only) Pulse item
+  // builder stays valid — lib/crossPlatformPulse.ts populates all of
+  // these on every item it builds. freshness/actionCapability mirror
+  // lib/playerIntelligence.ts's per-league vocabulary; canonicalPlayerId/
+  // providerPlayerId are this item's specific player identity in THIS
+  // league (never a cross-league merge); status mirrors
+  // PlayerLeagueStatus ('mine' | 'rostered_elsewhere' | 'free_agent' |
+  // 'waivers' | 'unknown') for item types about a specific player's
+  // availability, null for league-wide items like roster_grade.
+  freshness?: 'fresh' | 'stale' | 'unavailable' | 'unsupported' | 'approval_pending'
+  actionCapability?: 'none' | 'lineup' | 'waiver'
+  canonicalPlayerId?: string | null
+  providerPlayerId?: string | null
+  status?: 'mine' | 'rostered_elsewhere' | 'free_agent' | 'waivers' | 'unknown' | null
 }
 
 // T-69: lifecycle state — Pulse items persist in the DB so acting on one
