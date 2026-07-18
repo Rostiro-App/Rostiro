@@ -9,9 +9,126 @@ self-contained way to re-check everything independently.
 the version below found real defects — see Section 0. Everything in
 Sections 1-5 below is the ORIGINAL package as first written and is kept
 for the record; it describes commit `854a1b3630d21b3e62464a3e254e7b839f7ccafb`,
-which is now superseded. Section 0 is the current state.
+which is now superseded. Section 0 is now itself superseded by Section
+0-FINAL below — kept for the record in the same spirit.
 
-## 0. P3-11 correction pass (2026-07-18) — what changed and how it was checked
+## 0-FINAL. P3-11 final correction pass (2026-07-18) — provenance backfill, weakest-provenance preservation, cross-platform failure visibility
+
+Your follow-up review of Section 0 below found it insufficient: the
+provenance migration only added columns without a backfill plan, the
+downgraded confidence label was itself a mislabeling, `update_team` could
+silently overwrite a heuristic basis with a stronger-sounding one, several
+Supabase lookups still discarded their own errors, and a total
+cross-platform Pulse failure still collapsed into an indistinguishable
+empty coverage array. This section documents the fix for each.
+
+- **New commit:** `6d3ae05c65ecbaadd2da4428fffd0bdf3bfbc4a8` (supersedes
+  `ad69692e5bf2...`). Working tree clean with respect to every tracked
+  file; the same two untracked, unrelated items are still present and
+  still unrelated.
+- **New archive:**
+  `/private/tmp/claude-502/-Users-Lawrence-Documents-Rostiro/8747c564-1e80-4908-a471-8ad6d523d585/scratchpad/export/rostiro_6d3ae05c65ec.zip`
+  — built via `git archive` from a follow-up doc-only commit whose parent
+  is `6d3ae05...` (the code commit above), so this ZIP's content matches
+  what's described here exactly. 642 files, no `node_modules/`, no
+  `.next/`, no real `.env`, no match for "secret" in the file listing.
+  **Evidence: real database verification** for the file-listing scan
+  (ran `unzip -l` + `grep` against the actual built archive, not assumed).
+- **Migration NOT applied.** `supabase/migration_player_mapping_provenance.sql`
+  remains proposed only — no schema or data change was made to production
+  in this pass.
+- **Fixes in this pass**, each classified by evidence tier:
+  1. **Migration rewritten to backfill existing rows**, not just add empty
+     columns. Multi-provider rows (2+ of espn_id/yahoo_id/sleeper_id
+     populated) → `name_team_unambiguous`; single-provider rows →
+     `single_platform`; rows with `nfl_team IS NULL` →
+     `teamless_activity_unverified = true`. A precondition check aborts
+     the whole transaction (via `RAISE EXCEPTION`, rolling back) if any
+     row has zero provider IDs — cannot be backfilled without guessing.
+     **Evidence: real database verification (read-only)** — ran the exact
+     precondition-check query against production during this pass:
+     1970 total rows, 939 multi-provider, 1031 single-provider, **0
+     zero-provider rows** (so the precondition would pass cleanly today),
+     1040 teamless. The migration itself was **not executed** — only this
+     read-only count query was, to confirm the backfill logic is sound
+     against real data before handing it over.
+  2. **Confidence label corrected**: a heuristically-linked provider ID
+     (`mapping_basis: 'name_team_unambiguous'`) now downgrades from
+     `exact` to `name_team`, not `verified_alias` — `verified_alias` was
+     itself a mislabeling per `lib/playerIdentity.ts`'s own step 2 comment
+     (no independently verified second source exists in this resolver).
+     **Evidence: automated test** (4 tests in `lib/playerIdentity.test.ts`
+     covering heuristic/provider-reuse/single-platform/undated rows).
+  3. **`fetchActivePlayerMappings` now selects `mapping_basis`** and
+     throws on any Supabase error (previously silently returned `[]`).
+     Existing callers in `lib/platforms/espn.ts`/`sleeper.ts` already wrap
+     every call in `try/catch`, so this surfaces correctly as a `failed`
+     adapter result rather than an unhandled rejection. **Evidence:
+     automated test** for the throw behavior and the `mapping_basis`
+     mapping; the existing ESPN/Sleeper adapter test suites (which mock
+     this call without an `error` field) re-run clean, confirming no
+     regression.
+  4. **`update_team` no longer overwrites recorded provenance.** Its own
+     action-level `matchBasis` is always `'provider_id_reuse'`, but that
+     only reflects THIS platform's ID being re-matched — it says nothing
+     new about a basis the row already carries from its original
+     creation. `scripts/seedPlayerMappings.mts`'s `applyActions` now only
+     writes `mapping_basis` on `update_team` when the row has none
+     recorded yet; otherwise the existing (weaker) basis is left
+     untouched. **Evidence: code review + `tsc --noEmit`** — this is a
+     script, not unit-tested (consistent with this repo's existing
+     convention for `scripts/*.mts` runners); not re-run against
+     production in this pass.
+  5. **`resolvePlayerIdentityForRoute`'s 4 lookups now check their own
+     Supabase errors** and throw rather than silently falling through to
+     the next lookup (or ultimately to "no mapping found, legacy
+     fallback"). **Evidence: automated test**, 2 new cases (error on the
+     first lookup, error on a later lookup — both must throw, never
+     fall through).
+  6. **`buildPulseItemsForUser`'s total cross-platform failure is no
+     longer silently collapsed to empty coverage.** Previously,
+     `buildCrossPlatformPulseItemsForUser(userId).catch(() => ({ items:
+     [], leagueCount: 0, coverage: [] }))` made a total failure
+     indistinguishable from "this user has zero non-Sleeper leagues."
+     Now produces one explicit `failed` coverage entry
+     (`connectedLeagueId: 'cross-platform-system-error'`) carrying the
+     real error message; Sleeper items/coverage are computed entirely
+     independently and are unaffected. **Evidence: automated test**
+     extending the existing "ESPN totally down" test to assert both the
+     failure is visible in `coverage` AND the Sleeper league's own
+     coverage stays `included_fresh`.
+  7. **`supabase/verify_packet_03_production.sql` extended**: a
+     "provenance columns present" check added to Section 0 (safe to run
+     at any time — checks `information_schema` only, never references the
+     columns as data) — **re-ran read-only against production during this
+     pass: correctly returns FAIL today** (columns don't exist, migration
+     not applied), alongside the pre-existing 9 checks, which all still
+     PASS. A new Section 0B holds the 4 finer backfill checks (zero null
+     `mapping_basis`, valid basis distribution, every teamless row
+     flagged, no team-known row incorrectly flagged) — these directly
+     reference the not-yet-existing columns and will error with "column
+     does not exist" until the migration is applied; that's expected,
+     documented inline, and is itself informative (proves the columns
+     really aren't there yet).
+  8. **`supabase/schema.sql` reconciled** with the target end-state
+     schema — `mapping_basis`/`teamless_activity_unverified` added to the
+     `player_mappings` table definition, clearly commented as reflecting
+     the proposed-but-unapplied migration so a fresh environment built
+     from this file matches where production is headed, not where it is
+     today.
+- **Test/typecheck/lint results**: `npx tsc --noEmit` clean. `npx vitest
+  run` — 77 files, 470 tests passing (up from 466 before this pass).
+  `npx eslint` on every file this commit touches — 0 errors, 0 warnings
+  (ran `git status --short` file list through eslint directly; the 3
+  `.sql` files show only "ignored, no matching configuration," which is
+  expected — ESLint doesn't lint SQL). Pre-existing lint errors elsewhere
+  in the repo (react-hooks/set-state-in-effect, no-explicit-any) are in
+  files this pass never touched and predate it.
+- **Explicitly NOT done in this pass**: applying the migration; running
+  it against any real database (not even a scratch/local one); a live
+  re-run of the smoke-test scripts; a real browser check of anything.
+
+## 0. P3-11 correction pass (2026-07-18) — what changed and how it was checked (SUPERSEDED — kept for the record)
 
 - **New commit:** `ad69692e5bf23adfe3a7b0a64a7e3a5bd5ef1453` (supersedes
   `854a1b3630d2...`). Working tree clean with respect to every tracked
