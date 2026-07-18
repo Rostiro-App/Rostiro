@@ -1,5 +1,9 @@
 -- Player mapping constraints (Packet 03, P3-4 + P3-4B, 2026-07-17).
--- Proposed forward migration — NOT applied to production.
+-- Status: APPLIED to production 2026-07-17 (P3-10). Verified: nfl_team
+-- is nullable; all 3 partial unique indexes exist; 0 pre-existing rows
+-- meant no precondition violations were possible. Do not re-edit this
+-- file — it's a historical record now; any further change belongs in a
+-- new forward migration.
 
 -- ─── 1. nfl_team becomes nullable (P3-4B) ──────────────────────────────────
 -- A player with no current NFL team on record but a real activity signal

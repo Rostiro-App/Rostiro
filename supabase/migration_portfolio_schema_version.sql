@@ -1,5 +1,10 @@
 -- Portfolio exposure schema versioning (Packet 03, P3-6, 2026-07-17).
--- Proposed forward migration — NOT applied to production.
+-- Status: APPLIED to production 2026-07-17 (P3-10). Verified: all 15
+-- pre-existing portfolio_exposure_snapshots rows and all 4 pre-existing
+-- portfolio_health_snapshots rows backfilled to schema_version 1 (and
+-- player_id_space 'sleeper_raw' for exposure) with zero rows lost or
+-- reinterpreted. Do not re-edit this file — it's a historical record
+-- now; any further change belongs in a new forward migration.
 --
 -- public.portfolio_exposure_snapshots currently has 15 real rows (verified
 -- via a live query, 2026-07-17) whose `player_id` is a RAW SLEEPER PLAYER
