@@ -7,6 +7,36 @@ grant usage on schema public to anon, authenticated, service_role;
 grant all on all tables in schema public to service_role;
 grant all on all sequences in schema public to service_role;
 
+-- public.news_items, public.player_scratches, public.notes,
+-- public.player_context_cache: EXCEPTIONS to the blanket service_role
+-- grant just above. Packet 03 operational-closure correction
+-- (migration_pulse_data_access_closure.sql) — GRANT is purely additive,
+-- so the blanket `grant all` two lines up would otherwise leave
+-- service_role with full CRUD on these four tables forever, no matter
+-- what narrower grant appears later in this file. REVOKE ALL first, then
+-- grant back only what real application code actually does (verified by
+-- reading every `.from(...)` call site on these tables and which
+-- Supabase client — authenticated SSR or service_role admin — each one
+-- uses) — this is the only way to make a narrower-than-blanket set stick.
+-- No grant to anon on any of these four; RLS policies are unchanged (see
+-- each table's own create-policy statement below).
+revoke all privileges on public.news_items from anon, authenticated, service_role;
+revoke all privileges on public.player_scratches from anon, authenticated, service_role;
+revoke all privileges on public.notes from anon, authenticated, service_role;
+revoke all privileges on public.player_context_cache from anon, authenticated, service_role;
+
+grant select on public.news_items to authenticated;
+grant select, insert, update on public.news_items to service_role;
+
+grant select on public.player_scratches to authenticated;
+grant select, insert, update on public.player_scratches to service_role;
+
+grant select, insert, update, delete on public.notes to authenticated;
+grant select on public.notes to service_role;
+
+grant select, insert on public.player_context_cache to authenticated;
+grant select, insert on public.player_context_cache to service_role;
+
 -- authenticated: full access to their own rows (RLS enforces row-level isolation)
 grant select, insert, update, delete on
   public.connected_leagues,
@@ -53,29 +83,9 @@ grant select on
   public.player_mappings
 to anon;
 
--- authenticated read-only: global player injury signals (no per-user data),
--- read on-demand by buildPulseItemsForUser via the authenticated SSR client
-grant select on public.player_scratches to authenticated;
-
--- service_role: written by app/api/cron/news/route.ts's upsert — insert +
--- update only, no real delete path exists in the code today. Narrower than
--- the previous select/insert/update/delete grant here, which was never
--- actually applied to production (see
--- supabase/migration_pulse_data_access_closure.sql) — tightened to match
--- what real code does rather than carrying the blanket grant forward.
-grant select, insert, update on public.player_scratches to service_role;
-
--- public.news_items, public.player_context_cache, public.notes: Packet 03
--- operational-closure reconciliation (migration_pulse_data_access_closure.sql).
--- news_items/player_context_cache were created by migration_player_intel.sql
--- with RLS policies but NO grant statement at all — this is the actual
--- fix for that gap, not just documentation of intent. notes already grants
--- authenticated here via migration_notes.sql; service_role's read-only
--- grant below is new (lib/pulse.ts's cron-path notes lookup needs it).
-grant select on public.news_items to authenticated;
-grant select, insert, update on public.news_items to service_role;
-
-grant select, insert on public.player_context_cache to authenticated;
-grant select, insert on public.player_context_cache to service_role;
-
-grant select on public.notes to service_role;
+-- public.news_items, public.player_scratches, public.notes,
+-- public.player_context_cache: see the consolidated revoke+grant block
+-- right after the blanket service_role grant near the top of this file —
+-- that block (not here) is authoritative for these four tables' final
+-- privilege set, specifically so it runs AFTER the blanket grant and can
+-- actually narrow it.

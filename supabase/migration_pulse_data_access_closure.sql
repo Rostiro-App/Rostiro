@@ -67,32 +67,53 @@
 -- or dropped; every existing policy on these tables is left exactly as
 -- it is.
 --
--- Idempotent: GRANT is a no-op if the privilege is already held (already
--- true for authenticated on `notes`); ADD COLUMN IF NOT EXISTS is a no-op
--- if the column already exists. Safe to re-run.
+-- ─── Correction (2026-07-18, before this migration was ever applied) ────
+-- The first version of this migration only ADDED grants. That's
+-- insufficient: supabase/grants.sql runs
+-- `grant all on all tables in schema public to service_role;` — and now
+-- that all four tables exist in supabase/schema.sql too, a genuinely
+-- fresh environment (schema.sql, then grants.sql) ends up with
+-- service_role holding FULL privileges on all four tables from that one
+-- blanket line, and this migration's narrower grants never revoke the
+-- broader ones a later or earlier blanket grant already established —
+-- GRANT is purely additive; it cannot narrow a privilege another
+-- statement already gave. This version enforces the exact final set
+-- instead: REVOKE ALL from anon/authenticated/service_role on each of
+-- the four tables first, then grant back only what real code needs. This
+-- is safe to run regardless of whatever privilege state currently exists
+-- (production's real gaps, a fresh environment's blanket grant, or a
+-- prior partial run of this same file) — the end state is always exactly
+-- the set below.
+--
+-- Idempotent: REVOKE ALL is a no-op if no privileges are held; GRANT is a
+-- no-op if the privilege is already held; ADD COLUMN IF NOT EXISTS is a
+-- no-op if the column already exists. Safe to re-run.
 
 begin;
 
 -- ─── 1. pulse_items.metrics_json ────────────────────────────────────────
 alter table public.pulse_items add column if not exists metrics_json jsonb;
 
--- ─── 2. news_items ───────────────────────────────────────────────────────
+-- ─── 2. Enforce exact privilege sets (revoke everything, then grant back
+-- only what real code needs) ─────────────────────────────────────────────
+revoke all privileges on public.news_items from anon, authenticated, service_role;
+revoke all privileges on public.player_scratches from anon, authenticated, service_role;
+revoke all privileges on public.notes from anon, authenticated, service_role;
+revoke all privileges on public.player_context_cache from anon, authenticated, service_role;
+
+-- news_items
 grant select on public.news_items to authenticated;
 grant select, insert, update on public.news_items to service_role;
 
--- ─── 3. player_scratches ─────────────────────────────────────────────────
+-- player_scratches
 grant select on public.player_scratches to authenticated;
 grant select, insert, update on public.player_scratches to service_role;
 
--- ─── 4. notes ────────────────────────────────────────────────────────────
--- Re-issuing the authenticated grant already present in
--- migration_notes.sql — a no-op in production today, kept here so this
--- file is a complete, self-contained statement of the intended final
--- privilege set for all four tables in one place.
+-- notes
 grant select, insert, update, delete on public.notes to authenticated;
 grant select on public.notes to service_role;
 
--- ─── 5. player_context_cache ─────────────────────────────────────────────
+-- player_context_cache
 grant select, insert on public.player_context_cache to authenticated;
 grant select, insert on public.player_context_cache to service_role;
 
