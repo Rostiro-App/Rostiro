@@ -56,7 +56,15 @@ export function setGlobalMode(next: Mode) {
   }).catch(() => {})
 }
 
-export default function AppShell({ children }: { children: React.ReactNode }) {
+// P3.5-4B: `enableSimulation` is a server-derived capability flag (computed in
+// the layouts from the authenticated user.id via lib/adminAuth.ts's
+// isAdminUserId). It is ONLY a UI visibility/performance gate — never the
+// security boundary: the /api/admin/simulate route independently rechecks
+// authorization via requireAdmin() and returns 404 to anyone unauthorized,
+// even if this flag were forced true by manipulating client code. Defaults to
+// false so any caller that forgets to pass it fails closed. The ADMIN_USER_ID
+// itself is never passed to the client — only this boolean.
+export default function AppShell({ children, enableSimulation = false }: { children: React.ReactNode; enableSimulation?: boolean }) {
   const mode = useSyncExternalStore(subscribeToMode, readMode, () => 'balanced' as Mode)
 
   // Hydrate from the DB once per mount — if another device changed the mode,
@@ -106,9 +114,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             above. */}
         <PlayerIntelligenceCard />
 
-        {/* Dev-only Simulation Suite — self-hides for everyone except the
-            founder's own account (checked server-side, not by NODE_ENV). */}
-        <SimulationPanel />
+        {/* Dev-only Simulation Suite. P3.5-4B: mounted ONLY when the server
+            layout resolved the authenticated user as the admin (enableSimulation).
+            A non-admin never mounts it and therefore never probes
+            /api/admin/simulate (that recurring 404 is gone). This is a
+            visibility/performance gate only — the route independently rechecks
+            authorization and returns 404 to anyone unauthorized. */}
+        {enableSimulation && <SimulationPanel />}
 
         {/* T-106: the Interrupt layer (PRD 7.1) — visible on every
             authenticated page, not just Pulse. */}

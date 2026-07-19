@@ -1,13 +1,20 @@
 'use client'
 
-// Dev-only Simulation Suite — the Developer Override Panel. Self-hides for
-// everyone except the founder's own account: GET /api/admin/simulate
-// returns a plain 404 (not 401/403 — this shouldn't announce its own
-// existence) to anyone whose session user id doesn't match ADMIN_USER_ID
-// (lib/adminAuth.ts), and this component renders nothing at all until that
-// check succeeds. Works identically on localhost and the deployed app —
-// see the route's own header comment for why NODE_ENV alone wasn't the
-// right gate.
+// Dev-only Simulation Suite — the Developer Override Panel.
+//
+// P3.5-4B: authorization no longer works by "probe the route to discover
+// whether I'm allowed." The server layouts (app/(dashboard)/layout.tsx,
+// app/draft/layout.tsx) resolve the authenticated user and only mount this
+// panel via AppShell when isAdminUserId(user.id) is true, so an ordinary user
+// NEVER mounts it and never requests /api/admin/simulate. When it IS mounted
+// (admin only), it fetches its real state from GET /api/admin/simulate and
+// renders once that status is loaded; an unexpected failed status request is
+// handled honestly (it just doesn't render, no uncaught error). Defense in
+// depth: the route independently rechecks authorization via requireAdmin()
+// and returns a plain 404 (not 401/403 — it shouldn't announce its existence)
+// to anyone unauthorized, so client capability state is never the security
+// boundary. Works identically on localhost and the deployed app — see the
+// route's own header comment for why NODE_ENV alone wasn't the right gate.
 
 import { useEffect, useState } from 'react'
 import type { RostiroState } from '@/types'
@@ -85,7 +92,11 @@ async function callSimulate(body: Record<string, unknown>) {
 }
 
 export default function SimulationPanel() {
-  const [allowed, setAllowed] = useState(false)
+  // Whether the real sim status has loaded. This is NOT an authorization gate
+  // (that's the server layout + the route's own requireAdmin()); it only
+  // defers rendering until the panel's status GET succeeds, and fails closed
+  // (stays hidden, no throw) if that unexpectedly returns non-OK.
+  const [statusReady, setStatusReady] = useState(false)
   const [open, setOpen] = useState(false)
   const [status, setStatus] = useState<SimStatus | null>(null)
   const [busy, setBusy] = useState(false)
@@ -105,17 +116,19 @@ export default function SimulationPanel() {
     fetch('/api/admin/simulate')
       .then((res) => (res.ok ? res.json() : Promise.reject()))
       .then((data: SimStatus) => {
-        setAllowed(true)
+        setStatusReady(true)
         setStatus(data)
       })
-      .catch(() => setAllowed(false))
+      // An unexpected non-OK status (e.g. ADMIN_USER_ID drifted so the route
+      // 404s even for a mounted admin) fails closed — hidden, never a throw.
+      .catch(() => setStatusReady(false))
   }
 
   useEffect(() => {
     refresh()
   }, [])
 
-  if (!allowed) return null
+  if (!statusReady) return null
 
   async function runAction(body: Record<string, unknown>, note?: string) {
     setBusy(true)

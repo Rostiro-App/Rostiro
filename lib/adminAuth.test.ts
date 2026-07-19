@@ -14,7 +14,7 @@ vi.mock('./supabase', () => ({
 }))
 
 import { createSSRClient } from './supabase'
-import { requireAdmin, requireAdminUserId } from './adminAuth'
+import { requireAdmin, requireAdminUserId, isAdminUserId } from './adminAuth'
 
 describe('requireAdmin', () => {
   const original = process.env.ADMIN_USER_ID
@@ -76,5 +76,36 @@ describe('requireAdminUserId', () => {
   it('returns the configured id when valid', () => {
     process.env.ADMIN_USER_ID = ADMIN_ID
     expect(requireAdminUserId()).toBe(ADMIN_ID)
+  })
+})
+
+// P3.5-4B: the pure capability check the server layouts use to decide whether
+// to mount SimulationPanel. Shares configuredAdminUserId() with requireAdmin()
+// so the UI gate and the route's own check can't drift. Returns only booleans;
+// never exposes the configured id.
+describe('isAdminUserId', () => {
+  const original = process.env.ADMIN_USER_ID
+  afterEach(() => {
+    process.env.ADMIN_USER_ID = original
+  })
+
+  it('fails closed (false) when ADMIN_USER_ID is not configured', () => {
+    delete process.env.ADMIN_USER_ID
+    expect(isAdminUserId(ADMIN_ID)).toBe(false)
+  })
+
+  it('fails closed (false) when ADMIN_USER_ID is malformed (not a UUID)', () => {
+    process.env.ADMIN_USER_ID = 'not-a-real-uuid'
+    expect(isAdminUserId('not-a-real-uuid')).toBe(false)
+  })
+
+  it('returns false for a real, authenticated, non-matching user', () => {
+    process.env.ADMIN_USER_ID = ADMIN_ID
+    expect(isAdminUserId(OTHER_ID)).toBe(false)
+  })
+
+  it('returns true only for the exact configured admin user id', () => {
+    process.env.ADMIN_USER_ID = ADMIN_ID
+    expect(isAdminUserId(ADMIN_ID)).toBe(true)
   })
 })
