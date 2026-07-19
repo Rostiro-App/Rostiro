@@ -11,6 +11,7 @@ import { setGlobalMode, useMode, type Mode } from '@/components/nav/AppShell'
 import { bigAnimationsEnabled, setBigAnimationsEnabled } from '@/lib/animationPrefs'
 import { useHints } from '@/components/hints/HintProvider'
 import YahooConnectionPanel from '@/components/settings/YahooConnectionPanel'
+import PushNotificationSetting from '@/components/settings/PushNotificationSetting'
 
 interface SettingsData {
   email: string
@@ -112,17 +113,6 @@ export default function SettingsPage() {
       cancelled = true
     }
   }, [])
-
-  function togglePush() {
-    if (!data) return
-    const next = !data.pushEnabled
-    setData({ ...data, pushEnabled: next })
-    fetch('/api/settings', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pushEnabled: next }),
-    }).catch(() => setData((d) => (d ? { ...d, pushEnabled: !next } : d)))
-  }
 
   function toggleScratches() {
     if (!data) return
@@ -370,39 +360,8 @@ export default function SettingsPage() {
           </Section>
 
           {/* ─── Notifications ───────────────────────────────────────── */}
-          <Section
-            title="Notifications"
-            subtitle="Push delivery ships soon — this switch controls whether you're included when it does."
-          >
-            <div className="flex items-center justify-between py-1">
-              <div>
-                <p className="text-sm text-white">Push notifications</p>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--t3)' }}>
-                  Critical Pulse items: injuries to starters, deadlines inside 48h.
-                </p>
-              </div>
-              <button
-                role="switch"
-                aria-checked={data.pushEnabled}
-                onClick={togglePush}
-                className="relative rounded-full transition-all flex-shrink-0"
-                style={{
-                  width: 40,
-                  height: 22,
-                  backgroundColor: data.pushEnabled ? 'var(--cta)' : 'var(--hairline)',
-                }}
-              >
-                <span
-                  className="absolute top-[3px] rounded-full transition-all"
-                  style={{
-                    width: 16,
-                    height: 16,
-                    left: data.pushEnabled ? 21 : 3,
-                    backgroundColor: data.pushEnabled ? '#FFFFFF' : 'var(--t2)',
-                  }}
-                />
-              </button>
-            </div>
+          <Section title="Notifications">
+            <PushNotificationSetting />
             <div className="flex items-center justify-between py-1">
               <div>
                 <p className="text-sm text-white">Starter ruled out</p>

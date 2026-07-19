@@ -22,11 +22,17 @@ grant select on public.users to authenticated;
 
 -- ─── 2. Column-level update grant — only what app/api/settings/route.ts's
 -- authenticated PATCH handler legitimately writes today, verified directly
--- against that file: mode, push_enabled, seen_hints, notify_scratches,
--- updated_at. Every billing/plan/trial/founder/Stripe/email column is
--- deliberately excluded — those are service-role-only (Stripe webhook,
--- admin simulate route), never client-writable.
-grant update (mode, push_enabled, seen_hints, notify_scratches, updated_at)
+-- against that file: mode, seen_hints, notify_scratches, updated_at. Every
+-- billing/plan/trial/founder/Stripe/email column is deliberately excluded —
+-- those are service-role-only (Stripe webhook, admin simulate route), never
+-- client-writable.
+--
+-- push_enabled is deliberately NOT here (P3.5-4C correction pass #2): it is the
+-- push kill switch, derived server-side only from a real persisted subscription
+-- (app/api/push/subscribe, service_role). migration_push_subscription_global_identity.sql
+-- additionally REVOKEs it from authenticated for any environment that ran an
+-- older version of this grant that included it.
+grant update (mode, seen_hints, notify_scratches, updated_at)
   on public.users to authenticated;
 
 -- ─── 3. WITH CHECK on the update policy ─────────────────────────────────────

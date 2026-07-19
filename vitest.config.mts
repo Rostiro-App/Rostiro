@@ -30,6 +30,9 @@ export default defineConfig({
   // components/nav/*.test, components/admin/*.test, app/draft/**/*.test added
   // (Packet 3.5, P3.5-4B) for the SimulationPanel capability-gating regression
   // tests (AppShell gating, SimulationPanel status fetch, draft-layout rule).
-  test: { environment: 'jsdom', globals: true, include: ['app/demo/**/*.test.{ts,tsx}', 'components/*.test.{ts,tsx}', 'components/nav/*.test.{ts,tsx}', 'components/admin/*.test.{ts,tsx}', 'components/marketing/scenes/**/*.test.{ts,tsx}', 'components/interrupt/**/*.test.{ts,tsx}', 'components/settings/**/*.test.{ts,tsx}', 'components/onboarding/**/*.test.{ts,tsx}', 'components/players/**/*.test.{ts,tsx}', 'app/[(]auth[)]/**/*.test.{ts,tsx}', 'app/[(]dashboard[)]/**/*.test.{ts,tsx}', 'app/draft/**/*.test.{ts,tsx}', 'app/faq/**/*.test.{ts,tsx}', 'lib/**/*.test.ts', 'app/api/**/*.test.ts', 'scripts/**/*.test.ts'], setupFiles: ['./app/demo/test-setup.ts'] },
+  // supabase/**/*.test.ts added (Packet 3.5, P3.5-4C correction) for
+  // migration_push_subscription_global_identity.test.ts — a static assertion
+  // that the proposed global-identity migration + verifier are well-formed.
+  test: { environment: 'jsdom', globals: true, include: ['app/demo/**/*.test.{ts,tsx}', 'components/*.test.{ts,tsx}', 'components/nav/*.test.{ts,tsx}', 'components/admin/*.test.{ts,tsx}', 'components/marketing/scenes/**/*.test.{ts,tsx}', 'components/interrupt/**/*.test.{ts,tsx}', 'components/settings/**/*.test.{ts,tsx}', 'components/onboarding/**/*.test.{ts,tsx}', 'components/players/**/*.test.{ts,tsx}', 'app/[(]auth[)]/**/*.test.{ts,tsx}', 'app/[(]dashboard[)]/**/*.test.{ts,tsx}', 'app/draft/**/*.test.{ts,tsx}', 'app/faq/**/*.test.{ts,tsx}', 'lib/**/*.test.ts', 'app/api/**/*.test.ts', 'scripts/**/*.test.ts', 'supabase/**/*.test.ts'], setupFiles: ['./app/demo/test-setup.ts'] },
   resolve: { alias: { '@': fileURLToPath(new URL('.', import.meta.url)) } },
 })

@@ -3,31 +3,28 @@
 // OneSignal Web SDK init (PRD 6.6). Mounted once in the root layout. Pushes
 // an init call onto window.OneSignalDeferred (queued by the CDN script tag
 // in app/layout.tsx, which may still be loading when this runs — that's the
-// whole point of the deferred-push pattern), then reports the subscription
-// id to /api/push/subscribe whenever it's available or changes.
+// whole point of the deferred-push pattern), then hands the resolved SDK to
+// lib/pushSubscription.ts.
 //
-// This is the SDK wiring only — the guided permission-prompt UI (onboarding
-// Step 5, with the iOS "Add to Home Screen" copy) is a separate, still-
-// parked piece per PRD 6.8/Section 4.
+// P3.5-4C correction (Codex review): this component NO LONGER reports
+// subscriptions or registers its own 'change' listener. All server
+// synchronization now has a single owner — lib/pushSubscription.ts — so the
+// client and server can't drift. OneSignalInit's remaining job is narrow:
+//   • init the SDK exactly once per page lifecycle (P3.5-4A once-init guard);
+//   • never auto-prompt (P3.5-4A: autoPrompt false, no prompt API on load);
+//   • hand the SDK to the sync owner, or report the honest edge states
+//     (missing config → unsupported, init failure → initializationFailed) to it.
 //
-// Rostiro does NOT automatically prompt for notification permission during
-// initialization: init() below passes promptOptions with autoPrompt: false,
-// so OneSignal never shows its own prompt on page load. Permission will be
-// requested later, only through an explicit user action, in the designed
-// onboarding/settings flow (Step 5). As defense in depth, the OneSignal
-// dashboard's auto-prompt configuration must also remain disabled
-// (Settings → Push & In-App → Web Settings → Permission Prompt Setup).
+// Rostiro requests notification permission only through an explicit user
+// action in Settings (lib/pushSubscription.requestPushSubscription), never
+// here. As defense in depth, the OneSignal dashboard's auto-prompt config
+// must also remain disabled (Settings → Push & In-App → Web Settings).
 
 import { useEffect } from 'react'
-
-interface OneSignalPushSubscription {
-  id: string | null | undefined
-  addEventListener: (event: 'change', cb: (e: { current: { id?: string } }) => void) => void
-}
+import { setOneSignalSdk, markUnsupported, markInitializationFailed } from '@/lib/pushSubscription'
 
 // Narrow slice of OneSignal's init options — only the fields Rostiro sets.
-// promptOptions is included specifically to pin autoPrompt: false so the SDK
-// never shows its own permission prompt on page load.
+// promptOptions pins autoPrompt: false so the SDK never shows its own prompt.
 interface OneSignalInitOptions {
   appId: string
   allowLocalhostAsSecureOrigin?: boolean
@@ -40,7 +37,8 @@ interface OneSignalInitOptions {
 
 interface OneSignalSdk {
   init: (options: OneSignalInitOptions) => Promise<void>
-  User: { PushSubscription: OneSignalPushSubscription }
+  User: { PushSubscription: unknown }
+  Notifications: unknown
 }
 
 declare global {
@@ -53,24 +51,15 @@ declare global {
   }
 }
 
-async function reportSubscriptionId(subscriptionId: string) {
-  try {
-    await fetch('/api/push/subscribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subscriptionId }),
-    })
-  } catch {
-    // Best-effort — a failed report here just means the next page load
-    // (or the next subscription change event) tries again.
-  }
-}
-
 export default function OneSignalInit() {
   useEffect(() => {
-    // Missing config: exit quietly and honestly — no queue, no error.
     const appId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID
-    if (!appId) return
+    if (!appId) {
+      // No push configured in this deployment — tell the sync owner so the
+      // Settings UI resolves out of its neutral "checking" state honestly.
+      markUnsupported()
+      return
+    }
     // At most once per page lifecycle (guards remounts / Strict Mode's
     // double-invoked effect from queuing a second init).
     if (window.__rostiroPushInitStarted) return
@@ -79,19 +68,16 @@ export default function OneSignalInit() {
     window.OneSignalDeferred = window.OneSignalDeferred ?? []
     window.OneSignalDeferred.push(async (OneSignal) => {
       // P3.5-4A: the whole callback is wrapped — a slow, blocked, or failed
-      // OneSignal.init() (the historical "SDK timeout") previously rejected
-      // here with no catch, and since the SDK invokes this callback without
-      // awaiting it, that surfaced as an UNHANDLED promise rejection in the
-      // console. Push is strictly optional and must never do that or block the
-      // app, so we catch, log once honestly (a warn, not silent suppression),
-      // and continue. Rostiro, Pulse, auth, etc. are entirely unaffected.
+      // OneSignal.init() previously rejected here with no catch, surfacing as
+      // an UNHANDLED promise rejection. Push is strictly optional and must
+      // never do that or block the app, so we catch, log once honestly, and
+      // continue.
       try {
         await OneSignal.init({
           appId,
           allowLocalhostAsSecureOrigin: process.env.NODE_ENV !== 'production',
-          // Explicitly disable the SDK's auto-prompt — Rostiro requests
-          // permission only via an explicit user action (onboarding Step 5 /
-          // settings), never on page load.
+          // Explicitly disable the SDK's auto-prompt — permission is requested
+          // only via an explicit user action in Settings, never on load.
           promptOptions: {
             slidedown: {
               prompts: [{ type: 'push', autoPrompt: false }],
@@ -99,14 +85,16 @@ export default function OneSignalInit() {
           },
         })
 
-        const existingId = OneSignal.User.PushSubscription.id
-        if (existingId) reportSubscriptionId(existingId)
-
-        OneSignal.User.PushSubscription.addEventListener('change', (event) => {
-          if (event.current.id) reportSubscriptionId(event.current.id)
-        })
+        // Hand off to the single synchronization owner. It registers the one
+        // 'change' listener and syncs any existing subscription with the server
+        // before presenting the enabled state.
+        setOneSignalSdk(OneSignal as unknown as Parameters<typeof setOneSignalSdk>[0])
       } catch (err) {
         console.warn('[push] OneSignal initialization failed; push notifications are unavailable this session.', err)
+        // Distinct from a subscription-registration failure: the SDK never
+        // started, so there is nothing to retry in place — Settings tells the
+        // user to reload rather than showing an inert "Try again".
+        markInitializationFailed()
       }
     })
   }, [])

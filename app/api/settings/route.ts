@@ -7,10 +7,14 @@ import { createSSRClient } from '@/lib/supabase'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
+// P3.5-4C correction: pushEnabled is deliberately NOT settable here. The
+// server owns users.push_enabled and derives it solely from a successfully
+// persisted real subscription in app/api/push/subscribe (POST/DELETE) — a
+// client must never be able to flip the kill switch on from a bare preference
+// toggle. GET still returns push_enabled (read-only) for display.
 const Body = z
   .object({
     mode: z.enum(['focused', 'balanced', 'savant']).optional(),
-    pushEnabled: z.boolean().optional(),
     // T-72: hint ids to merge into users.seen_hints (never removed here —
     // "replay tour" resets via its own explicit payload).
     addSeenHints: z.array(z.string().max(64)).max(32).optional(),
@@ -20,7 +24,6 @@ const Body = z
   .refine(
     (b) =>
       b.mode !== undefined ||
-      b.pushEnabled !== undefined ||
       b.addSeenHints !== undefined ||
       b.resetSeenHints !== undefined ||
       b.notifyScratches !== undefined,
@@ -135,12 +138,11 @@ export async function PATCH(request: Request) {
 
   const parsed = Body.safeParse(await request.json().catch(() => null))
   if (!parsed.success) {
-    return NextResponse.json({ error: 'mode and/or pushEnabled required' }, { status: 400 })
+    return NextResponse.json({ error: 'No supported setting provided' }, { status: 400 })
   }
 
   const update: Record<string, unknown> = {}
   if (parsed.data.mode !== undefined) update.mode = parsed.data.mode
-  if (parsed.data.pushEnabled !== undefined) update.push_enabled = parsed.data.pushEnabled
   if (parsed.data.notifyScratches !== undefined) update.notify_scratches = parsed.data.notifyScratches
 
   // Never blind-overwrite seen_hints — read the current array first so a

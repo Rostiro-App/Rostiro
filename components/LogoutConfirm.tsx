@@ -10,6 +10,7 @@
 
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
+import { unregisterCurrentDeviceForLogout } from '@/lib/pushSubscription'
 
 export default function LogoutConfirm({
   trigger,
@@ -20,6 +21,27 @@ export default function LogoutConfirm({
   trigger: (open: () => void) => React.ReactNode
 }) {
   const [confirming, setConfirming] = useState(false)
+
+  // P3.5-4C correction: close the push logout lifecycle — remove THIS browser's
+  // subscription association before the session is destroyed, so a shared
+  // browser doesn't leave one user's device registered under the next signed-in
+  // user. Best-effort and time-bounded: sign-out must proceed regardless, and
+  // the server route only ever removes this device (other devices are kept).
+  async function handleLogout(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const form = e.currentTarget
+    try {
+      await Promise.race([
+        unregisterCurrentDeviceForLogout(),
+        new Promise((resolve) => setTimeout(resolve, 1500)),
+      ])
+    } catch {
+      // Never block sign-out on push cleanup.
+    }
+    // Native submit bypasses this handler, preserving the server route's 303
+    // Post/Redirect/Get behavior exactly.
+    form.submit()
+  }
 
   return (
     <>
@@ -61,7 +83,7 @@ export default function LogoutConfirm({
                 >
                   Cancel
                 </button>
-                <form action="/api/auth/signout" method="POST" className="flex-1">
+                <form action="/api/auth/signout" method="POST" onSubmit={handleLogout} className="flex-1">
                   <button
                     type="submit"
                     className="w-full py-2.5 rounded-lg text-sm font-semibold transition-all hover:brightness-110"

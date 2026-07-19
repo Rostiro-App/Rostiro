@@ -546,8 +546,17 @@ create table public.push_subscriptions (
   user_id             uuid not null references public.users(id) on delete cascade,
   onesignal_player_id text not null,
   created_at          timestamptz not null default now(),
+  -- Composite constraint kept as the upsert conflict target
+  -- (app/api/push/subscribe onConflict: 'user_id,onesignal_player_id').
   unique (user_id, onesignal_player_id)
 );
+
+-- P3.5-4C: one OneSignal browser subscription belongs to exactly one Rostiro
+-- user. The app reassigns on account switch, but this index is the DB-level
+-- backstop that also holds under concurrent account-switch requests. Added by
+-- migration_push_subscription_global_identity.sql.
+create unique index if not exists push_subscriptions_onesignal_player_id_global_key
+  on public.push_subscriptions (onesignal_player_id);
 
 alter table public.push_subscriptions enable row level security;
 
