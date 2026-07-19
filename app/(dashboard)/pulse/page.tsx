@@ -8,7 +8,7 @@
 // Live behavior unchanged from T-69: persistent items, optimistic PATCH
 // with rollback, persistent: false hides actions until the migration runs.
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { useMode, type Mode } from '@/components/nav/AppShell'
 import { STATE_CONFIG } from '@/lib/brandTokens'
@@ -126,6 +126,7 @@ interface FilmRoomLeagueResult {
 
 export default function PulsePage() {
   const mode = useMode()
+  const greeting = useGreeting()
   const gameDaySessionStart = useRef<number | null>(null)
   const [items, setItems] = useState<PulseItem[]>([])
   const [leaving, setLeaving] = useState<Set<string>>(new Set())
@@ -481,7 +482,7 @@ export default function PulsePage() {
           </span>
         )}
         <h1 className="text-[22px] font-semibold tracking-tight" style={{ color: 'var(--t1)' }}>
-          {greeting()}{firstName ? `, ${firstName}` : ''}.
+          {greeting}{firstName ? `, ${firstName}` : ''}.
         </h1>
         <p className="text-[13px] mt-0.5" style={{ color: 'var(--t2)' }}>
           {loading
@@ -762,11 +763,36 @@ export default function PulsePage() {
   )
 }
 
-function greeting(): string {
-  const hour = new Date().getHours()
+// P3.5-3: the greeting is the one value on /pulse's initial render that
+// depends on the wall clock — new Date().getHours() yields a different word on
+// the server (Vercel, UTC) than on the client (the user's local timezone) for
+// the same instant, which is exactly the React #418 hydration mismatch
+// ("server rendered text didn't match the client": +Good evening / -Good
+// morning). useSyncExternalStore is React's blessed way to render a value that
+// legitimately differs between server and client WITHOUT a mismatch:
+// getServerSnapshot supplies a deterministic, timezone-independent greeting
+// used for both the SSR HTML AND the first client render (so they match), and
+// the real time-of-day greeting is swapped in only AFTER hydration via
+// getSnapshot. No suppressHydrationWarning, no SSR opt-out, no setState-in-
+// effect.
+const SERVER_GREETING = 'Welcome back'
+
+function timeOfDayGreeting(hour: number): string {
   if (hour < 12) return 'Good morning'
   if (hour < 17) return 'Good afternoon'
   return 'Good evening'
+}
+
+// Stable module-level no-op subscribe: the greeting is fixed once the client
+// renders (it never needs to update live), so nothing ever notifies.
+const noopSubscribe = () => () => {}
+
+function useGreeting(): string {
+  return useSyncExternalStore(
+    noopSubscribe,
+    () => timeOfDayGreeting(new Date().getHours()), // client: local time-of-day
+    () => SERVER_GREETING // server + first client render: deterministic
+  )
 }
 
 // ─── PulseCard — renders differently per mode ─────────────────────────────────
